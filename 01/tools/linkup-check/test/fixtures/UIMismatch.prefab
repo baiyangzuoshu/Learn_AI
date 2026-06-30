@@ -1,0 +1,19 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "_name": "UIMismatch",
+    "data": { "__id__": 1 }
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "UIWrongRoot",
+    "_children": [{ "__id__": 2 }],
+    "_components": []
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "bg",
+    "_children": [],
+    "_components": []
+  }
+]

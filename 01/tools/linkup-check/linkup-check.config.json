@@ -1,0 +1,11 @@
+{
+  "projectRoot": "../LinkUpClient",
+  "rules": {
+    "prefab/glob": "assets/BundleLLK/GUI/*.prefab",
+    "tsControllerGlob": "assets/Scripts/UI/*UICtrl.ts",
+    "constantPath": "assets/Scripts/Constant.ts",
+    "uiControllerPath": "assets/Scripts/Manager/UIController.ts",
+    "scriptGlob": "assets/Scripts/**/*.ts"
+  },
+  "baselinePath": "./linkup-check.baseline.json"
+}
