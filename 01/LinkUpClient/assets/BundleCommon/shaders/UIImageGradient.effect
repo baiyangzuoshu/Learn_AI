@@ -1,0 +1,177 @@
+// Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.  
+
+CCEffect %{
+  techniques:
+ 
+  - passes:
+    - vert: vs
+      frag: fs
+      blendState:
+        targets:
+        - blend: true
+      rasterizerState:
+        cullMode: none
+      properties:
+        texture: { value: white }
+        alphaThreshold: { value: 0.5 }
+        headColor: { value: [1, 1, 1, 1] }
+        tailColor: { value: [1, 1, 1, 1] }
+        u_uvSliced: { value: [1, 1, 1, 1] }
+        spriteBorder: { value: [1, 1, 1, 1] }
+        u_uvOffset: { value: [1, 1, 1, 1] }
+
+        rotate: { value: 0 }
+        reverse: { value: 0 }
+        gradient: { value: 0 }
+        garmmaTransform: { value: 0 }
+        
+}%
+
+
+CCProgram vs %{
+  precision highp float;
+
+  #include <cc-global>
+  #include <cc-local>
+
+  in vec3 a_position;
+  in vec4 a_color;
+  out vec4 v_color;
+
+  in vec2 a_uv0;
+  out vec2 v_uv0;
+  out vec3 v_position;
+
+  
+
+  void main () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if CC_USE_MODEL
+    pos = cc_matViewProj * cc_matWorld * pos;
+    #else
+    pos = cc_matViewProj * pos;
+    #endif
+
+    #if USE_TEXTURE
+    v_uv0 = a_uv0;
+    #endif
+    v_color = a_color;
+
+    v_position = a_position;
+    gl_Position = pos;
+  }
+}%
+
+
+
+
+
+CCProgram fs %{
+  precision highp float;
+  
+  #include <alpha-test>
+  #include <texture>
+
+  in vec4 v_color;
+  in vec2 v_uv0;
+  in vec3 v_position;
+
+  #if USE_TEXTURE
+  uniform sampler2D texture;
+  #endif
+
+  uniform Props {
+    vec4 headColor;
+    vec4 tailColor;
+    vec4 u_uvSliced;
+    vec4 spriteBorder;
+    vec4 u_uvOffset;
+    float rotate;
+    float reverse;
+    float gradient;
+    float garmmaTransform;
+  };
+
+  
+  float remap(float x, float t1, float t2, float s1, float s2) {
+      return (x - t1) / ((t2 - t1)+0.000001) * (s2 - s1) + s1;
+  }
+
+  float GammaToLinearSpace (float linRGB){
+      linRGB = max(linRGB, 0.0);
+      return max(1.055 * pow(linRGB, 0.416666667) - 0.055, 0.0);
+
+  }
+
+  void main () {
+    vec4 o;
+    vec4 mainTex = vec4(1.0,1.0,1.0,1.0);
+    #if USE_TEXTURE
+      CCTexture(texture, v_uv0, mainTex);
+    #endif
+    
+    vec2 uvNormalize = v_uv0;
+
+    //------------------------------------修复Packable带来的UV问题-----------------------------//
+    uvNormalize.x = remap(uvNormalize.x,u_uvOffset.x,u_uvOffset.z,0.0,1.0);
+    uvNormalize.y = remap(uvNormalize.y,u_uvOffset.y,u_uvOffset.w,0.0,1.0);
+    //---------------------------------适配slied模式-----------------------------------------//
+    #if USE_SLICED
+      vec2 slicedUV = uvNormalize;
+      float originWidth = u_uvSliced.x;
+      float newWidth = u_uvSliced.z;
+      float originHeight = u_uvSliced.y;
+      float newHeight = u_uvSliced.w;
+      float left = spriteBorder.x;
+      float right = spriteBorder.z;
+      float bottom = spriteBorder.w;
+      float top = spriteBorder.y;
+
+      float leftFix =left*mix(1.0,(newWidth/(left+right+0.001)),step(newWidth,left+right));
+      float rightFix =right*mix(1.0,(newWidth/(left+right+0.001)),step(newWidth,left+right));
+      float bottomFix =bottom*mix(1.0,(newHeight/(top+bottom+0.001)),step(newHeight,top+bottom));
+      float topFix =top*mix(1.0,(newHeight/(top+bottom+0.001)),step(newHeight,top+bottom));
+                  
+      float leftFactor = step(slicedUV.x, left / originWidth);
+      float middleFactor = step(left / originWidth, slicedUV.x) * step(slicedUV.x, 1.0 - right / originWidth);
+      float rightFactor = step(1.0 - right / originWidth, slicedUV.x);
+                  
+      slicedUV.x = leftFactor * remap(slicedUV.x, 0.0, left / originWidth, 0.0, leftFix / newWidth) +
+                middleFactor * remap(slicedUV.x, left / originWidth, 1.0 - right / originWidth, leftFix / newWidth, 1.0 - rightFix / newWidth) +
+                rightFactor * remap(slicedUV.x, 1.0 - right / originWidth, 1.0, 1.0 - rightFix / newWidth, 1.0);
+
+      float leftFactorY = step(slicedUV.y, bottom / originHeight);
+      float middleFactorY = step(bottom / originHeight, slicedUV.y) * step(slicedUV.y, 1.0 - top / originHeight);
+      float rightFactorY = step(1.0 - top / originHeight, slicedUV.y);
+                  
+      slicedUV.y = leftFactorY * remap(slicedUV.y, 0.0, bottom / originHeight, 0.0, bottomFix / newHeight) +
+                middleFactorY * remap(slicedUV.y, bottom / originHeight, 1.0 - top / originHeight, bottomFix / newHeight, 1.0 - topFix / newHeight) +
+                rightFactorY * remap(slicedUV.y, 1.0 - top / originHeight, 1.0, 1.0 - topFix / newHeight, 1.0);
+                  
+      uvNormalize = slicedUV;
+    #endif
+    //-------------------------------------Caculate rotation---------------------------------//
+    float angle = radians( rotate );
+    float rotateFactor = cos( angle );
+    float rotateFactor2 = sin( angle );
+    
+    vec3 matrixOne = (vec3(rotateFactor , -rotateFactor2 , 1.0));
+    vec3 matrixTwo = (vec3(rotateFactor2 , rotateFactor , 1.0));
+
+    vec3 centerUv = (vec3(( uvNormalize - vec2( 0.5,0.5 ) ) , 0.0));
+    float rotateUv = ( ( ( ( mat3(matrixOne, matrixTwo, vec3( 0,0,0 )) * centerUv ).xy / ( cos( radians( abs( ( 45.0 - ( rotate - ( floor( ( rotate / 90.0 ) ) * 90.0 ) ) ) ) ) ) * sqrt( 2.0 ) ) ) + vec2( 0.5,0.5 ) ).x + 0.0 );
+    float reverse2 = mix(rotateUv,1.0 - rotateUv,reverse);
+
+
+    //---------------------------------------------------------------------------------------//
+    float lerpFactor = clamp( ( reverse2/ gradient ) , 0.0 , 1.0 );
+    lerpFactor = mix(lerpFactor,GammaToLinearSpace(lerpFactor),garmmaTransform);
+    o = mix(tailColor,headColor,lerpFactor);
+    o.a *= mainTex.a;
+    ALPHA_TEST(o);
+
+    gl_FragColor = o;
+
+  }
+}%

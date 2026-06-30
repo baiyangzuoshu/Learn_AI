@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Main as UIMainUICtrl
+    participant Map as MainMap
+    participant Item as GKItem
+    participant Net as HttpManager
+    participant UI as UIController/UIManager
+    participant Game as UIGameUICtrl
+
+    Main->>Map: loadTableView(realHeight)
+    Note right of Map: 预热GK缓存、构建长列表、定位到当前关卡
+
+    Main->>Main: 点击“开始” 或 关卡选择
+    Main->>Net: Play/PlayTest(id = 当前关卡)
+    Net-->>Main: PlayResponse(map/plan/limits)
+
+    Main->>UI: Destroy UIMain
+    Main->>UI: emit uiGame({gameType: Normal})
+    UI-->>Game: 创建 UIGameUICtrl 及子系统
+

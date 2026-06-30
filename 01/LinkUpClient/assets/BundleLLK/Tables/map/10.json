@@ -1,0 +1,23 @@
+{
+  "id": 10,
+  "width": 8,
+  "height": 14,
+  "dirction": 8,
+  "linkCount": 10,
+  "items": [
+    {
+      "id": 1007,
+      "x": 2,
+      "y": 3,
+      "type": 1007
+    },
+    {
+      "id": 1007,
+      "x": 2,
+      "y": 8,
+      "type": 1007
+    }
+  ],
+  "woodenState": 0,
+  "rocketState": 1
+}

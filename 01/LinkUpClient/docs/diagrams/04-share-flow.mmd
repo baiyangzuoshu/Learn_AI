@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant UI as UIMain/UIGame
+    participant WF as WorkFlow
+    participant SDK as SDKAdapter
+    participant App as SDKImpl(App/HLDDZ/Web)
+    participant Share as ShareManager
+    participant PM as PlayerManager
+
+    UI->>WF: onShareBtnClick()
+    WF->>SDK: HLDDZ_shareMessage / shareMessage2
+    App-->>SDK: rspShareMessage(isSuccess)
+    SDK-->>WF: 回调（成功: 动画/奖励；失败: 提示）
+    Note over UI,WF: 新手引导分支会打 Guild 上报
+
+    App-->>SDK: rspCpMiniGameByShare(extraStr)
+    SDK->>PM: 保存 extraStr
+    SDK->>Share: parseExtraStr() 解包/构建 ShareMapData
+    Share->>UI: removeAllUI → emit uiGame({gameType: Share})
+

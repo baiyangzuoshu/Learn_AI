@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "name": "刷新",
+    "type": 0,
+    "value": 1,
+    "desc": ""
+  },
+  {
+    "id": 2,
+    "name": "提示",
+    "type": 0,
+    "value": 1,
+    "desc": ""
+  },
+  {
+    "id": 3,
+    "name": "消除",
+    "type": 0,
+    "value": 1,
+    "desc": ""
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "path": "cancleLabelSDF",
+    "text": "取消"
+  },
+  {
+    "id": 2,
+    "path": "confirmLabelSDF",
+    "text": "确认"
+  },
+  {
+    "id": 3,
+    "path": "3500LablSDF",
+    "text": "玩家昵称"
+  }
+]

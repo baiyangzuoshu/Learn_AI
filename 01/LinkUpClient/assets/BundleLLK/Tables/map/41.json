@@ -1,0 +1,35 @@
+{
+  "id": 41,
+  "width": 8,
+  "height": 14,
+  "dirction": 3,
+  "linkCount": 10,
+  "items": [
+    {
+      "id": 1009,
+      "x": 3,
+      "y": 3,
+      "type": 1009
+    },
+    {
+      "id": 1009,
+      "x": 3,
+      "y": 10,
+      "type": 1009
+    },
+    {
+      "id": 1009,
+      "x": 4,
+      "y": 3,
+      "type": 1009
+    },
+    {
+      "id": 1009,
+      "x": 4,
+      "y": 10,
+      "type": 1009
+    }
+  ],
+  "woodenState": 0,
+  "rocketState": 1
+}
