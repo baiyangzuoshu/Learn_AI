@@ -1,0 +1,4 @@
+interface:
+  display_name: "LinkUpClient Skill"
+  short_description: "Inspect, modify, and validate LinkUpClient GUI and code"
+  default_prompt: "Use $linkup-client to inspect and modify LinkUpClient UI or code"
