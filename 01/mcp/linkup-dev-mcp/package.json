@@ -1,0 +1,27 @@
+{
+  "name": "linkup-dev-mcp",
+  "version": "0.1.0",
+  "description": "Read-only stdio MCP Server for LinkUpClient static analysis",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test dist/test/**/*.test.js",
+    "start": "node dist/src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "3.25.76",
+    "linkup-check": "file:../../tools/linkup-check"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3",
+    "@types/node": "22.15.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

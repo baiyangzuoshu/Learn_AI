@@ -1,0 +1,1 @@
+{"version":3,"file":"ui-contracts.d.ts","sourceRoot":"","sources":["../../../src/resources/ui-contracts.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAEH,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAE5D,eAAO,MAAM,gBAAgB,gCAAgC,CAAC;AAE9D,wBAAgB,eAAe,CAAC,IAAI,EAAE,cAAc,GAAG;IAAE,QAAQ,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,CAiCxF"}

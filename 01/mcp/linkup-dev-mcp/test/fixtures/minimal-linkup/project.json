@@ -1,0 +1,6 @@
+{
+  "name": "TestProject",
+  "engine": "cocos-creator-js",
+  "creator": { "version": "2.4.15" },
+  "packages": "packages"
+}

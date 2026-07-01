@@ -1,0 +1,8 @@
+{
+  "projectRoot": "../../LinkUpClient",
+  "baselinePath": "../../tools/linkup-check/linkup-check.baseline.json",
+  "maxTreeDepth": 8,
+  "maxTreeNodes": 2000,
+  "maxDiagnostics": 500,
+  "logLevel": "info"
+}

@@ -219,3 +219,14 @@ export function listRules() {
 export { createDiagnostic, applyBaseline, computeSummary } from './diagnostics.mjs';
 export { formatText } from './reporters/text-reporter.mjs';
 export { formatJSON } from './reporters/json-reporter.mjs';
+
+// G3 MCP public API re-exports (read-only, from existing modules)
+export { buildProjectIndex } from './project-index.mjs';
+export {
+  parsePrefab,
+  getRootNodeName,
+  walkNodes,
+  getComponents,
+  nodeHasComponent,
+} from './prefab-parser.mjs';
+export { extractNodePaths } from './ts-extractor.mjs';
