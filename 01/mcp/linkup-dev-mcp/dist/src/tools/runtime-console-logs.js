@@ -15,12 +15,8 @@ export async function handleRuntimeConsoleLogs(cdpManager, input) {
     }
     const start = Date.now();
     try {
-        // Map 'warning' to 'warn' for consistency
-        let levelFilter = input.level;
-        if (levelFilter === 'warning')
-            levelFilter = 'warn';
         const allLogs = cdpManager.getConsoleLogs({
-            level: levelFilter,
+            level: input.level,
             since: input.since,
         });
         const limit = input.limit ?? 100;

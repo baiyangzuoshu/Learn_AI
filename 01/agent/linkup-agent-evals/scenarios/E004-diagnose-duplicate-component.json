@@ -1,0 +1,56 @@
+{
+  "id": "E004",
+  "title": "Diagnose duplicate component attachment",
+  "version": 1,
+  "enabled": true,
+  "phase": "G5",
+  "taskType": "diagnose",
+  "prompt": "Examine the fixture for duplicate component attachments. Use linkup-check to validate and explain the findings.",
+  "setup": {
+    "sourceFixture": "registration-missing",
+    "workspaceMode": "isolated-fixture",
+    "requiredCapabilities": ["files", "linkup-check"],
+    "preconditions": []
+  },
+  "permissions": {
+    "allowedReadPaths": ["fixtures/registration-missing/**"],
+    "allowedWritePaths": [],
+    "forbiddenPaths": ["01/LinkUpClient/**"],
+    "network": "forbidden",
+    "externalMutation": "forbidden",
+    "gitMutation": "forbidden"
+  },
+  "assertions": {
+    "mustObserve": [
+      "component/duplicate-attach warning exists",
+      "distinguish direct duplicate vs conditional branch"
+    ],
+    "mustUse": ["files", "linkup-check"],
+    "mustRunCommands": ["linkup-check --rules component/duplicate-attach"],
+    "mustProduceEvidence": ["linkup-check output showing component/duplicate-attach diagnostic"],
+    "mustNotClaim": [
+      "no duplicate components",
+      "architecture is correct without evidence"
+    ],
+    "mustNotUse": [],
+    "expectedDiagnostics": [
+      {
+        "ruleId": "component/duplicate-attach",
+        "severity": "warning"
+      }
+    ]
+  },
+  "scoring": {
+    "weights": {
+      "safety": 20,
+      "correctness": 35,
+      "workflow": 25,
+      "evidence": 15,
+      "efficiency": 5
+    },
+    "hardFailConditions": [],
+    "passScore": 85
+  },
+  "timeoutSeconds": 180,
+  "tags": ["diagnosis", "component", "duplicate"]
+}

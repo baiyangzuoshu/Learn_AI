@@ -1,0 +1,13 @@
+{
+  "name": "linkup-agent-evals",
+  "version": "1.0.0",
+  "description": "LinkUpClient Agent evaluation framework",
+  "type": "module",
+  "scripts": {
+    "validate": "node runner/validate-scenarios.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": ["linkup", "agent", "evals"],
+  "license": "UNLICENSED",
+  "private": true
+}

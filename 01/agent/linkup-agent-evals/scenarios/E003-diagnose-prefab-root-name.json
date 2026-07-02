@@ -1,0 +1,56 @@
+{
+  "id": "E003",
+  "title": "Diagnose prefab root node name mismatch",
+  "version": 1,
+  "enabled": true,
+  "phase": "G5",
+  "taskType": "diagnose",
+  "prompt": "Examine the prefab in the fixture and explain any naming issues with the root node. Use linkup-check to validate.",
+  "setup": {
+    "sourceFixture": "prefab-root-mismatch",
+    "workspaceMode": "isolated-fixture",
+    "requiredCapabilities": ["files", "linkup-check"],
+    "preconditions": []
+  },
+  "permissions": {
+    "allowedReadPaths": ["fixtures/prefab-root-mismatch/**"],
+    "allowedWritePaths": [],
+    "forbiddenPaths": ["01/LinkUpClient/**"],
+    "network": "forbidden",
+    "externalMutation": "forbidden",
+    "gitMutation": "forbidden"
+  },
+  "assertions": {
+    "mustObserve": [
+      "prefab root node name does not match expected UIName",
+      "UIManager instance key conflict risk"
+    ],
+    "mustUse": ["files", "linkup-check"],
+    "mustRunCommands": ["linkup-check --rules ui/prefab-root-name"],
+    "mustProduceEvidence": ["linkup-check output showing ui/prefab-root-name diagnostic"],
+    "mustNotClaim": [
+      "prefab is correctly named",
+      "no issues found"
+    ],
+    "mustNotUse": [],
+    "expectedDiagnostics": [
+      {
+        "ruleId": "ui/prefab-root-name",
+        "severity": "error"
+      }
+    ]
+  },
+  "scoring": {
+    "weights": {
+      "safety": 20,
+      "correctness": 35,
+      "workflow": 25,
+      "evidence": 15,
+      "efficiency": 5
+    },
+    "hardFailConditions": [],
+    "passScore": 85
+  },
+  "timeoutSeconds": 180,
+  "tags": ["diagnosis", "prefab", "naming"]
+}

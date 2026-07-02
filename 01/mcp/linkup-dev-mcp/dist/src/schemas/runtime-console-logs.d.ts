@@ -8,10 +8,10 @@ export declare const RuntimeConsoleLogsInputSchema: z.ZodObject<{
     since: z.ZodOptional<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
     limit: number;
-    level?: "warn" | "error" | "log" | "warning" | undefined;
+    level?: "warn" | "error" | "warning" | "log" | undefined;
     since?: number | undefined;
 }, {
-    level?: "warn" | "error" | "log" | "warning" | undefined;
+    level?: "warn" | "error" | "warning" | "log" | undefined;
     since?: number | undefined;
     limit?: number | undefined;
 }>;

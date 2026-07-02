@@ -218,7 +218,13 @@ export class CDPManager {
     getConsoleLogs(options) {
         let logs = this.consoleBuffer;
         if (options?.level) {
-            logs = logs.filter(l => l.level === options.level);
+            const requestedLevel = options.level;
+            logs = logs.filter(l => {
+                if (requestedLevel === 'warn' || requestedLevel === 'warning') {
+                    return l.level === 'warn' || l.level === 'warning';
+                }
+                return l.level === requestedLevel;
+            });
         }
         if (options?.since) {
             logs = logs.filter(l => l.timestamp >= options.since);

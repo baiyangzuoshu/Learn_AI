@@ -32,6 +32,18 @@ describe('CDPManager', () => {
         const logs = mgr.getConsoleLogs({ level: 'error', limit: 10 });
         assert.deepEqual(logs, []);
     });
+    it('should treat warn and warning filters as equivalent', () => {
+        const mgr = createCDPManager();
+        mgr.consoleBuffer = [
+            { level: 'warning', text: 'warning-entry', timestamp: 1 },
+            { level: 'warn', text: 'warn-entry', timestamp: 2 },
+            { level: 'error', text: 'error-entry', timestamp: 3 },
+        ];
+        const warnLogs = mgr.getConsoleLogs({ level: 'warn' });
+        const warningLogs = mgr.getConsoleLogs({ level: 'warning' });
+        assert.deepEqual(warnLogs.map(l => l.text), ['warning-entry', 'warn-entry']);
+        assert.deepEqual(warningLogs.map(l => l.text), ['warning-entry', 'warn-entry']);
+    });
     it('disconnect should be idempotent', async () => {
         const mgr = createCDPManager();
         await mgr.disconnect(); // Should not throw
