@@ -18,6 +18,19 @@ import { SERVER_VERSION } from './schemas/common.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { basename } from 'node:path';
 
+// G4 Runtime imports
+import { createCDPManager, type CDPManager } from './runtime/cdp-manager.js';
+import { RuntimeStatusInputSchema, RuntimeStatusOutputSchema } from './schemas/runtime-status.js';
+import { RuntimeSceneTreeInputSchema, RuntimeSceneTreeOutputSchema } from './schemas/runtime-scene-tree.js';
+import { RuntimeNodeDetailInputSchema, RuntimeNodeDetailOutputSchema } from './schemas/runtime-node-detail.js';
+import { RuntimeConsoleLogsInputSchema, RuntimeConsoleLogsOutputSchema } from './schemas/runtime-console-logs.js';
+import { RuntimeCapturePreviewInputSchema, RuntimeCapturePreviewOutputSchema } from './schemas/runtime-capture-preview.js';
+import { handleRuntimeStatus } from './tools/runtime-status.js';
+import { handleRuntimeSceneTree } from './tools/runtime-scene-tree.js';
+import { handleRuntimeNodeDetail } from './tools/runtime-node-detail.js';
+import { handleRuntimeConsoleLogs } from './tools/runtime-console-logs.js';
+import { handleRuntimeCapturePreview } from './tools/runtime-capture-preview.js';
+
 // Schema imports
 import { ValidateProjectInputSchema, ValidateProjectOutputSchema } from './schemas/validate-project.js';
 import { InspectUiPrefabInputSchema, InspectUiPrefabOutputSchema } from './schemas/inspect-ui-prefab.js';
@@ -56,6 +69,35 @@ const TOOLS = [
     inputSchema: zodToJsonSchema(ResolveUiContractInputSchema),
     outputSchema: zodToJsonSchema(ResolveUiContractOutputSchema),
   },
+  // G4 Runtime Tools — always registered, even when not connected
+  // Note: outputSchema intentionally omitted for Runtime tools because
+  // the SDK validates structuredContent against it, but our structuredContent
+  // contains only the data portion (not the full ToolEnvelope wrapper).
+  {
+    name: 'runtime_status',
+    description: 'Get Cocos Creator preview runtime connection status. Returns disconnected if no preview is running.',
+    inputSchema: zodToJsonSchema(RuntimeStatusInputSchema),
+  },
+  {
+    name: 'runtime_scene_tree',
+    description: 'Get the running scene node tree from Cocos Creator preview. Depth and node count limited.',
+    inputSchema: zodToJsonSchema(RuntimeSceneTreeInputSchema),
+  },
+  {
+    name: 'runtime_node_detail',
+    description: 'Get detailed info for a specific node by path in the running Cocos preview.',
+    inputSchema: zodToJsonSchema(RuntimeNodeDetailInputSchema),
+  },
+  {
+    name: 'runtime_console_logs',
+    description: 'Get buffered console logs from the Cocos Creator preview.',
+    inputSchema: zodToJsonSchema(RuntimeConsoleLogsInputSchema),
+  },
+  {
+    name: 'runtime_capture_preview',
+    description: 'Capture a screenshot of the Cocos Creator browser preview.',
+    inputSchema: zodToJsonSchema(RuntimeCapturePreviewInputSchema),
+  },
 ];
 
 // Resource definitions
@@ -86,7 +128,7 @@ const RESOURCES = [
   },
 ];
 
-export async function createAndStartServer(): Promise<{ server: Server; transport: StdioServerTransport }> {
+export async function createAndStartServer(): Promise<{ server: Server; transport: StdioServerTransport; cdpManager: CDPManager }> {
   // 1. Load and validate config
   const configResult = loadConfig();
   if (configResult.error) {
@@ -111,7 +153,16 @@ export async function createAndStartServer(): Promise<{ server: Server; transpor
   logger.info(`Project: ${basename(config.projectRoot)} (verified)`);
   logger.info('Baseline: linked');
 
-  // 4. Create Server with explicit minimal capabilities (no listChanged)
+  // 4. Create CDP Manager for G4 Runtime
+  const cdpManager = createCDPManager({
+    host: config.runtimeHost,
+    port: config.runtimePort,
+    timeoutMs: config.runtimeTimeoutMs,
+    maxConsoleLogs: config.runtimeMaxConsoleLogs,
+  });
+  logger.info(`Runtime CDP target: ${config.runtimeHost}:${config.runtimePort}`);
+
+  // 5. Create Server with explicit minimal capabilities (no listChanged)
   const server = new Server(
     {
       name: 'linkup-dev-mcp',
@@ -171,6 +222,55 @@ export async function createAndStartServer(): Promise<{ server: Server; transpor
         result = await handleResolveUiContract(ctx, parsed.data);
         break;
       }
+      // G4 Runtime Tools
+      case 'runtime_status': {
+        result = await handleRuntimeStatus(cdpManager, {});
+        break;
+      }
+      case 'runtime_scene_tree': {
+        const parsed = RuntimeSceneTreeInputSchema.safeParse(args ?? {});
+        if (!parsed.success) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: parsed.error.message }, meta: { serverVersion: SERVER_VERSION, generatedAt: new Date().toISOString(), truncated: false } }) }],
+            isError: true,
+          };
+        }
+        result = await handleRuntimeSceneTree(cdpManager, parsed.data);
+        break;
+      }
+      case 'runtime_node_detail': {
+        const parsed = RuntimeNodeDetailInputSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: parsed.error.message }, meta: { serverVersion: SERVER_VERSION, generatedAt: new Date().toISOString(), truncated: false } }) }],
+            isError: true,
+          };
+        }
+        result = await handleRuntimeNodeDetail(cdpManager, parsed.data);
+        break;
+      }
+      case 'runtime_console_logs': {
+        const parsed = RuntimeConsoleLogsInputSchema.safeParse(args ?? {});
+        if (!parsed.success) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: parsed.error.message }, meta: { serverVersion: SERVER_VERSION, generatedAt: new Date().toISOString(), truncated: false } }) }],
+            isError: true,
+          };
+        }
+        result = await handleRuntimeConsoleLogs(cdpManager, parsed.data);
+        break;
+      }
+      case 'runtime_capture_preview': {
+        const parsed = RuntimeCapturePreviewInputSchema.safeParse(args ?? {});
+        if (!parsed.success) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: parsed.error.message }, meta: { serverVersion: SERVER_VERSION, generatedAt: new Date().toISOString(), truncated: false } }) }],
+            isError: true,
+          };
+        }
+        result = await handleRuntimeCapturePreview(cdpManager, parsed.data);
+        break;
+      }
       default:
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code: 'INTERNAL_ERROR', message: `Unknown tool: ${name}` }, meta: { serverVersion: SERVER_VERSION, generatedAt: new Date().toISOString(), truncated: false } }) }],
@@ -222,5 +322,5 @@ export async function createAndStartServer(): Promise<{ server: Server; transpor
 
   logger.info('linkup-dev-mcp server started on stdio transport');
 
-  return { server, transport };
+  return { server, transport, cdpManager };
 }

@@ -23,6 +23,10 @@ describe('Integration: Minimal Fixture', () => {
             maxTreeNodes: 2000,
             maxDiagnostics: 500,
             logLevel: 'info',
+            runtimeHost: '127.0.0.1',
+            runtimePort: 9222,
+            runtimeTimeoutMs: 5000,
+            runtimeMaxConsoleLogs: 1000,
         }, {
             runChecks: async (opts) => {
                 try {
@@ -52,6 +56,10 @@ describe('Integration: Minimal Fixture', () => {
             maxTreeNodes: 2000,
             maxDiagnostics: 500,
             logLevel: 'info',
+            runtimeHost: '127.0.0.1',
+            runtimePort: 9222,
+            runtimeTimeoutMs: 5000,
+            runtimeMaxConsoleLogs: 1000,
         }, {
             runChecks: async (opts) => {
                 try {

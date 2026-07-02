@@ -4,5 +4,9 @@
   "maxTreeDepth": 8,
   "maxTreeNodes": 2000,
   "maxDiagnostics": 500,
-  "logLevel": "info"
+  "logLevel": "info",
+  "runtimeHost": "127.0.0.1",
+  "runtimePort": 9222,
+  "runtimeTimeoutMs": 5000,
+  "runtimeMaxConsoleLogs": 1000
 }

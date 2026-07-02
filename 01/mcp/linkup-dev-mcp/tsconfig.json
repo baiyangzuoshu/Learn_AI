@@ -15,6 +15,6 @@
     "sourceMap": true,
     "lib": ["ES2022"]
   },
-  "include": ["src/**/*.ts", "test/unit/**/*.ts", "test/integration/**/*.ts", "test/protocol/**/*.ts", "test/contract/**/*.ts", "test/security/**/*.ts"],
+  "include": ["src/**/*.ts", "test/unit/**/*.ts", "test/integration/**/*.ts", "test/protocol/**/*.ts", "test/contract/**/*.ts", "test/security/**/*.ts", "test/runtime/**/*.ts"],
   "exclude": ["node_modules", "dist", "test/fixtures"]
 }

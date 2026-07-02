@@ -15,12 +15,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
-    "zod": "3.25.76",
-    "linkup-check": "file:../../tools/linkup-check"
+    "chrome-remote-interface": "0.33.2",
+    "linkup-check": "file:../../tools/linkup-check",
+    "zod": "3.25.76"
   },
   "devDependencies": {
-    "typescript": "5.8.3",
-    "@types/node": "22.15.0"
+    "@types/node": "22.15.0",
+    "typescript": "5.8.3"
   },
   "license": "UNLICENSED",
   "private": true

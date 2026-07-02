@@ -19,15 +19,15 @@ export declare const NodePathEntrySchema: z.ZodObject<{
     exists: z.ZodNullable<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     path: string;
-    line: number;
     functionName: string;
+    line: number;
     isDynamic: boolean;
     kind: "lookup" | "button" | "delay-button" | "mouse";
     exists: boolean | null;
 }, {
     path: string;
-    line: number;
     functionName: string;
+    line: number;
     isDynamic: boolean;
     kind: "lookup" | "button" | "delay-button" | "mouse";
     exists: boolean | null;
@@ -55,15 +55,15 @@ export declare const ResolveUiContractOutputSchema: z.ZodObject<{
         exists: z.ZodNullable<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
         path: string;
-        line: number;
         functionName: string;
+        line: number;
         isDynamic: boolean;
         kind: "lookup" | "button" | "delay-button" | "mouse";
         exists: boolean | null;
     }, {
         path: string;
-        line: number;
         functionName: string;
+        line: number;
         isDynamic: boolean;
         kind: "lookup" | "button" | "delay-button" | "mouse";
         exists: boolean | null;
@@ -78,8 +78,8 @@ export declare const ResolveUiContractOutputSchema: z.ZodObject<{
     prefabBasename: string;
     nodePaths: {
         path: string;
-        line: number;
         functionName: string;
+        line: number;
         isDynamic: boolean;
         kind: "lookup" | "button" | "delay-button" | "mouse";
         exists: boolean | null;
@@ -102,8 +102,8 @@ export declare const ResolveUiContractOutputSchema: z.ZodObject<{
     prefabBasename: string;
     nodePaths: {
         path: string;
-        line: number;
         functionName: string;
+        line: number;
         isDynamic: boolean;
         kind: "lookup" | "button" | "delay-button" | "mouse";
         exists: boolean | null;

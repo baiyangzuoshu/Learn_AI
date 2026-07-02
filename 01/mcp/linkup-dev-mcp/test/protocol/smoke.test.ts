@@ -45,12 +45,21 @@ describe('MCP Protocol Smoke Test', () => {
     assert.ok(client, 'Client should be connected');
   });
 
-  it('should list exactly 3 tools', async () => {
+  it('should list exactly 8 tools (3 G3 + 5 Runtime)', async () => {
     const result = await client.listTools();
-    assert.strictEqual(result.tools.length, 3, `Expected 3 tools, got ${result.tools.length}`);
+    assert.strictEqual(result.tools.length, 8, `Expected 8 tools (3 G3 + 5 Runtime), got ${result.tools.length}`);
 
     const toolNames = result.tools.map(t => t.name).sort();
-    assert.deepStrictEqual(toolNames, ['inspect_ui_prefab', 'resolve_ui_contract', 'validate_project']);
+    assert.deepStrictEqual(toolNames, [
+      'inspect_ui_prefab',
+      'resolve_ui_contract',
+      'runtime_capture_preview',
+      'runtime_console_logs',
+      'runtime_node_detail',
+      'runtime_scene_tree',
+      'runtime_status',
+      'validate_project',
+    ]);
   });
 
   it('should list exactly 4 resources', async () => {

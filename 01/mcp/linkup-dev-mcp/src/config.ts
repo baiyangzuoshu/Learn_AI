@@ -23,6 +23,11 @@ export interface AppConfig {
   maxTreeNodes: number;
   maxDiagnostics: number;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  // G4 Runtime configuration
+  runtimeHost: string;
+  runtimePort: number;
+  runtimeTimeoutMs: number;
+  runtimeMaxConsoleLogs: number;
 }
 
 export interface ConfigResult {
@@ -119,6 +124,12 @@ export function loadConfig(): ConfigResult {
   const validLogLevels = ['debug', 'info', 'warn', 'error'] as const;
   const logLevel = validLogLevels.includes(raw.logLevel as any) ? raw.logLevel as AppConfig['logLevel'] : 'info';
 
+  // G4 Runtime configuration with defaults
+  const runtimeHost = typeof raw.runtimeHost === 'string' ? raw.runtimeHost : '127.0.0.1';
+  const runtimePort = typeof raw.runtimePort === 'number' ? raw.runtimePort : 9222;
+  const runtimeTimeoutMs = typeof raw.runtimeTimeoutMs === 'number' ? raw.runtimeTimeoutMs : 5000;
+  const runtimeMaxConsoleLogs = typeof raw.runtimeMaxConsoleLogs === 'number' ? raw.runtimeMaxConsoleLogs : 1000;
+
   return {
     config: {
       projectRoot: resolvedProjectRoot,
@@ -127,6 +138,10 @@ export function loadConfig(): ConfigResult {
       maxTreeNodes,
       maxDiagnostics,
       logLevel,
+      runtimeHost,
+      runtimePort,
+      runtimeTimeoutMs,
+      runtimeMaxConsoleLogs,
     },
   };
 }

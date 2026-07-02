@@ -13,6 +13,10 @@ export interface AppConfig {
     maxTreeNodes: number;
     maxDiagnostics: number;
     logLevel: 'debug' | 'info' | 'warn' | 'error';
+    runtimeHost: string;
+    runtimePort: number;
+    runtimeTimeoutMs: number;
+    runtimeMaxConsoleLogs: number;
 }
 export interface ConfigResult {
     config?: AppConfig;

@@ -32,7 +32,7 @@ describe('Security', () => {
     });
     it('should have exactly 3 tools (no read/write/shell/eval/network)', async () => {
         const result = await client.listTools();
-        assert.strictEqual(result.tools.length, 3);
+        assert.strictEqual(result.tools.length, 8, `Expected 8 tools (3 G3 + 5 Runtime), got ${result.tools.length}`);
     });
     it('should have exactly 4 resources', async () => {
         const result = await client.listResources();

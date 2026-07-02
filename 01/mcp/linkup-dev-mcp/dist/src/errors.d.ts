@@ -11,6 +11,12 @@ export declare const ErrorCode: {
     readonly LIMIT_EXCEEDED: "LIMIT_EXCEEDED";
     readonly PATH_BOUNDARY_VIOLATION: "PATH_BOUNDARY_VIOLATION";
     readonly INTERNAL_ERROR: "INTERNAL_ERROR";
+    readonly RUNTIME_UNAVAILABLE: "RUNTIME_UNAVAILABLE";
+    readonly RUNTIME_TIMEOUT: "RUNTIME_TIMEOUT";
+    readonly RUNTIME_CONNECT_FAILED: "RUNTIME_CONNECT_FAILED";
+    readonly RUNTIME_TARGET_NOT_FOUND: "RUNTIME_TARGET_NOT_FOUND";
+    readonly RUNTIME_PROTOCOL_ERROR: "RUNTIME_PROTOCOL_ERROR";
+    readonly RUNTIME_LIMIT_EXCEEDED: "RUNTIME_LIMIT_EXCEEDED";
 };
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 export interface StructuredError {

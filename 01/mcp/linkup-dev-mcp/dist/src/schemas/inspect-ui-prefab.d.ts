@@ -61,9 +61,6 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
         name: string;
         depth: number;
         active?: boolean | undefined;
-        components?: {
-            typeName: string;
-        }[] | undefined;
         position?: {
             x: number;
             y: number;
@@ -72,15 +69,15 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
             width: number;
             height: number;
         } | undefined;
+        components?: {
+            typeName: string;
+        }[] | undefined;
         children?: any[] | undefined;
     }, {
         path: string;
         name: string;
         depth: number;
         active?: boolean | undefined;
-        components?: {
-            typeName: string;
-        }[] | undefined;
         position?: {
             x: number;
             y: number;
@@ -89,6 +86,9 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
             width: number;
             height: number;
         } | undefined;
+        components?: {
+            typeName: string;
+        }[] | undefined;
         children?: any[] | undefined;
     }>>;
     nodeCount: z.ZodNumber;
@@ -108,9 +108,6 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
         name: string;
         depth: number;
         active?: boolean | undefined;
-        components?: {
-            typeName: string;
-        }[] | undefined;
         position?: {
             x: number;
             y: number;
@@ -119,6 +116,9 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
             width: number;
             height: number;
         } | undefined;
+        components?: {
+            typeName: string;
+        }[] | undefined;
         children?: any[] | undefined;
     } | undefined;
 }, {
@@ -135,9 +135,6 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
         name: string;
         depth: number;
         active?: boolean | undefined;
-        components?: {
-            typeName: string;
-        }[] | undefined;
         position?: {
             x: number;
             y: number;
@@ -146,6 +143,9 @@ export declare const InspectUiPrefabOutputSchema: z.ZodObject<{
             width: number;
             height: number;
         } | undefined;
+        components?: {
+            typeName: string;
+        }[] | undefined;
         children?: any[] | undefined;
     } | undefined;
 }>;
