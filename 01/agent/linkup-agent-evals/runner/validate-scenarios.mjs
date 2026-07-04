@@ -47,8 +47,8 @@ for (const file of scenarioFiles) {
 
   // Check ID format
   if (scenario.id) {
-    if (!/^E[0-9]{3}$/.test(scenario.id)) {
-      errors.push(`${file}: Invalid ID format '${scenario.id}', expected E001-E999`);
+    if (!/^(E[0-9]{3}|G6-S0[0-9])$/.test(scenario.id)) {
+      errors.push(`${file}: Invalid ID format '${scenario.id}', expected E001-E999 or G6-S0x`);
     }
     if (ids.has(scenario.id)) {
       errors.push(`${file}: Duplicate ID '${scenario.id}'`);

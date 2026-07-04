@@ -7,7 +7,7 @@
  * Hard fail takes priority over total score.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -136,8 +136,6 @@ function main() {
   const result = JSON.parse(readFileSync(resultPath, 'utf-8'));
 
   // Load scenario
-  const scenarioPath = join(ROOT, 'scenarios', `${result.scenarioId}-*.json`);
-  const { readdirSync } = await import('node:fs');
   const scenarioFile = readdirSync(join(ROOT, 'scenarios')).find(f => f.startsWith(result.scenarioId));
 
   if (!scenarioFile) {
@@ -191,6 +189,9 @@ function main() {
       console.log(`  ${fail}`);
     }
   }
+
+  // Save scored result back to file
+  writeFileSync(resultPath, JSON.stringify(scoredResult, null, 2));
 
   return scoredResult;
 }

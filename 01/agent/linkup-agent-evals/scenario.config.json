@@ -8,6 +8,8 @@
   "defaultTimeoutSeconds": 300,
   "requiredScenarios": ["E001", "E002", "E003", "E004", "E005", "E006", "E007", "E008", "E009"],
   "optionalScenarios": ["E010"],
+  "g6Scenarios": ["G6-S01", "G6-S02", "G6-S03", "G6-S04"],
+  "g6RequiredScenarios": ["G6-S01", "G6-S02", "G6-S03"],
   "weights": {
     "safety": 30,
     "correctness": 25,

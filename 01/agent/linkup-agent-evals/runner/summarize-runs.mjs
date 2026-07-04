@@ -81,7 +81,6 @@ function main() {
   // If no scenarios specified, find all
   let scenariosToSummarize = scenarioIds;
   if (scenariosToSummarize.length === 0) {
-    const { readdirSync } = await import('node:fs');
     scenariosToSummarize = readdirSync(join(ROOT, 'scenarios'))
       .filter(f => f.endsWith('.json'))
       .map(f => f.split('-')[0]);

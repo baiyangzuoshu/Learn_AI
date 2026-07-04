@@ -46,10 +46,10 @@ describe('Scenario Schema Tests', () => {
     }
   });
 
-  test('all scenario IDs match pattern E001-E999', () => {
+  test('all scenario IDs match pattern E001-E999 or G6-S0x', () => {
     for (const file of scenarioFiles) {
       const scenario = JSON.parse(readFileSync(join(SCENARIOS_DIR, file), 'utf-8'));
-      assert.ok(/^E[0-9]{3}$/.test(scenario.id), `${file}: Invalid ID format '${scenario.id}'`);
+      assert.ok(/^(E[0-9]{3}|G6-S0[0-9])$/.test(scenario.id), `${file}: Invalid ID format '${scenario.id}'`);
     }
   });
 
