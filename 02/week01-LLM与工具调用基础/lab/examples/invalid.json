@@ -1,0 +1,11 @@
+{
+  "results": [
+    {
+      "id": "T01",
+      "risk": "critical",
+      "reason": "risk 使用了 Schema 未允许的枚举值。",
+      "requiresApproval": "false",
+      "unexpected": true
+    }
+  ]
+}
