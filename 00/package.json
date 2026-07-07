@@ -1,11 +1,13 @@
 {
-  "name": "s01-agent-loop-deepseek",
+  "name": "learn-agent-harness-deepseek",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
     "start": "node s01_agent_loop/index.js",
-    "check": "node --check s01_agent_loop/index.js"
+    "s01": "node s01_agent_loop/index.js",
+    "s02": "node s02_tool_use/index.js",
+    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js"
   },
   "engines": {
     "node": ">=18"
