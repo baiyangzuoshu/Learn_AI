@@ -10,7 +10,8 @@
     "s03": "node s03_permission/index.js",
     "s04": "node s04_hooks/index.js",
     "s05": "node s05_todo_write/index.js",
-    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js && node --check s04_hooks/index.js && node --check s05_todo_write/index.js"
+    "s06": "node s06_subagent/index.js",
+    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js && node --check s04_hooks/index.js && node --check s05_todo_write/index.js && node --check s06_subagent/index.js"
   },
   "engines": {
     "node": ">=18"
