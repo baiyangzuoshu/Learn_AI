@@ -8,7 +8,8 @@
     "s01": "node s01_agent_loop/index.js",
     "s02": "node s02_tool_use/index.js",
     "s03": "node s03_permission/index.js",
-    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js"
+    "s04": "node s04_hooks/index.js",
+    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js && node --check s04_hooks/index.js"
   },
   "engines": {
     "node": ">=18"
