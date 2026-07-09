@@ -13,7 +13,8 @@
     "s06": "node s06_subagent/index.js",
     "s07": "node s07_skill_loading/index.js",
     "s08": "node s08_context_compact/index.js",
-    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js && node --check s04_hooks/index.js && node --check s05_todo_write/index.js && node --check s06_subagent/index.js && node --check s07_skill_loading/index.js && node --check s08_context_compact/index.js"
+    "s09": "node s09_memory/index.js",
+    "check": "node --check s01_agent_loop/index.js && node --check s02_tool_use/index.js && node --check s03_permission/index.js && node --check s04_hooks/index.js && node --check s05_todo_write/index.js && node --check s06_subagent/index.js && node --check s07_skill_loading/index.js && node --check s08_context_compact/index.js && node --check s09_memory/index.js"
   },
   "engines": {
     "node": ">=18"
