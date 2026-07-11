@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deno Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <aside>
+    <div class="brand"><span class="logo">D</span><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
+    <button class="new-chat">＋ 新对话</button>
+    <nav><span class="label">工作区</span><button class="active">Learn_AI</button></nav>
+    <button id="settings-button" class="settings-button">⚙ 设置</button>
+    <div class="stage"><span>Harness</span><strong>s01</strong><div><i></i></div><small>Agent Loop · 1 / 20</small></div>
+  </aside>
+  <main>
+    <header><div><h1>新的任务</h1><p id="status">正在连接 Deno Runtime…</p></div><span class="pill">DeepSeek</span></header>
+    <section id="messages" class="messages">
+      <div class="welcome"><div class="orb">✦</div><h2>今天想一起构建什么？</h2><p>我可以读取代码、执行命令并完成工作区任务。</p><div class="suggestions"><button>解释这个项目的架构</button><button>检查当前代码并提出改进</button><button>创建一个新功能</button></div></div>
+    </section>
+    <section id="events" class="events hidden"></section>
+    <form id="composer"><textarea id="prompt" rows="1" placeholder="交给 Deno Agent 一个任务…"></textarea><button id="send" type="submit">↑</button><div class="composer-meta"><select id="model-select"></select><small>Agent 可能执行命令，请检查工具记录</small></div></form>
+  </main>
+  <dialog id="settings-dialog"><form id="settings-form" method="dialog">
+    <div class="dialog-title"><div><h2>AI 模型设置</h2><p>密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
+    <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
+    <label>Base URL<input id="base-url" type="url" required /></label>
+    <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
+    <label>默认模型<select id="default-model"></select></label>
+    <p id="key-status" class="key-status"></p>
+    <div class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>
+  </form></dialog>
+  <script src="app.js"></script>
+</body>
+</html>

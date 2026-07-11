@@ -1,1 +1,8 @@
 .DS_Store
+.deno/
+.env
+.env.local
+deno-agent/.env
+deno-agent/.env.local
+deno-agent/.agent/
+deno-agent/dist/
