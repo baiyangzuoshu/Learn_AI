@@ -3,7 +3,7 @@ import {
   runCronSchedule,
   saveCronSchedules,
 } from "../stages/s14_cron_scheduling.ts";
-import { type AgentEvent, agentLoop } from "../stages/s19_mcp_plugins.ts";
+import { type AgentEvent, agentLoop } from "../stages/s20_comprehensive.ts";
 import type { PermissionMode } from "../stages/s03_permission.ts";
 import { providerTelemetry } from "../src/providers/deepseek.ts";
 import { readConversations, saveConversations } from "../src/config/conversations.ts";
@@ -74,7 +74,9 @@ function json(data: unknown, status = 200): Response {
 
 Deno.serve(async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === "/api/health") return json({ ok: true, stage: "s19" });
+  if (url.pathname === "/api/health") {
+    return json({ ok: true, stage: "s20", version: "1.0.0", capabilities: 20 });
+  }
   if (url.pathname === "/api/telemetry") return json(providerTelemetry());
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());

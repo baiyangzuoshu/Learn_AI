@@ -157,6 +157,20 @@
   color: #8b9bad;
   font: 10px ui-monospace,monospace;
 }
+.harness-event > b {
+  color: #49dfa9!important;
+}
+.harness-event pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 7px;
+  background: #09110e;
+  white-space: pre-wrap;
+  color: #8eafa3;
+  font: 10px ui-monospace,monospace;
+}
 .worktree-card small {
   color: #687a8d;
   font: 9px ui-monospace,monospace;

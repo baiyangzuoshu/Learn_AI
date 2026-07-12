@@ -19,6 +19,7 @@
     "s17": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s17_autonomous_agent.ts",
     "s18": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s18_git_worktree.ts",
     "s19": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s19_mcp_plugins.ts",
+    "s20": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s20_comprehensive.ts",
     "server": "deno run --allow-env --allow-net=127.0.0.1,api.deepseek.com --allow-run --allow-read=. --allow-write=. --env-file=.env.local src/server.ts",
     "desktop": "deno desktop --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:hmr": "deno desktop --hmr --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",

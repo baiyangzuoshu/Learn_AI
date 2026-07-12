@@ -4,38 +4,38 @@
 
 ## 路线
 
-| 阶段 | 机制 |
-|---|---|
-| s01 | Agent loop + Bash |
-| s02 | 工具注册与文件工具 |
-| s03 | 权限审批 |
-| s04 | Hooks |
-| s05 | Todo |
-| s06 | Subagent |
-| s07 | Skill 按需加载 |
-| s08 | 上下文压缩 |
-| s09 | Memory |
-| s10 | System prompt 组装 |
-| s11 | 错误恢复 |
-| s12 | 持久化任务图 |
-| s13 | 后台任务 |
-| s14 | Cron 调度 |
-| s15 | Agent teams |
-| s16 | 团队协议 |
-| s17 | 自治 Agent |
-| s18 | Git worktree 隔离 |
-| s19 | MCP 插件 |
-| s20 | 完整 Harness + Desktop UI |
+| 阶段 | 机制                      |
+| ---- | ------------------------- |
+| s01  | Agent loop + Bash         |
+| s02  | 工具注册与文件工具        |
+| s03  | 权限审批                  |
+| s04  | Hooks                     |
+| s05  | Todo                      |
+| s06  | Subagent                  |
+| s07  | Skill 按需加载            |
+| s08  | 上下文压缩                |
+| s09  | Memory                    |
+| s10  | System prompt 组装        |
+| s11  | 错误恢复                  |
+| s12  | 持久化任务图              |
+| s13  | 后台任务                  |
+| s14  | Cron 调度                 |
+| s15  | Agent teams               |
+| s16  | 团队协议                  |
+| s17  | 自治 Agent                |
+| s18  | Git worktree 隔离         |
+| s19  | MCP 插件                  |
+| s20  | 完整 Harness + Desktop UI |
 
-## s01
+## 完整 Harness
 
 安装 Deno 后运行：
 
 ```sh
-deno task s01
+deno task s20
 ```
 
-当前 s01 有意保留原课程的最小结构：一个模型循环和一个 Bash 工具。Bash 尚未进行权限隔离，安全边界将在 s03 加入。
+s01–s20 已完整接入桌面版。可在开发者模式中观察 Hook、工具、团队、自治、Worktree 与 MCP 事件。
 
 ## 桌面版
 
@@ -55,4 +55,4 @@ deno task s01
 ../.deno/bin/deno task desktop:build
 ```
 
-发布构建不会读取或嵌入 `.env.local`。正式版的密钥设置界面将在桌面基础骨架之后加入。
+发布构建不会读取或嵌入 `.env.local`。正式版密钥由设置界面写入 macOS Keychain。

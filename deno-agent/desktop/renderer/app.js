@@ -189,6 +189,20 @@ function renderToolEvent(event) {
       input.tool ? ` / ${escapeHtml(input.tool)}` : ""
     }</span><pre>${escapeHtml(event.output || "")}</pre></div>`;
   }
+  if (event.name.startsWith("harness_")) {
+    let data = {};
+    try {
+      data = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    return `<div class="event harness-event"><b>Harness · ${
+      escapeHtml(event.name)
+    }</b><span class="mcp-target">${
+      escapeHtml(
+        data.stage ||
+          (data.ok === true ? "全部检查通过" : data.ok === false ? "检查未通过" : "s20"),
+      )
+    }</span><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></div>`;
+  }
   if (event.name === "list_skills") {
     return `<div class="event skill-event"><b>Skills · 可用技能</b><span class="skill-list">${
       escapeHtml(event.output || "无可用技能")
@@ -369,7 +383,7 @@ async function loadSettings() {
 async function connect(retries = 30) {
   try {
     if (!(await fetch(`${API}/health`)).ok) throw new Error();
-    status.textContent = "Deno Runtime 已连接 · s19 MCP Plugins";
+    status.textContent = "Deno Runtime 已连接 · s20 Complete Harness";
     await loadSettings();
   } catch {
     if (retries) setTimeout(() => connect(retries - 1), 300);
@@ -458,7 +472,7 @@ form.addEventListener("submit", async (event) => {
     item.classList.remove("stream-cursor");
     session.messages.push({ role: "assistant", content: answer });
     await saveSessions();
-    status.textContent = "Deno Runtime 已连接 · s19 MCP Plugins";
+    status.textContent = "Deno Runtime 已连接 · s20 Complete Harness";
   } catch (error) {
     const stopped = error.name === "AbortError";
     const text = stopped
