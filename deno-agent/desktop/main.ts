@@ -1,4 +1,4 @@
-import { type AgentEvent, agentLoop } from "../stages/s04_hooks.ts";
+import { type AgentEvent, agentLoop } from "../stages/s08_context_compact.ts";
 import type { PermissionMode } from "../stages/s03_permission.ts";
 import {
   chooseWorkspace,
@@ -31,6 +31,18 @@ const assets = new Map<string, { body: string; contentType: string }>([
     body: await Deno.readTextFile(new URL("./renderer/developer.css", import.meta.url)),
     contentType: "text/css; charset=utf-8",
   }],
+  ["/todo.css", {
+    body: await Deno.readTextFile(new URL("./renderer/todo.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/subagent.css", {
+    body: await Deno.readTextFile(new URL("./renderer/subagent.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/skill.css", {
+    body: await Deno.readTextFile(new URL("./renderer/skill.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
   ["/app.js", {
     body: await Deno.readTextFile(new URL("./renderer/app.js", import.meta.url)),
     contentType: "text/javascript; charset=utf-8",
@@ -54,7 +66,7 @@ function json(data: unknown, status = 200): Response {
 
 Deno.serve(async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === "/api/health") return json({ ok: true, stage: "s04" });
+  if (url.pathname === "/api/health") return json({ ok: true, stage: "s08" });
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
   }

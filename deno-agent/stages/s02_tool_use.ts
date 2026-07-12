@@ -124,6 +124,16 @@ const tools: ToolDefinition[] = [
     },
   },
 ];
+let systemGuidance = "";
+export function registerTool(definition: ToolDefinition, handler: ToolHandler): void {
+  if (!tools.some((tool) => tool.function.name === definition.function.name)) {
+    tools.push(definition);
+  }
+  handlers[definition.function.name] = handler;
+}
+export function setSystemGuidance(guidance: string): void {
+  systemGuidance = `${systemGuidance} ${guidance}`.trim();
+}
 
 export async function agentLoop(
   query: string,
@@ -140,7 +150,7 @@ export async function agentLoop(
     {
       role: "system",
       content:
-        `You are a coding agent working in ${workspace}. Use dedicated file tools for precise file operations and bash for commands. Continue until the task is complete.`,
+        `You are a coding agent working in ${workspace}. Use dedicated file tools for precise file operations and bash for commands. Continue until the task is complete. ${systemGuidance}`,
     },
     ...history.filter((m) => m.role === "user" || m.role === "assistant"),
     { role: "user", content: query },

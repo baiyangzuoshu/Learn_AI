@@ -1,0 +1,1 @@
+.todo-event b{color:#e1bc66!important}.todo-row{display:flex;gap:8px;align-items:flex-start;margin-top:8px;color:#8c99aa;font-size:11px;line-height:1.4}.todo-row.in_progress{color:#62dbc2}.todo-row.completed{color:#667486;text-decoration:line-through}.todo-row span{width:12px;flex:none}

@@ -11,6 +11,10 @@ let generationController = null;
 function escapeHtml(value) { const node = document.createElement("div"); node.textContent = value; return node.innerHTML; }
 function renderToolEvent(event) {
   let input = {}; try { input = JSON.parse(event.input || "{}"); } catch { /* keep raw input */ }
+  if (event.name === "todo_write" && Array.isArray(input.todos)) return `<div class="event todo-event"><b>Todo · 任务计划</b>${input.todos.map((todo) => `<div class="todo-row ${todo.status}"><span>${todo.status === "completed" ? "✓" : todo.status === "in_progress" ? "▸" : "○"}</span>${escapeHtml(todo.content)}</div>`).join("")}</div>`;
+  if (event.name === "subagent") return `<div class="event subagent-event"><b>Subagent · 隔离子任务</b><span class="subagent-task">${escapeHtml(input.task || "")}</span><span class="subagent-result">${escapeHtml(event.output || "")}</span></div>`;
+  if (event.name === "list_skills") return `<div class="event skill-event"><b>Skills · 可用技能</b><span class="skill-list">${escapeHtml(event.output || "无可用技能")}</span></div>`;
+  if (event.name === "load_skill") return `<div class="event skill-event"><b>Skill · ${escapeHtml(input.name || "")}</b><span class="skill-loaded">✓ 已按需加载 SKILL.md</span></div>`;
   const fileTool = ["read_file", "write_file", "edit_file"].includes(event.name) && input.path;
   if (fileTool) return `<div class="event"><b>${event.name}</b><button class="file-link" data-path="${escapeHtml(input.path)}">↗ ${escapeHtml(input.path)}</button></div>`;
   return `<div class="event"><b>${event.name}</b><br>${escapeHtml(event.input)}${event.output ? `<span class="event-output">${escapeHtml(event.output)}</span>` : ""}</div>`;
@@ -66,7 +70,7 @@ async function loadSettings() {
 }
 
 async function connect(retries = 30) {
-  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s04 Hooks"; await loadSettings(); }
+  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s08 Context Compact"; await loadSettings(); }
   catch { if (retries) setTimeout(() => connect(retries - 1), 300); else status.textContent = "Deno Runtime 连接失败"; }
 }
 
@@ -94,7 +98,7 @@ form.addEventListener("submit", async (event) => {
     thinking.remove(); const item = document.createElement("div"); item.className = "message agent stream-cursor"; messages.append(item);
     for (let i = 0; i < answer.length; i += 3) { item.textContent += answer.slice(i, i + 3); messages.scrollTop = messages.scrollHeight; await new Promise((resolve) => setTimeout(resolve, 7)); }
     item.classList.remove("stream-cursor"); session.messages.push({ role: "assistant", content: answer }); saveSessions();
-    status.textContent = "Deno Runtime 已连接 · s04 Hooks";
+    status.textContent = "Deno Runtime 已连接 · s08 Context Compact";
   } catch (error) { const stopped = error.name === "AbortError"; const text = stopped ? "已停止生成" : `执行失败\n\n阶段：流式响应或 Agent 执行\n原因：${error.message || String(error)}\n\n建议：检查网络、API Key 和模型配置后重试；如果错误持续出现，请打开工具面板查看最后一个操作。`; session.messages.push({ role: "assistant", content: text }); saveSessions(); addMessage("agent", text); status.textContent = stopped ? "生成已停止" : "请求失败 · 可重试"; }
   finally { generationController = null; send.textContent = "↑"; send.title = "发送"; input.focus(); }
 });
