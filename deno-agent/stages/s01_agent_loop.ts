@@ -1,9 +1,12 @@
 import { createChatCompletion } from "../src/providers/deepseek.ts";
 import { resolveDeepSeekConfig } from "../src/config/settings.ts";
+import { getWorkspace } from "../src/config/settings.ts";
 import type { Message, ToolDefinition } from "../src/core/types.ts";
 
-const SYSTEM = `You are a coding agent working in ${Deno.cwd()}.
-Use the bash tool to inspect and modify the workspace. Keep going until the user's task is complete.`;
+function systemPrompt(workspace: string): string {
+  return `You are a coding agent working in ${workspace}.
+Use the bash tool to inspect and modify this workspace. Keep going until the user's task is complete.`;
+}
 
 const TOOLS: ToolDefinition[] = [{
   type: "function",
@@ -19,10 +22,10 @@ const TOOLS: ToolDefinition[] = [{
   },
 }];
 
-async function runBash(command: string): Promise<string> {
-  const process = new Deno.Command("sh", {
+async function runBash(command: string, workspace: string): Promise<string> {
+  const process = new Deno.Command("/bin/sh", {
     args: ["-c", command],
-    cwd: Deno.cwd(),
+    cwd: workspace,
     stdout: "piped",
     stderr: "piped",
   });
@@ -43,10 +46,13 @@ export async function agentLoop(
   query: string,
   onEvent: (event: AgentEvent) => void = () => {},
   model?: string,
+  history: Message[] = [],
 ): Promise<string> {
   const config = await resolveDeepSeekConfig(model);
+  const workspace = await getWorkspace();
   const messages: Message[] = [
-    { role: "system", content: SYSTEM },
+    { role: "system", content: systemPrompt(workspace) },
+    ...history.filter((message) => message.role === "user" || message.role === "assistant"),
     { role: "user", content: query },
   ];
 
@@ -62,7 +68,7 @@ export async function agentLoop(
       let result: string;
       try {
         const input = JSON.parse(call.function.arguments) as { command?: string };
-        result = input.command ? await runBash(input.command) : "Error: command is required";
+        result = input.command ? await runBash(input.command, workspace) : "Error: command is required";
       } catch (error) {
         result = `Error: ${error instanceof Error ? error.message : String(error)}`;
       }

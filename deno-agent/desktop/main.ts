@@ -1,5 +1,5 @@
 import { agentLoop, type AgentEvent } from "../stages/s01_agent_loop.ts";
-import { getPublicSettings, revealApiKey, saveSettings } from "../src/config/settings.ts";
+import { chooseWorkspace, getPublicSettings, removeWorkspace, revealApiKey, saveSettings, selectWorkspace } from "../src/config/settings.ts";
 
 const assets = new Map<string, { body: string; contentType: string }>([
   ["/", {
@@ -40,6 +40,18 @@ Deno.serve(async (request) => {
   if (url.pathname === "/api/health") return json({ ok: true, stage: "s01" });
   if (url.pathname === "/api/settings" && request.method === "GET") return json(await getPublicSettings());
   if (url.pathname === "/api/settings/key" && request.method === "GET") return json({ apiKey: await revealApiKey() });
+  if (url.pathname === "/api/workspace/select" && request.method === "POST") {
+    try { return json(await chooseWorkspace()); }
+    catch (error) { return json({ error: error instanceof Error ? error.message : String(error) }, 400); }
+  }
+  if (url.pathname === "/api/workspace/activate" && request.method === "POST") {
+    try { const body = await request.json(); return json(await selectWorkspace(body.workspace)); }
+    catch (error) { return json({ error: error instanceof Error ? error.message : String(error) }, 400); }
+  }
+  if (url.pathname === "/api/workspace/remove" && request.method === "POST") {
+    try { const body = await request.json(); return json(await removeWorkspace(body.workspace)); }
+    catch (error) { return json({ error: error instanceof Error ? error.message : String(error) }, 400); }
+  }
   if (url.pathname === "/api/settings" && request.method === "POST") {
     try { return json(await saveSettings(await request.json())); }
     catch (error) { return json({ error: error instanceof Error ? error.message : String(error) }, 400); }
@@ -47,10 +59,10 @@ Deno.serve(async (request) => {
 
   if (url.pathname === "/api/chat" && request.method === "POST") {
     try {
-      const body = await request.json() as { message?: string; model?: string };
+      const body = await request.json() as { message?: string; model?: string; history?: Array<{ role: "user" | "assistant"; content: string }> };
       if (!body.message?.trim()) return json({ error: "message is required" }, 400);
       const events: AgentEvent[] = [];
-      const answer = await agentLoop(body.message, (event) => events.push(event), body.model);
+      const answer = await agentLoop(body.message, (event) => events.push(event), body.model, body.history ?? []);
       return json({ answer, events });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
