@@ -9,6 +9,18 @@ export interface AgentEvent {
   input: string;
   output: string;
 }
+export interface ToolRequest {
+  name: string;
+  input: Record<string, unknown>;
+}
+export type AuthorizeTool = (
+  request: ToolRequest,
+) => Promise<{ allowed: boolean; reason?: string }>;
+export interface ToolHooks {
+  before?: (request: ToolRequest) => Promise<string | void>;
+  after?: (request: ToolRequest, output: string) => Promise<void>;
+  stop?: (toolCount: number) => Promise<void>;
+}
 type ToolHandler = (input: Record<string, unknown>, workspace: string) => Promise<string>;
 
 function safePath(workspace: string, requested: string): string {
@@ -118,7 +130,11 @@ export async function agentLoop(
   onEvent: (event: AgentEvent) => void = () => {},
   model?: string,
   history: Message[] = [],
+  authorize: AuthorizeTool = async () => ({ allowed: true }),
+  signal?: AbortSignal,
+  hooks: ToolHooks = {},
 ): Promise<string> {
+  let toolCount = 0;
   const config = await resolveDeepSeekConfig(model), workspace = await getWorkspace();
   const messages: Message[] = [
     {
@@ -130,17 +146,30 @@ export async function agentLoop(
     { role: "user", content: query },
   ];
   while (true) {
-    const response = await createChatCompletion(config, messages, tools);
+    if (signal?.aborted) throw new DOMException("Generation stopped", "AbortError");
+    const response = await createChatCompletion(config, messages, tools, signal);
     const assistant = response.choices[0]?.message;
     if (!assistant) throw new Error("Model returned no message");
     messages.push(assistant);
-    if (!assistant.tool_calls?.length) return assistant.content ?? "";
+    if (!assistant.tool_calls?.length) {
+      await hooks.stop?.(toolCount);
+      return assistant.content ?? "";
+    }
     for (const call of assistant.tool_calls) {
       let output: string;
       try {
         const handler = handlers[call.function.name];
         if (!handler) throw new Error(`Unknown tool: ${call.function.name}`);
-        output = await handler(JSON.parse(call.function.arguments), workspace);
+        const input = JSON.parse(call.function.arguments);
+        const blocked = await hooks.before?.({ name: call.function.name, input });
+        if (blocked) throw new Error(blocked);
+        const decision = await authorize({ name: call.function.name, input });
+        if (!decision.allowed) {
+          throw new Error(`Permission denied${decision.reason ? `: ${decision.reason}` : ""}`);
+        }
+        output = await handler(input, workspace);
+        toolCount++;
+        await hooks.after?.({ name: call.function.name, input }, output);
       } catch (error) {
         output = `Error: ${error instanceof Error ? error.message : String(error)}`;
       }

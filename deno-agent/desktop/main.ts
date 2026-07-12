@@ -1,7 +1,9 @@
-import { type AgentEvent, agentLoop } from "../stages/s02_tool_use.ts";
+import { type AgentEvent, agentLoop } from "../stages/s04_hooks.ts";
+import type { PermissionMode } from "../stages/s03_permission.ts";
 import {
   chooseWorkspace,
   getPublicSettings,
+  getWorkspace,
   removeWorkspace,
   revealApiKey,
   saveSettings,
@@ -19,6 +21,14 @@ const assets = new Map<string, { body: string; contentType: string }>([
   }],
   ["/settings.css", {
     body: await Deno.readTextFile(new URL("./renderer/settings.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/stream.css", {
+    body: await Deno.readTextFile(new URL("./renderer/stream.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/developer.css", {
+    body: await Deno.readTextFile(new URL("./renderer/developer.css", import.meta.url)),
     contentType: "text/css; charset=utf-8",
   }],
   ["/app.js", {
@@ -44,7 +54,7 @@ function json(data: unknown, status = 200): Response {
 
 Deno.serve(async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === "/api/health") return json({ ok: true, stage: "s02" });
+  if (url.pathname === "/api/health") return json({ ok: true, stage: "s04" });
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
   }
@@ -74,6 +84,21 @@ Deno.serve(async (request) => {
       return json({ error: error instanceof Error ? error.message : String(error) }, 400);
     }
   }
+  if (url.pathname === "/api/file/open" && request.method === "POST") {
+    try {
+      const { path } = await request.json();
+      const workspace = await getWorkspace();
+      const target = await Deno.realPath(path.startsWith("/") ? path : `${workspace}/${path}`);
+      const root = await Deno.realPath(workspace);
+      if (target !== root && !target.startsWith(`${root}/`)) {
+        throw new Error("文件不在当前工作目录中");
+      }
+      await new Deno.Command("/usr/bin/open", { args: [target] }).output();
+      return json({ ok: true });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
   if (url.pathname === "/api/settings" && request.method === "POST") {
     try {
       return json(await saveSettings(await request.json()));
@@ -87,6 +112,7 @@ Deno.serve(async (request) => {
       const body = await request.json() as {
         message?: string;
         model?: string;
+        permissionMode?: PermissionMode;
         history?: Array<{ role: "user" | "assistant"; content: string }>;
       };
       if (!body.message?.trim()) return json({ error: "message is required" }, 400);
@@ -96,11 +122,82 @@ Deno.serve(async (request) => {
         (event) => events.push(event),
         body.model,
         body.history ?? [],
+        body.permissionMode ?? "ask",
       );
       return json({ answer, events });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
     }
+  }
+
+  if (url.pathname === "/api/chat/stream" && request.method === "POST") {
+    const body = await request.json() as {
+      message?: string;
+      model?: string;
+      permissionMode?: PermissionMode;
+      developerMode?: boolean;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
+    const encoder = new TextEncoder();
+    const abortController = new AbortController();
+    let streamClosed = false;
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          const emit = (data: unknown) => {
+            if (streamClosed) return;
+            try {
+              controller.enqueue(encoder.encode(`${JSON.stringify(data)}\n`));
+            } catch {
+              streamClosed = true;
+              abortController.abort();
+            }
+          };
+          const close = () => {
+            if (streamClosed) return;
+            streamClosed = true;
+            try {
+              controller.close();
+            } catch { /* consumer already disconnected */ }
+          };
+          emit({ type: "status", message: "正在分析任务…" });
+          agentLoop(
+            body.message ?? "",
+            (event) => emit({ type: "tool", event }),
+            body.model,
+            body.history ?? [],
+            body.permissionMode ?? "ask",
+            abortController.signal,
+            (event) => {
+              if (body.developerMode) emit({ type: "hook", event });
+            },
+          )
+            .then((answer) => {
+              emit({ type: "status", message: "正在组织答案…" });
+              emit({ type: "answer", answer });
+              emit({ type: "done" });
+              close();
+            })
+            .catch((error) => {
+              emit({
+                type: "error",
+                error: error instanceof Error ? error.message : String(error),
+              });
+              close();
+            });
+        },
+        cancel() {
+          streamClosed = true;
+          abortController.abort();
+        },
+      }),
+      {
+        headers: {
+          "content-type": "application/x-ndjson; charset=utf-8",
+          "cache-control": "no-cache",
+        },
+      },
+    );
   }
 
   const asset = assets.get(url.pathname);

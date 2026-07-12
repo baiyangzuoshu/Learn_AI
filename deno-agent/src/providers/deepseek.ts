@@ -20,6 +20,7 @@ export async function createChatCompletion(
   config: DeepSeekConfig,
   messages: Message[],
   tools: ToolDefinition[],
+  signal?: AbortSignal,
 ): Promise<ChatResponse> {
   const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
@@ -28,6 +29,7 @@ export async function createChatCompletion(
       "content-type": "application/json",
     },
     body: JSON.stringify({ model: config.model, messages, tools, temperature: 0 }),
+    signal,
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 2_000);

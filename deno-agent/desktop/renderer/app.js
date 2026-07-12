@@ -1,12 +1,20 @@
 const API = "/api";
 const $ = (selector) => document.querySelector(selector);
-const messages = $("#messages"), events = $("#events"), form = $("#composer");
+const messages = $("#messages"), events = $("#events"), eventsContent = $("#events-content"), form = $("#composer");
 const input = $("#prompt"), send = $("#send"), status = $("#status");
 const modelSelect = $("#model-select"), settingsDialog = $("#settings-dialog");
+const permissionMode = $("#permission-mode"), permissionHint = $("#permission-hint");
 const settingsForm = $("#settings-form"), modelsInput = $("#models"), defaultModel = $("#default-model");
 let settings = {}, sessions = [], activeSessionId = null;
+let generationController = null;
 
 function escapeHtml(value) { const node = document.createElement("div"); node.textContent = value; return node.innerHTML; }
+function renderToolEvent(event) {
+  let input = {}; try { input = JSON.parse(event.input || "{}"); } catch { /* keep raw input */ }
+  const fileTool = ["read_file", "write_file", "edit_file"].includes(event.name) && input.path;
+  if (fileTool) return `<div class="event"><b>${event.name}</b><button class="file-link" data-path="${escapeHtml(input.path)}">↗ ${escapeHtml(input.path)}</button></div>`;
+  return `<div class="event"><b>${event.name}</b><br>${escapeHtml(event.input)}${event.output ? `<span class="event-output">${escapeHtml(event.output)}</span>` : ""}</div>`;
+}
 function fillModels(select, models, selected) { select.innerHTML = models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join(""); select.value = selected || models[0]; }
 function storageKey() { return `deno-agent:sessions:${settings.workspace || "none"}`; }
 function activeSession() { return sessions.find((session) => session.id === activeSessionId); }
@@ -53,11 +61,12 @@ async function loadSettings() {
   fillModels(modelSelect, settings.models, settings.defaultModel); $("#base-url").value = settings.baseUrl;
   modelsInput.value = settings.models.join("\n"); fillModels(defaultModel, settings.models, settings.defaultModel);
   $("#key-status").textContent = settings.hasApiKey ? "✓ 已配置 API Key" : "尚未配置 API Key";
+  $("#developer-mode").checked = localStorage.getItem("deno-agent:developer-mode") === "true";
   if (previousWorkspace !== settings.workspace) loadSessions(); else renderWorkspaceTree();
 }
 
 async function connect(retries = 30) {
-  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s02 Tool Use"; await loadSettings(); }
+  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s04 Hooks"; await loadSettings(); }
   catch { if (retries) setTimeout(() => connect(retries - 1), 300); else status.textContent = "Deno Runtime 连接失败"; }
 }
 
@@ -65,15 +74,58 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault(); const prompt = input.value.trim(), session = activeSession(); if (!prompt || !session) return;
   const history = session.messages.slice(); session.messages.push({ role: "user", content: prompt });
   if (session.title === "新对话") session.title = prompt.slice(0, 24); saveSessions(); renderSessions(); addMessage("user", prompt);
-  input.value = ""; send.disabled = true; status.textContent = "Agent 正在思考和行动…";
+  input.value = ""; generationController = new AbortController(); send.textContent = "■"; send.title = "停止生成"; status.textContent = "Agent 正在思考和行动…";
   try {
-    const response = await fetch(`${API}/chat`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: prompt, model: modelSelect.value, history }) });
-    const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed");
-    session.messages.push({ role: "assistant", content: data.answer || "任务已完成" }); saveSessions(); addMessage("agent", data.answer || "任务已完成");
-    if (data.events?.length) { document.body.classList.add("has-events"); events.classList.remove("hidden"); events.innerHTML = data.events.map((e) => `<div class="event"><b>${e.name}</b><br>${escapeHtml(e.input)}${e.output ? `<span class="event-output">${escapeHtml(e.output)}</span>` : ""}</div>`).join(""); }
-    status.textContent = "Deno Runtime 已连接 · s02 Tool Use";
-  } catch (error) { session.messages.push({ role: "assistant", content: `错误：${error.message}` }); saveSessions(); addMessage("agent", `错误：${error.message}`); status.textContent = "请求失败"; }
-  finally { send.disabled = false; input.focus(); }
+    const thinking = document.createElement("div"); thinking.className = "thinking-card"; thinking.textContent = "正在分析任务…"; messages.append(thinking); messages.scrollTop = messages.scrollHeight;
+    const response = await fetch(`${API}/chat/stream`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: prompt, model: modelSelect.value, permissionMode: permissionMode.value, developerMode: $("#developer-mode").checked, history }), signal: generationController.signal });
+    if (!response.ok || !response.body) throw new Error("无法建立执行流");
+    let buffer = "", answer = ""; const decoder = new TextDecoder(), reader = response.body.getReader();
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buffer += decoder.decode(value, { stream: true }); const lines = buffer.split("\n"); buffer = lines.pop() || "";
+      for (const line of lines) { if (!line) continue; const data = JSON.parse(line);
+        if (data.type === "status") { thinking.textContent = data.message; status.textContent = data.message; }
+        if (data.type === "tool") { thinking.textContent = `正在执行 ${data.event.name}…`; events.classList.remove("hidden"); $("#toggle-events").classList.remove("hidden"); eventsContent.insertAdjacentHTML("beforeend", renderToolEvent(data.event)); }
+        if (data.type === "hook") { events.classList.remove("hidden"); $("#toggle-events").classList.remove("hidden"); eventsContent.insertAdjacentHTML("beforeend", `<div class="event hook-event"><b>Hook · ${escapeHtml(data.event.name)}</b><span class="hook-detail">${escapeHtml(data.event.detail)}</span></div>`); }
+        if (data.type === "answer") answer = data.answer || "任务已完成";
+        if (data.type === "error") throw new Error(data.error);
+      }
+    }
+    thinking.remove(); const item = document.createElement("div"); item.className = "message agent stream-cursor"; messages.append(item);
+    for (let i = 0; i < answer.length; i += 3) { item.textContent += answer.slice(i, i + 3); messages.scrollTop = messages.scrollHeight; await new Promise((resolve) => setTimeout(resolve, 7)); }
+    item.classList.remove("stream-cursor"); session.messages.push({ role: "assistant", content: answer }); saveSessions();
+    status.textContent = "Deno Runtime 已连接 · s04 Hooks";
+  } catch (error) { const stopped = error.name === "AbortError"; const text = stopped ? "已停止生成" : `执行失败\n\n阶段：流式响应或 Agent 执行\n原因：${error.message || String(error)}\n\n建议：检查网络、API Key 和模型配置后重试；如果错误持续出现，请打开工具面板查看最后一个操作。`; session.messages.push({ role: "assistant", content: text }); saveSessions(); addMessage("agent", text); status.textContent = stopped ? "生成已停止" : "请求失败 · 可重试"; }
+  finally { generationController = null; send.textContent = "↑"; send.title = "发送"; input.focus(); }
+});
+
+send.addEventListener("click", (event) => {
+  if (!generationController) return;
+  event.preventDefault(); generationController.abort();
+});
+
+input.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  if (!generationController && input.value.trim()) form.requestSubmit();
+});
+
+function updatePermissionMode() {
+  const hints = { ask: "危险操作会请求确认", auto: "自动批准操作，系统级危险命令仍拦截", full: "警告：所有工具操作均直接执行" };
+  permissionHint.textContent = hints[permissionMode.value];
+  document.body.classList.toggle("permission-full", permissionMode.value === "full");
+  localStorage.setItem("deno-agent:permission-mode", permissionMode.value);
+}
+permissionMode.value = localStorage.getItem("deno-agent:permission-mode") || "ask";
+permissionMode.addEventListener("change", updatePermissionMode);
+updatePermissionMode();
+
+$("#toggle-events").addEventListener("click", () => events.classList.toggle("hidden"));
+$("#close-events").addEventListener("click", () => events.classList.add("hidden"));
+eventsContent.addEventListener("click", async (event) => {
+  const link = event.target.closest(".file-link"); if (!link) return;
+  const response = await fetch(`${API}/file/open`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: link.dataset.path }) });
+  if (!response.ok) status.textContent = (await response.json()).error || "无法打开文件";
 });
 
 $("#new-chat").addEventListener("click", createSession);
@@ -100,5 +152,5 @@ $("#new-workspace").addEventListener("click", async () => { status.textContent =
 $("#settings-button").addEventListener("click", async () => { await loadSettings(); const data = await (await fetch(`${API}/settings/key`)).json(), key = $("#api-key"), toggle = $("#toggle-key"); key.value = data.apiKey || ""; key.type = "text"; toggle.textContent = "隐藏"; settingsDialog.showModal(); });
 $("#toggle-key").addEventListener("click", () => { const key = $("#api-key"), hidden = key.type === "password"; key.type = hidden ? "text" : "password"; $("#toggle-key").textContent = hidden ? "隐藏" : "显示"; });
 modelsInput.addEventListener("input", () => { const models = modelsInput.value.split("\n").map((x) => x.trim()).filter(Boolean); fillModels(defaultModel, models, models.includes(defaultModel.value) ? defaultModel.value : models[0]); });
-settingsForm.addEventListener("submit", async (event) => { if (event.submitter?.value === "cancel") return; event.preventDefault(); const button = $("#save-settings"); button.disabled = true; try { const response = await fetch(`${API}/settings`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ apiKey: $("#api-key").value, baseUrl: $("#base-url").value, models: modelsInput.value.split("\n"), defaultModel: defaultModel.value }) }), data = await response.json(); if (!response.ok) throw new Error(data.error); await loadSettings(); settingsDialog.close(); } catch (error) { $("#key-status").textContent = `错误：${error.message}`; } finally { button.disabled = false; } });
+settingsForm.addEventListener("submit", async (event) => { if (event.submitter?.value === "cancel") return; event.preventDefault(); const button = $("#save-settings"); button.disabled = true; try { localStorage.setItem("deno-agent:developer-mode", String($("#developer-mode").checked)); const response = await fetch(`${API}/settings`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ apiKey: $("#api-key").value, baseUrl: $("#base-url").value, models: modelsInput.value.split("\n"), defaultModel: defaultModel.value }) }), data = await response.json(); if (!response.ok) throw new Error(data.error); await loadSettings(); settingsDialog.close(); } catch (error) { $("#key-status").textContent = `错误：${error.message}`; } finally { button.disabled = false; } });
 connect();
