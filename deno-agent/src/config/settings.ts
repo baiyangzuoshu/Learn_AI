@@ -4,8 +4,21 @@ const SERVICE = "com.youjunmao.deno-agent";
 const ACCOUNT = "deepseek-api-key";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
 
-export interface PublicSettings { baseUrl: string; models: string[]; defaultModel: string; hasApiKey: boolean; workspace?: string; workspaces: string[] }
-interface StoredSettings { baseUrl: string; models: string[]; defaultModel: string; workspace?: string; workspaces?: string[] }
+export interface PublicSettings {
+  baseUrl: string;
+  models: string[];
+  defaultModel: string;
+  hasApiKey: boolean;
+  workspace?: string;
+  workspaces: string[];
+}
+interface StoredSettings {
+  baseUrl: string;
+  models: string[];
+  defaultModel: string;
+  workspace?: string;
+  workspaces?: string[];
+}
 
 function settingsPath(): string {
   const home = Deno.env.get("HOME");
@@ -14,15 +27,31 @@ function settingsPath(): string {
 }
 
 async function readStored(): Promise<StoredSettings> {
-  const fallback = { baseUrl: Deno.env.get("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com", models: DEFAULT_MODELS, defaultModel: Deno.env.get("DEEPSEEK_MODEL") ?? "deepseek-v4-flash" };
+  const fallback = {
+    baseUrl: Deno.env.get("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com",
+    models: DEFAULT_MODELS,
+    defaultModel: Deno.env.get("DEEPSEEK_MODEL") ?? "deepseek-v4-flash",
+  };
   try {
     const parsed = JSON.parse(await Deno.readTextFile(settingsPath())) as Partial<StoredSettings>;
     const savedModels = parsed.models?.filter(Boolean);
     const legacyDefaults = ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash"];
-    const models = savedModels?.join("\n") === legacyDefaults.join("\n") ? DEFAULT_MODELS : savedModels ?? fallback.models;
+    const models = savedModels?.join("\n") === legacyDefaults.join("\n")
+      ? DEFAULT_MODELS
+      : savedModels ?? fallback.models;
     const workspaces = parsed.workspaces ?? (parsed.workspace ? [parsed.workspace] : []);
-    const workspace = parsed.workspace && workspaces.includes(parsed.workspace) ? parsed.workspace : workspaces[0];
-    return { baseUrl: parsed.baseUrl?.trim() || fallback.baseUrl, models, defaultModel: parsed.defaultModel && models.includes(parsed.defaultModel) ? parsed.defaultModel : models[0], workspace, workspaces };
+    const workspace = parsed.workspace && workspaces.includes(parsed.workspace)
+      ? parsed.workspace
+      : workspaces[0];
+    return {
+      baseUrl: parsed.baseUrl?.trim() || fallback.baseUrl,
+      models,
+      defaultModel: parsed.defaultModel && models.includes(parsed.defaultModel)
+        ? parsed.defaultModel
+        : models[0],
+      workspace,
+      workspaces,
+    };
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) return fallback;
     throw error;
@@ -30,7 +59,11 @@ async function readStored(): Promise<StoredSettings> {
 }
 
 async function keychain(args: string[]): Promise<{ ok: boolean; output: string }> {
-  const result = await new Deno.Command("/usr/bin/security", { args, stdout: "piped", stderr: "null" }).output();
+  const result = await new Deno.Command("/usr/bin/security", {
+    args,
+    stdout: "piped",
+    stderr: "null",
+  }).output();
   return { ok: result.success, output: new TextDecoder().decode(result.stdout).trim() };
 }
 
@@ -50,19 +83,43 @@ export async function getPublicSettings(): Promise<PublicSettings> {
   return { ...stored, workspaces: stored.workspaces ?? [], hasApiKey: Boolean(await readKey()) };
 }
 
-export async function saveSettings(input: { apiKey?: string; baseUrl: string; models: string[]; defaultModel: string }): Promise<PublicSettings> {
+export async function saveSettings(
+  input: { apiKey?: string; baseUrl: string; models: string[]; defaultModel: string },
+): Promise<PublicSettings> {
   const models = [...new Set(input.models.map((item) => item.trim()).filter(Boolean))];
   if (!input.baseUrl.startsWith("https://")) throw new Error("Base URL 必须使用 HTTPS");
   if (!models.length) throw new Error("至少配置一个模型");
   if (!models.includes(input.defaultModel)) throw new Error("默认模型不在模型列表中");
   if (input.apiKey?.trim()) {
-    const result = await keychain(["add-generic-password", "-U", "-s", SERVICE, "-a", ACCOUNT, "-w", input.apiKey.trim()]);
+    const result = await keychain([
+      "add-generic-password",
+      "-U",
+      "-s",
+      SERVICE,
+      "-a",
+      ACCOUNT,
+      "-w",
+      input.apiKey.trim(),
+    ]);
     if (!result.ok) throw new Error("无法写入 macOS Keychain");
   }
   const path = settingsPath();
   await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
   const current = await readStored();
-  await Deno.writeTextFile(path, JSON.stringify({ baseUrl: input.baseUrl.replace(/\/$/, ""), models, defaultModel: input.defaultModel, workspace: current.workspace, workspaces: current.workspaces ?? [] }, null, 2));
+  await Deno.writeTextFile(
+    path,
+    JSON.stringify(
+      {
+        baseUrl: input.baseUrl.replace(/\/$/, ""),
+        models,
+        defaultModel: input.defaultModel,
+        workspace: current.workspace,
+        workspaces: current.workspaces ?? [],
+      },
+      null,
+      2,
+    ),
+  );
   return await getPublicSettings();
 }
 
@@ -76,7 +133,11 @@ export async function getWorkspace(): Promise<string> {
 
 export async function chooseWorkspace(): Promise<PublicSettings> {
   const script = 'POSIX path of (choose folder with prompt "选择 Deno Agent 工作目录")';
-  const result = await new Deno.Command("/usr/bin/osascript", { args: ["-e", script], stdout: "piped", stderr: "piped" }).output();
+  const result = await new Deno.Command("/usr/bin/osascript", {
+    args: ["-e", script],
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
   if (!result.success) throw new Error("已取消选择目录");
   const workspace = new TextDecoder().decode(result.stdout).trim().replace(/\/$/, "");
   const current = await readStored();
@@ -98,7 +159,10 @@ export async function removeWorkspace(workspace: string): Promise<PublicSettings
   const current = await readStored();
   const workspaces = (current.workspaces ?? []).filter((item) => item !== workspace);
   const active = current.workspace === workspace ? workspaces[0] : current.workspace;
-  await Deno.writeTextFile(settingsPath(), JSON.stringify({ ...current, workspace: active, workspaces }, null, 2));
+  await Deno.writeTextFile(
+    settingsPath(),
+    JSON.stringify({ ...current, workspace: active, workspaces }, null, 2),
+  );
   return await getPublicSettings();
 }
 

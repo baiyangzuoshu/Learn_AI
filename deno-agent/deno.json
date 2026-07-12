@@ -1,6 +1,7 @@
 {
   "tasks": {
     "s01": "deno run --allow-env --allow-net --allow-run --allow-read=. --allow-write=. --env-file=.env.local stages/s01_agent_loop.ts",
+    "s02": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s02_tool_use.ts",
     "server": "deno run --allow-env --allow-net=127.0.0.1,api.deepseek.com --allow-run --allow-read=. --allow-write=. --env-file=.env.local src/server.ts",
     "desktop": "deno desktop --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/bin/sh,/usr/bin/osascript --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:hmr": "deno desktop --hmr --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/bin/sh,/usr/bin/osascript --allow-read --allow-write --env-file=.env.local desktop/main.ts",

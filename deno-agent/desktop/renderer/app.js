@@ -57,7 +57,7 @@ async function loadSettings() {
 }
 
 async function connect(retries = 30) {
-  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s01 Agent Loop"; await loadSettings(); }
+  try { if (!(await fetch(`${API}/health`)).ok) throw new Error(); status.textContent = "Deno Runtime 已连接 · s02 Tool Use"; await loadSettings(); }
   catch { if (retries) setTimeout(() => connect(retries - 1), 300); else status.textContent = "Deno Runtime 连接失败"; }
 }
 
@@ -71,7 +71,7 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed");
     session.messages.push({ role: "assistant", content: data.answer || "任务已完成" }); saveSessions(); addMessage("agent", data.answer || "任务已完成");
     if (data.events?.length) { document.body.classList.add("has-events"); events.classList.remove("hidden"); events.innerHTML = data.events.map((e) => `<div class="event"><b>${e.name}</b><br>${escapeHtml(e.input)}${e.output ? `<span class="event-output">${escapeHtml(e.output)}</span>` : ""}</div>`).join(""); }
-    status.textContent = "Deno Runtime 已连接 · s01 Agent Loop";
+    status.textContent = "Deno Runtime 已连接 · s02 Tool Use";
   } catch (error) { session.messages.push({ role: "assistant", content: `错误：${error.message}` }); saveSessions(); addMessage("agent", `错误：${error.message}`); status.textContent = "请求失败"; }
   finally { send.disabled = false; input.focus(); }
 });
