@@ -1,4 +1,4 @@
-import { createChatCompletion } from "../src/providers/deepseek.ts";
+import { createChatCompletion, ProviderError } from "../src/providers/deepseek.ts";
 import { getWorkspace, resolveDeepSeekConfig } from "../src/config/settings.ts";
 import type { Message, ToolDefinition } from "../src/core/types.ts";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -20,6 +20,7 @@ export interface ToolHooks {
   before?: (request: ToolRequest) => Promise<string | void>;
   after?: (request: ToolRequest, output: string) => Promise<void>;
   stop?: (toolCount: number) => Promise<void>;
+  recovery?: (attempt: number, delayMs: number, reason: string) => Promise<void>;
 }
 type ToolHandler = (input: Record<string, unknown>, workspace: string) => Promise<string>;
 
@@ -124,7 +125,14 @@ const tools: ToolDefinition[] = [
     },
   },
 ];
-let systemGuidance = "";
+export interface SystemPromptSection {
+  id: string;
+  title: string;
+  content: string;
+  priority: number;
+}
+const promptSections = new Map<string, SystemPromptSection>();
+let legacyGuidanceId = 0;
 export function registerTool(definition: ToolDefinition, handler: ToolHandler): void {
   if (!tools.some((tool) => tool.function.name === definition.function.name)) {
     tools.push(definition);
@@ -132,7 +140,74 @@ export function registerTool(definition: ToolDefinition, handler: ToolHandler): 
   handlers[definition.function.name] = handler;
 }
 export function setSystemGuidance(guidance: string): void {
-  systemGuidance = `${systemGuidance} ${guidance}`.trim();
+  registerSystemPromptSection({
+    id: `capability-${++legacyGuidanceId}`,
+    title: "Capability guidance",
+    content: guidance,
+    priority: 50,
+  });
+}
+export function registerSystemPromptSection(section: SystemPromptSection): void {
+  if (!section.id.trim() || !section.content.trim()) throw new Error("invalid prompt section");
+  promptSections.set(section.id, { ...section, content: section.content.trim() });
+}
+export function systemPromptSnapshot(workspace: string): {
+  prompt: string;
+  sections: SystemPromptSection[];
+} {
+  const core: SystemPromptSection[] = [{
+    id: "core",
+    title: "Identity and workspace",
+    priority: 0,
+    content:
+      `You are a coding agent working in ${workspace}. Use dedicated file tools for precise file operations and bash for commands. Continue until the user's task is complete.`,
+  }];
+  const sections = [...core, ...promptSections.values()].sort((a, b) =>
+    a.priority - b.priority || a.id.localeCompare(b.id)
+  );
+  return {
+    sections,
+    prompt: sections.map((section) => `## ${section.title}\n${section.content}`).join("\n\n"),
+  };
+}
+
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Generation stopped", "AbortError"));
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Generation stopped", "AbortError"));
+    }, { once: true });
+  });
+}
+
+async function completionWithRecovery(
+  config: Awaited<ReturnType<typeof resolveDeepSeekConfig>>,
+  messages: Message[],
+  signal: AbortSignal | undefined,
+  hooks: ToolHooks,
+) {
+  const delays = [600, 1_200, 2_400];
+  for (let attempt = 0;; attempt++) {
+    try {
+      return await createChatCompletion(config, messages, tools, signal);
+    } catch (error) {
+      if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+      const retryable = error instanceof ProviderError
+        ? error.retryable
+        : error instanceof TypeError;
+      if (!retryable || attempt >= delays.length) throw error;
+      const delay = error instanceof ProviderError && error.retryAfterMs
+        ? Math.min(error.retryAfterMs, 10_000)
+        : delays[attempt];
+      const reason = error instanceof ProviderError ? `HTTP ${error.status}` : "网络连接中断";
+      await hooks.recovery?.(attempt + 1, delay, reason);
+      await abortableDelay(delay, signal);
+    }
+  }
 }
 
 export async function agentLoop(
@@ -146,18 +221,18 @@ export async function agentLoop(
 ): Promise<string> {
   let toolCount = 0;
   const config = await resolveDeepSeekConfig(model), workspace = await getWorkspace();
+  const systemPrompt = systemPromptSnapshot(workspace);
   const messages: Message[] = [
     {
       role: "system",
-      content:
-        `You are a coding agent working in ${workspace}. Use dedicated file tools for precise file operations and bash for commands. Continue until the task is complete. ${systemGuidance}`,
+      content: systemPrompt.prompt,
     },
     ...history.filter((m) => m.role === "user" || m.role === "assistant"),
     { role: "user", content: query },
   ];
   while (true) {
     if (signal?.aborted) throw new DOMException("Generation stopped", "AbortError");
-    const response = await createChatCompletion(config, messages, tools, signal);
+    const response = await completionWithRecovery(config, messages, signal, hooks);
     const assistant = response.choices[0]?.message;
     if (!assistant) throw new Error("Model returned no message");
     messages.push(assistant);

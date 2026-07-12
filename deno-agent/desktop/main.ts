@@ -1,5 +1,6 @@
-import { type AgentEvent, agentLoop } from "../stages/s08_context_compact.ts";
+import { type AgentEvent, agentLoop } from "../stages/s12_persistent_task_graph.ts";
 import type { PermissionMode } from "../stages/s03_permission.ts";
+import { readConversations, saveConversations } from "../src/config/conversations.ts";
 import {
   chooseWorkspace,
   getPublicSettings,
@@ -66,12 +67,27 @@ function json(data: unknown, status = 200): Response {
 
 Deno.serve(async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === "/api/health") return json({ ok: true, stage: "s08" });
+  if (url.pathname === "/api/health") return json({ ok: true, stage: "s12" });
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
   }
   if (url.pathname === "/api/settings/key" && request.method === "GET") {
     return json({ apiKey: await revealApiKey() });
+  }
+  if (url.pathname === "/api/conversations" && request.method === "GET") {
+    try {
+      return json({ sessions: await readConversations() });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+  if (url.pathname === "/api/conversations" && request.method === "PUT") {
+    try {
+      const body = await request.json();
+      return json({ sessions: await saveConversations(body.sessions) });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
   if (url.pathname === "/api/workspace/select" && request.method === "POST") {
     try {

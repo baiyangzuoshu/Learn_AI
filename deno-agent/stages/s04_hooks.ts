@@ -7,7 +7,7 @@ import type { ToolHooks, ToolRequest } from "./s02_tool_use.ts";
 import type { Message } from "../src/core/types.ts";
 import { getWorkspace } from "../src/config/settings.ts";
 
-type HookEvent = "UserPromptSubmit" | "PreToolUse" | "PostToolUse" | "Stop";
+type HookEvent = "UserPromptSubmit" | "PreToolUse" | "PostToolUse" | "Stop" | "ErrorRecovery";
 type Hook = (...args: unknown[]) => void | string | Promise<void | string>;
 const registry = new Map<HookEvent, Hook[]>();
 
@@ -53,6 +53,12 @@ export async function agentLoop(
     stop: async (count) => {
       onHook({ name: "Stop", detail: `${count} 次工具调用` });
       await trigger("Stop", count);
+    },
+    recovery: async (attempt, delayMs, reason) => {
+      onHook({
+        name: "ErrorRecovery",
+        detail: `${reason} · 第 ${attempt}/3 次重试 · 等待 ${delayMs}ms`,
+      });
     },
   };
   return await permissionAgentLoop(query, onEvent, model, history, permissionMode, signal, hooks);

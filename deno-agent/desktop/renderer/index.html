@@ -1,43 +1,68 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deno Agent</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="settings.css" />
-  <link rel="stylesheet" href="stream.css" />
-  <link rel="stylesheet" href="developer.css" />
-  <link rel="stylesheet" href="todo.css" />
-  <link rel="stylesheet" href="subagent.css" />
-  <link rel="stylesheet" href="skill.css" />
-</head>
-<body>
-  <aside>
-    <div class="brand"><span class="logo">D</span><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
-    <button id="new-chat" class="new-chat">＋ 新对话</button>
-    <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
-    <div class="stage"><span>Harness</span><strong>s08</strong><div><i style="width:40%"></i></div><small>Context Compact · 8 / 20</small></div>
-    <button id="settings-button" class="settings-button">⚙ 设置</button>
-  </aside>
-  <main>
-    <header><div><h1>新的任务</h1><p id="status">正在连接 Deno Runtime…</p></div><div class="header-actions"><button id="toggle-events" class="tool-toggle hidden">工具</button><span class="pill">DeepSeek</span></div></header>
-    <section id="messages" class="messages">
-      <div class="welcome"><div class="orb">✦</div><h2>今天想一起构建什么？</h2><p>我可以读取代码、执行命令并完成工作区任务。</p><div class="suggestions"><button>解释这个项目的架构</button><button>检查当前代码并提出改进</button><button>创建一个新功能</button></div></div>
-    </section>
-    <section id="events" class="events hidden"><div class="events-header"><span>工具执行记录</span><button id="close-events" title="隐藏工具记录">×</button></div><div id="events-content"></div></section>
-    <form id="composer"><textarea id="prompt" rows="1" placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea><select id="model-select" class="model-side" title="选择模型"></select><button id="send" type="submit">↑</button><div class="composer-meta"><select id="permission-mode" title="工具权限模式"><option value="ask">请求批准</option><option value="auto">替我审批</option><option value="full">完全访问权限</option></select><small id="permission-hint">危险操作会请求确认</small></div></form>
-  </main>
-  <dialog id="settings-dialog"><form id="settings-form" method="dialog">
-    <div class="dialog-title"><div><h2>AI 模型设置</h2><p>密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
-    <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
-    <label>Base URL<input id="base-url" type="url" required /></label>
-    <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
-    <label>默认模型<select id="default-model"></select></label>
-    <label class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示 Hook 生命周期事件</small></span></label>
-    <p id="key-status" class="key-status"></p>
-    <div class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>
-  </form></dialog>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deno Agent</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="stylesheet" href="stream.css" />
+    <link rel="stylesheet" href="developer.css" />
+    <link rel="stylesheet" href="todo.css" />
+    <link rel="stylesheet" href="subagent.css" />
+    <link rel="stylesheet" href="skill.css" />
+  </head>
+  <body>
+    <aside>
+      <div
+        class="brand"><span class="logo">D</span><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
+      <button id="new-chat" class="new-chat">＋ 新对话</button>
+      <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
+      <div
+        class="stage"><span>Harness</span><strong>s12</strong><div><i style="width:60%"></i></div><small>Task Graph · 12 / 20</small></div>
+      <button id="settings-button" class="settings-button">⚙ 设置</button>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <h1>新的任务</h1>
+          <p id="status">正在连接 Deno Runtime…</p>
+        </div>
+        <div
+          class="header-actions"><button id="toggle-events" class="tool-toggle hidden">工具</button><span class="pill">DeepSeek</span></div>
+      </header>
+      <section id="messages" class="messages">
+        <div class="welcome">
+          <div class="orb">✦</div>
+          <h2>今天想一起构建什么？</h2>
+          <p>我可以读取代码、执行命令并完成工作区任务。</p>
+          <div
+            class="suggestions"><button>解释这个项目的架构</button><button>检查当前代码并提出改进</button><button>创建一个新功能</button></div>
+        </div>
+      </section>
+      <section id="events" class="events hidden">
+        <div
+          class="events-header"><span>工具执行记录</span><button id="close-events" title="隐藏工具记录">×</button></div>
+        <div id="events-content"></div>
+      </section>
+      <form
+        id="composer"><textarea id="prompt" rows="1" placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea><select id="model-select" class="model-side" title="选择模型"></select><button id="send" type="submit">↑</button><div class="composer-meta"><select id="permission-mode" title="工具权限模式"><option value="ask">请求批准</option><option value="auto">替我审批</option><option value="full">完全访问权限</option></select><small id="permission-hint">危险操作会请求确认</small></div></form>
+    </main>
+    <dialog id="settings-dialog">
+      <form id="settings-form" method="dialog">
+        <div
+          class="dialog-title"><div><h2>AI 模型设置</h2><p>密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
+        <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
+        <label>Base URL<input id="base-url" type="url" required /></label>
+        <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
+        <label>默认模型<select id="default-model"></select></label>
+        <label
+          class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示 Hook 生命周期事件</small></span></label>
+        <p id="key-status" class="key-status"></p>
+        <div
+          class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
 </html>

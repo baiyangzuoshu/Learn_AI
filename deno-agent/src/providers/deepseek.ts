@@ -6,6 +6,18 @@ export interface DeepSeekConfig {
   model: string;
 }
 
+export class ProviderError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryable: boolean,
+    readonly retryAfterMs?: number,
+  ) {
+    super(message);
+    this.name = "ProviderError";
+  }
+}
+
 export function deepSeekConfigFromEnv(): DeepSeekConfig {
   const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
   if (!apiKey) throw new Error("Missing DEEPSEEK_API_KEY");
@@ -33,7 +45,13 @@ export async function createChatCompletion(
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 2_000);
-    throw new Error(`DeepSeek API ${response.status}: ${detail}`);
+    const retryAfter = Number(response.headers.get("retry-after"));
+    throw new ProviderError(
+      `DeepSeek API ${response.status}: ${detail}`,
+      response.status,
+      response.status === 408 || response.status === 429 || response.status >= 500,
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined,
+    );
   }
   return await response.json() as ChatResponse;
 }
