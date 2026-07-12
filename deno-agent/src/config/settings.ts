@@ -1,8 +1,10 @@
 import type { DeepSeekConfig } from "../providers/deepseek.ts";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const SERVICE = "com.youjunmao.deno-agent";
 const ACCOUNT = "deepseek-api-key";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+const workspaceContext = new AsyncLocalStorage<string>();
 
 export interface PublicSettings {
   baseUrl: string;
@@ -124,11 +126,18 @@ export async function saveSettings(
 }
 
 export async function getWorkspace(): Promise<string> {
+  const scoped = workspaceContext.getStore();
+  if (scoped) return scoped;
   const workspace = (await readStored()).workspace;
   if (!workspace) throw new Error("请先点击左侧“新目录”选择工作目录");
   const stat = await Deno.stat(workspace);
   if (!stat.isDirectory) throw new Error("保存的工作目录已失效");
   return workspace;
+}
+export async function withWorkspace<T>(workspace: string, action: () => Promise<T>): Promise<T> {
+  const stat = await Deno.stat(workspace);
+  if (!stat.isDirectory) throw new Error("绑定的项目目录已失效");
+  return await workspaceContext.run(workspace, action);
 }
 
 export async function chooseWorkspace(): Promise<PublicSettings> {

@@ -54,8 +54,10 @@ function validateSessions(value: unknown): ConversationSession[] {
   });
 }
 
-export async function readConversations(): Promise<ConversationSession[]> {
-  const path = await conversationsPath(await getWorkspace());
+export async function readConversations(
+  workspace?: string,
+): Promise<ConversationSession[]> {
+  const path = await conversationsPath(workspace ?? await getWorkspace());
   try {
     return validateSessions(JSON.parse(await Deno.readTextFile(path)));
   } catch (error) {
@@ -64,12 +66,26 @@ export async function readConversations(): Promise<ConversationSession[]> {
   }
 }
 
-export async function saveConversations(value: unknown): Promise<ConversationSession[]> {
+export async function saveConversations(
+  value: unknown,
+  workspace?: string,
+): Promise<ConversationSession[]> {
   const sessions = validateSessions(value);
-  const path = await conversationsPath(await getWorkspace());
+  const path = await conversationsPath(workspace ?? await getWorkspace());
   await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
   const temporary = `${path}.${crypto.randomUUID()}.tmp`;
   await Deno.writeTextFile(temporary, `${JSON.stringify(sessions, null, 2)}\n`);
   await Deno.rename(temporary, path);
   return sessions;
+}
+
+export async function appendConversation(
+  workspace: string,
+  session: ConversationSession,
+): Promise<void> {
+  const sessions = await readConversations(workspace);
+  await saveConversations(
+    [session, ...sessions.filter((item) => item.id !== session.id)].slice(0, MAX_SESSIONS),
+    workspace,
+  );
 }

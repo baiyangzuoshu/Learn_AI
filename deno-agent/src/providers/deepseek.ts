@@ -5,6 +5,19 @@ export interface DeepSeekConfig {
   baseUrl: string;
   model: string;
 }
+const telemetry = {
+  calls: 0,
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  cacheHitTokens: 0,
+  cacheMissTokens: 0,
+  lastTotalTokens: 0,
+  lastCacheHitTokens: 0,
+};
+export function providerTelemetry() {
+  return { ...telemetry };
+}
 
 export class ProviderError extends Error {
   constructor(
@@ -53,5 +66,16 @@ export async function createChatCompletion(
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined,
     );
   }
-  return await response.json() as ChatResponse;
+  const payload = await response.json() as ChatResponse;
+  if (payload.usage) {
+    telemetry.calls++;
+    telemetry.promptTokens += payload.usage.prompt_tokens ?? 0;
+    telemetry.completionTokens += payload.usage.completion_tokens ?? 0;
+    telemetry.totalTokens += payload.usage.total_tokens ?? 0;
+    telemetry.cacheHitTokens += payload.usage.prompt_cache_hit_tokens ?? 0;
+    telemetry.cacheMissTokens += payload.usage.prompt_cache_miss_tokens ?? 0;
+    telemetry.lastTotalTokens = payload.usage.total_tokens ?? 0;
+    telemetry.lastCacheHitTokens = payload.usage.prompt_cache_hit_tokens ?? 0;
+  }
+  return payload;
 }

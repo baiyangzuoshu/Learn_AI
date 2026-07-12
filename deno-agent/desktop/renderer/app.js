@@ -12,6 +12,7 @@ const settingsForm = $("#settings-form"),
   defaultModel = $("#default-model");
 let settings = {}, sessions = [], activeSessionId = null;
 let generationController = null;
+let cronSchedules = [];
 
 function escapeHtml(value) {
   const node = document.createElement("div");
@@ -51,10 +52,142 @@ function renderToolEvent(event) {
       ).join("")
     }</div>`;
   }
+  if (event.name.startsWith("cron_")) {
+    let result = [];
+    try {
+      const parsed = JSON.parse(event.output || "[]");
+      result = Array.isArray(parsed) ? parsed : parsed.schedule ? [parsed.schedule] : [];
+    } catch { /* show raw output */ }
+    return `<div class="event cron-event"><b>Cron · ${escapeHtml(event.name)}</b>${
+      result.map((schedule) =>
+        `<div class="cron-schedule ${schedule.enabled ? "enabled" : "disabled"}"><strong>${
+          escapeHtml(schedule.id)
+        }</strong><span>${schedule.enabled ? "已启用" : "已停用"}</span><small>${
+          escapeHtml(schedule.title || "")
+        } · ${
+          escapeHtml(schedule.workspace ? schedule.workspace.split("/").pop() : "默认全局项目")
+        } · 每 ${escapeHtml(schedule.intervalSeconds)} 秒</small><code>${
+          escapeHtml(schedule.prompt || "")
+        }</code>${
+          schedule.lastConversationId
+            ? `<em>最近对话：${escapeHtml(schedule.lastConversationId)}</em>`
+            : ""
+        }</div>`
+      ).join("")
+    }${
+      !result.length ? `<span class="event-output">${escapeHtml(event.output)}</span>` : ""
+    }</div>`;
+  }
+  if (event.name.startsWith("background_")) {
+    let result = {};
+    try {
+      result = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    const jobList = Array.isArray(result) ? result : [result];
+    return `<div class="event background-event"><b>Background · ${escapeHtml(event.name)}</b>${
+      jobList.map((job) =>
+        job.id
+          ? `<div class="background-job ${escapeHtml(job.status)}"><strong>${
+            escapeHtml(job.id)
+          }</strong><span>${escapeHtml(job.status)}</span>${
+            job.command ? `<small>${escapeHtml(job.command)}</small>` : ""
+          }${job.output ? `<pre>${escapeHtml(job.output)}</pre>` : ""}</div>`
+          : ""
+      ).join("")
+    }${
+      !jobList.some((job) => job.id)
+        ? `<span class="event-output">${escapeHtml(event.output)}</span>`
+        : ""
+    }</div>`;
+  }
   if (event.name === "subagent") {
     return `<div class="event subagent-event"><b>Subagent · 隔离子任务</b><span class="subagent-task">${
       escapeHtml(input.task || "")
     }</span><span class="subagent-result">${escapeHtml(event.output || "")}</span></div>`;
+  }
+  if (event.name === "team_run") {
+    let team = { members: [] };
+    try {
+      team = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    return `<div class="event team-event"><b>Agent Team · 并行团队</b><span class="team-objective">${
+      escapeHtml(team.objective || input.objective || "")
+    }</span>${
+      (team.members || []).map((member) =>
+        `<div class="team-member ${escapeHtml(member.status)}"><div><strong>${
+          escapeHtml(member.role)
+        }</strong><span>${escapeHtml(member.status)}</span></div><small>${
+          escapeHtml(member.task)
+        }</small><pre>${escapeHtml(member.result || "")}</pre></div>`
+      ).join("")
+    }</div>`;
+  }
+  if (event.name === "team_protocol_run") {
+    let team = { members: [], messages: [] };
+    try {
+      team = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    return `<div class="event team-event protocol-event"><b>Team Protocol · ${
+      escapeHtml(team.teamId || "")
+    }</b><span class="team-objective">${
+      escapeHtml(team.objective || input.objective || "")
+    }</span><div class="protocol-messages">${
+      (team.messages || []).map((message) =>
+        `<div><strong>${escapeHtml(message.from)} → ${escapeHtml(message.to)}</strong><span>${
+          escapeHtml(message.kind)
+        }</span><p>${escapeHtml(message.content)}</p></div>`
+      ).join("")
+    }</div>${
+      (team.members || []).map((member) =>
+        `<div class="team-member ${escapeHtml(member.status)}"><div><strong>${
+          escapeHtml(member.role)
+        }</strong><span>${escapeHtml(member.status)}</span></div><small>${
+          escapeHtml(member.task)
+        }</small><pre>${escapeHtml(member.result || "")}</pre></div>`
+      ).join("")
+    }</div>`;
+  }
+  if (event.name === "autonomous_run") {
+    let run = { iterations: [] };
+    try {
+      run = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    return `<div class="event autonomy-event"><b>Autonomy · ${
+      escapeHtml(run.status || "")
+    }</b><span class="team-objective">${escapeHtml(run.objective || input.objective || "")}</span>${
+      (run.iterations || []).map((item) =>
+        `<div class="autonomy-iteration ${
+          item.completed ? "completed" : "continue"
+        }"><strong>Iteration ${escapeHtml(item.iteration)}</strong><span>${
+          item.completed ? "完成" : "继续"
+        }</span><pre>${escapeHtml(item.output || "")}</pre></div>`
+      ).join("")
+    }</div>`;
+  }
+  if (event.name.startsWith("worktree_")) {
+    let data = {};
+    try {
+      data = JSON.parse(event.output || "{}");
+    } catch { /* show raw output */ }
+    const items = Array.isArray(data) ? data : [data];
+    return `<div class="event worktree-event"><b>Git Worktree · ${escapeHtml(event.name)}</b>${
+      items.map((item) =>
+        item.id
+          ? `<div class="worktree-card"><strong>${escapeHtml(item.id)}</strong><span>${
+            escapeHtml(item.branch || (item.removed ? "已移除" : ""))
+          }</span>${item.path ? `<small>${escapeHtml(item.path)}</small>` : ""}${
+            item.status ? `<pre>${escapeHtml(item.status)}</pre>` : ""
+          }${item.result ? `<pre>${escapeHtml(item.result)}</pre>` : ""}</div>`
+          : ""
+      ).join("")
+    }</div>`;
+  }
+  if (event.name.startsWith("mcp_")) {
+    return `<div class="event mcp-event"><b>MCP · ${
+      escapeHtml(event.name)
+    }</b><span class="mcp-target">${escapeHtml(input.server || "工作区服务器")}${
+      input.tool ? ` / ${escapeHtml(input.tool)}` : ""
+    }</span><pre>${escapeHtml(event.output || "")}</pre></div>`;
   }
   if (event.name === "list_skills") {
     return `<div class="event skill-event"><b>Skills · 可用技能</b><span class="skill-list">${
@@ -87,6 +220,32 @@ function storageKey() {
 function activeSession() {
   return sessions.find((session) => session.id === activeSessionId);
 }
+async function updateRuntimeStatus() {
+  const sessionMessages = activeSession()?.messages || [];
+  const estimatedTokens = Math.ceil(
+    sessionMessages.reduce((sum, item) => sum + item.content.length, 0) / 4,
+  );
+  $("#runtime-model").textContent = modelSelect.value || settings.defaultModel || "—";
+  $("#runtime-workspace").textContent = settings.workspace || "未选择项目";
+  $("#runtime-workspace").title = settings.workspace || "";
+  $("#runtime-turns").textContent = `${
+    sessionMessages.filter((item) => item.role === "user").length
+  }轮`;
+  $("#runtime-context").textContent = `${Math.min(100, Math.round(estimatedTokens / 1280))}%`;
+  try {
+    const data = await (await fetch(`${API}/telemetry`)).json();
+    $("#runtime-session-tokens").textContent = data.totalTokens?.toLocaleString() || "—";
+    $("#runtime-last-tokens").textContent = data.lastTotalTokens?.toLocaleString() || "—";
+    const lastTotal = data.lastTotalTokens || 0;
+    $("#runtime-hit").textContent = lastTotal
+      ? `${Math.round((data.lastCacheHitTokens || 0) / lastTotal * 100)}%`
+      : "—";
+    const cacheTotal = (data.cacheHitTokens || 0) + (data.cacheMissTokens || 0);
+    $("#runtime-avg-hit").textContent = cacheTotal
+      ? `${Math.round(data.cacheHitTokens / cacheTotal * 100)}%`
+      : "—";
+  } catch { /* keep the last telemetry values */ }
+}
 async function saveSessions() {
   localStorage.setItem(storageKey(), JSON.stringify(sessions));
   try {
@@ -113,7 +272,8 @@ function createSession() {
   renderMessages();
 }
 
-async function loadSessions() {
+async function loadSessions(preserveActive = false) {
+  const previousActive = activeSessionId;
   let localSessions = [];
   try {
     localSessions = JSON.parse(localStorage.getItem(storageKey()) || "[]");
@@ -135,7 +295,9 @@ async function loadSessions() {
   }
   if (!sessions.length) createSession();
   else {
-    activeSessionId = sessions[0].id;
+    activeSessionId = preserveActive && sessions.some((item) => item.id === previousActive)
+      ? previousActive
+      : sessions[0].id;
     renderSessions();
     renderMessages();
   }
@@ -179,6 +341,7 @@ function renderMessages() {
   );
   bindSuggestions();
   messages.scrollTop = messages.scrollHeight;
+  updateRuntimeStatus();
 }
 
 function addMessage(kind, text, scroll = true) {
@@ -206,7 +369,7 @@ async function loadSettings() {
 async function connect(retries = 30) {
   try {
     if (!(await fetch(`${API}/health`)).ok) throw new Error();
-    status.textContent = "Deno Runtime 已连接 · s12 Task Graph";
+    status.textContent = "Deno Runtime 已连接 · s19 MCP Plugins";
     await loadSettings();
   } catch {
     if (retries) setTimeout(() => connect(retries - 1), 300);
@@ -295,7 +458,7 @@ form.addEventListener("submit", async (event) => {
     item.classList.remove("stream-cursor");
     session.messages.push({ role: "assistant", content: answer });
     await saveSessions();
-    status.textContent = "Deno Runtime 已连接 · s12 Task Graph";
+    status.textContent = "Deno Runtime 已连接 · s19 MCP Plugins";
   } catch (error) {
     const stopped = error.name === "AbortError";
     const text = stopped
@@ -424,8 +587,155 @@ $("#new-workspace").addEventListener("click", async () => {
     status.textContent = error.message || "已取消选择目录";
   }
 });
+function renderCronSchedules() {
+  const list = $("#cron-list");
+  list.innerHTML = cronSchedules.length
+    ? cronSchedules.map((schedule) =>
+      `<div class="cron-manage-card ${schedule.enabled ? "enabled" : "disabled"}" data-id="${
+        escapeHtml(schedule.id)
+      }"><div><strong>${escapeHtml(schedule.title)}</strong><span>${
+        schedule.enabled ? "已启用" : "已停用"
+      }</span></div><code>${escapeHtml(schedule.prompt)}</code><small>${
+        escapeHtml(schedule.workspace ? schedule.workspace.split("/").pop() : "默认全局项目")
+      } · ${escapeHtml(cronFrequencyLabel(schedule))} · 超时 ${
+        escapeHtml(schedule.timeoutSeconds)
+      } 秒${
+        schedule.nextRunAt
+          ? ` · 下次 ${escapeHtml(new Date(schedule.nextRunAt).toLocaleString())}`
+          : ""
+      }${
+        schedule.lastConversationId ? ` · 最近对话 ${escapeHtml(schedule.lastConversationId)}` : ""
+      }</small><div class="cron-card-actions"><button data-action="run">立即运行</button><button data-action="toggle">${
+        schedule.enabled ? "停用" : "启用"
+      }</button><button data-action="delete" class="danger">删除</button></div></div>`
+    ).join("")
+    : `<div class="cron-empty">当前工作区还没有定时任务</div>`;
+}
+function cronFrequencyLabel(schedule) {
+  if (schedule.frequency === "daily") return `每天 ${schedule.time}`;
+  if (schedule.frequency === "weekly") {
+    return `每周 ${["日", "一", "二", "三", "四", "五", "六"][schedule.weekday]} ${schedule.time}`;
+  }
+  if (schedule.frequency === "monthly") return `每月 ${schedule.dayOfMonth} 日 ${schedule.time}`;
+  if (schedule.frequency === "yearly") {
+    return `每年 ${schedule.month} 月 ${schedule.dayOfMonth} 日 ${schedule.time}`;
+  }
+  return `每 ${schedule.intervalSeconds} 秒`;
+}
+function updateCronFrequencyFields() {
+  const frequency = $("#cron-frequency").value;
+  $("#cron-interval-field").classList.toggle("hidden", frequency !== "interval");
+  $("#cron-calendar-fields").classList.toggle("hidden", frequency === "interval");
+  $("#cron-weekday-field").classList.toggle("hidden", frequency !== "weekly");
+  $("#cron-day-field").classList.toggle("hidden", !["monthly", "yearly"].includes(frequency));
+  $("#cron-month-field").classList.toggle("hidden", frequency !== "yearly");
+}
+$("#cron-frequency").addEventListener("change", updateCronFrequencyFields);
+updateCronFrequencyFields();
+async function loadCronSchedules() {
+  const response = await fetch(`${API}/cron`), data = await response.json();
+  if (!response.ok) throw new Error(data.error || "读取定时任务失败");
+  cronSchedules = data.schedules || [];
+  renderCronSchedules();
+}
+async function persistCronSchedules() {
+  const response = await fetch(`${API}/cron`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ schedules: cronSchedules }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "保存定时任务失败");
+  cronSchedules = data.schedules || [];
+  renderCronSchedules();
+}
+$("#cron-button").addEventListener("click", async () => {
+  try {
+    $("#cron-workspace").innerHTML = `<option value="global">默认全局项目</option>${
+      (settings.workspaces || []).map((workspace) =>
+        `<option value="${escapeHtml(workspace)}">${
+          escapeHtml(workspace.split("/").pop())
+        }</option>`
+      ).join("")
+    }`;
+    fillModels($("#cron-model"), settings.models, settings.defaultModel);
+    await loadCronSchedules();
+    $("#cron-status").textContent = "";
+    $("#cron-dialog").showModal();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+$("#close-cron").addEventListener("click", () => $("#cron-dialog").close());
+$("#cron-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const prompt = $("#cron-prompt").value.trim();
+  if (!confirm(`确认创建定时AI对话任务？\n\n${prompt}`)) return;
+  const title = $("#cron-title").value.trim();
+  const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "task";
+  cronSchedules.push({
+    id: `${base}-${Date.now().toString(36)}`,
+    title,
+    prompt,
+    workspace: $("#cron-workspace").value === "global" ? null : $("#cron-workspace").value,
+    intervalSeconds: Number($("#cron-interval").value),
+    frequency: $("#cron-frequency").value,
+    time: $("#cron-time").value,
+    weekday: Number($("#cron-weekday").value),
+    dayOfMonth: Number($("#cron-day").value),
+    month: Number($("#cron-month").value),
+    timeoutSeconds: Number($("#cron-timeout").value),
+    model: $("#cron-model").value,
+    permissionMode: $("#cron-permission").value,
+    enabled: $("#cron-enabled").checked,
+  });
+  try {
+    await persistCronSchedules();
+    event.target.reset();
+    $("#cron-interval").value = "3600";
+    $("#cron-timeout").value = "600";
+    $("#cron-enabled").checked = true;
+    updateCronFrequencyFields();
+    $("#cron-status").textContent = "✓ 定时任务已创建";
+  } catch (error) {
+    cronSchedules.pop();
+    $("#cron-status").textContent = `错误：${error.message}`;
+  }
+});
+$("#cron-list").addEventListener("click", async (event) => {
+  const button = event.target.closest("button"), card = event.target.closest(".cron-manage-card");
+  if (!button || !card) return;
+  const schedule = cronSchedules.find((item) => item.id === card.dataset.id);
+  if (!schedule) return;
+  try {
+    if (button.dataset.action === "run") {
+      const response = await fetch(`${API}/cron/run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: schedule.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "运行失败");
+      $("#cron-status").textContent = `✓ 已生成项目对话 ${data.conversationId}`;
+      await loadCronSchedules();
+      if (!schedule.workspace || schedule.workspace === settings.workspace) {
+        await loadSessions(true);
+      }
+      return;
+    }
+    if (button.dataset.action === "delete") {
+      if (!confirm(`确定删除定时任务“${schedule.title}”吗？`)) return;
+      cronSchedules = cronSchedules.filter((item) => item.id !== schedule.id);
+    } else if (button.dataset.action === "toggle") schedule.enabled = !schedule.enabled;
+    await persistCronSchedules();
+  } catch (error) {
+    $("#cron-status").textContent = `错误：${error.message}`;
+    await loadCronSchedules();
+  }
+});
 $("#settings-button").addEventListener("click", async () => {
   await loadSettings();
+  $("#mcp-workspace").textContent = settings.workspace || "尚未选择工作区";
   const data = await (await fetch(`${API}/settings/key`)).json(),
     key = $("#api-key"),
     toggle = $("#toggle-key");
@@ -434,6 +744,24 @@ $("#settings-button").addEventListener("click", async () => {
   toggle.textContent = "隐藏";
   settingsDialog.showModal();
 });
+const settingsTabText = {
+  model: ["模型", "密钥安全保存在 macOS Keychain"],
+  mcp: ["MCP与工具", "管理工作区插件与工具连接"],
+  general: ["通用", "运行时、开发者模式与本地数据"],
+};
+document.querySelectorAll("[data-settings-tab]").forEach((button) =>
+  button.addEventListener("click", () => {
+    const tab = button.dataset.settingsTab;
+    document.querySelectorAll("[data-settings-tab]").forEach((item) =>
+      item.classList.toggle("active", item === button)
+    );
+    document.querySelectorAll("[data-settings-panel]").forEach((panel) =>
+      panel.classList.toggle("active", panel.dataset.settingsPanel === tab)
+    );
+    $("#settings-title").textContent = settingsTabText[tab][0];
+    $("#settings-subtitle").textContent = settingsTabText[tab][1];
+  })
+);
 $("#toggle-key").addEventListener("click", () => {
   const key = $("#api-key"), hidden = key.type === "password";
   key.type = hidden ? "text" : "password";
@@ -475,3 +803,8 @@ settingsForm.addEventListener("submit", async (event) => {
   }
 });
 connect();
+modelSelect.addEventListener("change", updateRuntimeStatus);
+setInterval(updateRuntimeStatus, 3_000);
+setInterval(() => {
+  if (!generationController && settings.workspace) loadSessions(true).catch(() => {});
+}, 10_000);

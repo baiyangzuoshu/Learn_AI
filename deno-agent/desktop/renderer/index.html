@@ -19,8 +19,9 @@
       <button id="new-chat" class="new-chat">＋ 新对话</button>
       <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
       <div
-        class="stage"><span>Harness</span><strong>s12</strong><div><i style="width:60%"></i></div><small>Task Graph · 12 / 20</small></div>
-      <button id="settings-button" class="settings-button">⚙ 设置</button>
+        class="stage"><span>Harness</span><strong>s19</strong><div><i style="width:95%"></i></div><small>MCP Plugins · 19 / 20</small></div>
+      <div
+        class="sidebar-actions"><button id="cron-button" class="settings-button">◷ 定时任务</button><button id="settings-button" class="settings-button">⚙ 设置</button></div>
     </aside>
     <main>
       <header>
@@ -48,20 +49,68 @@
       <form
         id="composer"><textarea id="prompt" rows="1" placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea><select id="model-select" class="model-side" title="选择模型"></select><button id="send" type="submit">↑</button><div class="composer-meta"><select id="permission-mode" title="工具权限模式"><option value="ask">请求批准</option><option value="auto">替我审批</option><option value="full">完全访问权限</option></select><small id="permission-hint">危险操作会请求确认</small></div></form>
     </main>
+    <footer id="runtime-status"
+      class="runtime-status"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b>—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b class="runtime-money">—</b></span><span>余额 <b class="runtime-money">—</b></span></footer>
     <dialog id="settings-dialog">
       <form id="settings-form" method="dialog">
-        <div
-          class="dialog-title"><div><h2>AI 模型设置</h2><p>密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
-        <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
-        <label>Base URL<input id="base-url" type="url" required /></label>
-        <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
-        <label>默认模型<select id="default-model"></select></label>
-        <label
-          class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示 Hook 生命周期事件</small></span></label>
-        <p id="key-status" class="key-status"></p>
-        <div
-          class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>
+        <div class="settings-shell">
+          <aside
+            class="settings-nav"><div><h2>设置</h2><p>Deno Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button></aside>
+          <div class="settings-content">
+            <div
+              class="settings-top"><div><h2 id="settings-title">模型</h2><p id="settings-subtitle">密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
+            <section class="settings-panel active" data-settings-panel="model">
+              <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
+              <label>Base URL<input id="base-url" type="url" required /></label>
+              <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
+              <label>默认模型<select id="default-model"></select></label>
+              <p id="key-status" class="key-status"></p>
+            </section>
+            <section class="settings-panel" data-settings-panel="mcp">
+              <div
+                class="settings-card"><b>工作区MCP插件</b><p>配置会随项目隔离，Agent仅在需要时发现工具。</p><code id="mcp-workspace">尚未选择工作区</code></div>
+              <div
+                class="settings-card"><b>配置文件</b><code>.deno-agent/mcp.json</code><code>mcp.json</code></div>
+              <div
+                class="settings-card"><b>连接安全</b><p>允许HTTPS远程服务，以及localhost、127.0.0.1、::1本地HTTP服务。实际调用仍受权限模式控制。</p></div>
+            </section>
+            <section class="settings-panel" data-settings-panel="general">
+              <label
+                class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示Hook生命周期事件</small></span></label>
+              <div
+                class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
+              <div
+                class="settings-card"><b>运行时</b><p>Deno Desktop · 系统WebView · 无Electron</p></div>
+            </section>
+            <div
+              class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>
+          </div>
+        </div>
       </form>
+    </dialog>
+    <dialog id="cron-dialog">
+      <div class="cron-panel">
+        <div
+          class="dialog-title"><div><h2>定时任务</h2><p>仅在 Deno Agent 运行期间触发 · 当前工作区独立保存</p></div><button id="close-cron" class="close">×</button></div>
+        <div id="cron-list" class="cron-list"></div>
+        <form id="cron-form">
+          <h3>新建定时任务</h3>
+          <div
+            class="cron-grid"><label>名称<input id="cron-title" required maxlength="200" placeholder="例如：每日代码检查" /></label><label>绑定项目<select id="cron-workspace"></select></label></div>
+          <label>AI 对话提示词<textarea id="cron-prompt" rows="4" required placeholder="例如：检查当前项目并总结需要关注的问题，不要修改文件。"></textarea></label>
+          <div
+            class="cron-grid"><label>执行频率<select id="cron-frequency"><option value="interval">固定秒数</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select></label><label id="cron-interval-field">间隔（秒）<input id="cron-interval" type="number" min="5" max="2592000" value="3600" /></label></div>
+          <div id="cron-calendar-fields"
+            class="cron-grid hidden"><label>执行时间<input id="cron-time" type="time" value="09:00" /></label><label id="cron-weekday-field">星期<select id="cron-weekday"><option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="0">周日</option></select></label><label id="cron-day-field">日期<input id="cron-day" type="number" min="1" max="31" value="1" /></label><label id="cron-month-field">月份<input id="cron-month" type="number" min="1" max="12" value="1" /></label></div>
+          <label>AI执行超时（秒）<input id="cron-timeout" type="number" min="10" max="7200" value="600" required /></label>
+          <div
+            class="cron-grid"><label>模型<select id="cron-model"></select></label><label>权限模式<select id="cron-permission"><option value="ask">请求批准</option><option value="auto" selected>替我审批</option><option value="full">完全访问权限</option></select></label></div>
+          <label
+            class="cron-enabled"><input id="cron-enabled" type="checkbox" checked /> 创建后启用</label>
+          <p id="cron-status" class="key-status"></p>
+          <div class="dialog-actions"><button id="create-cron" type="submit">创建任务</button></div>
+        </form>
+      </div>
     </dialog>
     <script src="app.js"></script>
   </body>

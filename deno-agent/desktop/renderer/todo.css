@@ -54,3 +54,83 @@
 .graph-node.blocked {
   color: #e48378;
 }
+.background-event > b {
+  color: #73b9f3!important;
+}
+.background-job {
+  margin-top: 9px;
+  padding: 8px;
+  border-radius: 7px;
+  background: #0b121a;
+  color: #8998aa;
+  font-size: 11px;
+}
+.background-job strong {
+  color: #a8bed4;
+  font: 600 10px ui-monospace,monospace;
+}
+.background-job > span {
+  float: right;
+  color: #e0ad63;
+}
+.background-job.completed > span {
+  color: #60d4b9;
+}
+.background-job.failed > span,
+.background-job.timed_out > span {
+  color: #e27d73;
+}
+.background-job small,
+.background-job pre {
+  display: block;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cron-event > b {
+  color: #b99aff!important;
+}
+.cron-schedule {
+  margin-top: 9px;
+  padding: 8px;
+  border-radius: 7px;
+  background: #0b121a;
+  color: #8998aa;
+  font-size: 11px;
+}
+.cron-schedule strong {
+  color: #c2afe9;
+  font: 600 10px ui-monospace,monospace;
+}
+.cron-schedule > span {
+  float: right;
+  color: #5fd3b8;
+}
+.cron-schedule.disabled > span {
+  color: #687789;
+}
+.cron-schedule small,
+.cron-schedule code,
+.cron-schedule em {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.cron-schedule small,
+.cron-schedule em {
+  color: #6f8092;
+  font-style: normal;
+}
+.cron-schedule code {
+  color: #91a4b8;
+  font: 10px ui-monospace,monospace;
+}
+.background-job small {
+  color: #6f8092;
+}
+.background-job pre {
+  max-height: 130px;
+  overflow: auto;
+  color: #8191a3;
+  font: 10px ui-monospace,monospace;
+}

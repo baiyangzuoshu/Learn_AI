@@ -1,5 +1,11 @@
-import { type AgentEvent, agentLoop } from "../stages/s12_persistent_task_graph.ts";
+import {
+  listCronSchedules,
+  runCronSchedule,
+  saveCronSchedules,
+} from "../stages/s14_cron_scheduling.ts";
+import { type AgentEvent, agentLoop } from "../stages/s19_mcp_plugins.ts";
 import type { PermissionMode } from "../stages/s03_permission.ts";
+import { providerTelemetry } from "../src/providers/deepseek.ts";
 import { readConversations, saveConversations } from "../src/config/conversations.ts";
 import {
   chooseWorkspace,
@@ -60,6 +66,7 @@ const mainWindow = new Deno.BrowserWindow({
   height: 820,
 });
 mainWindow.addEventListener("close", () => Deno.exit(0));
+listCronSchedules().catch((error) => console.error("Unable to initialize AI schedules", error));
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
@@ -67,7 +74,8 @@ function json(data: unknown, status = 200): Response {
 
 Deno.serve(async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === "/api/health") return json({ ok: true, stage: "s12" });
+  if (url.pathname === "/api/health") return json({ ok: true, stage: "s19" });
+  if (url.pathname === "/api/telemetry") return json(providerTelemetry());
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
   }
@@ -85,6 +93,29 @@ Deno.serve(async (request) => {
     try {
       const body = await request.json();
       return json({ sessions: await saveConversations(body.sessions) });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/cron" && request.method === "GET") {
+    try {
+      return json({ schedules: await listCronSchedules() });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/cron" && request.method === "PUT") {
+    try {
+      const body = await request.json();
+      return json({ schedules: await saveCronSchedules(body.schedules) });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/cron/run" && request.method === "POST") {
+    try {
+      const body = await request.json();
+      return json(await runCronSchedule(String(body.id ?? "")));
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 400);
     }
