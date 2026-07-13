@@ -7,18 +7,191 @@ const messages = $("#messages"),
 const input = $("#prompt"), send = $("#send"), status = $("#status");
 const modelSelect = $("#model-select"), settingsDialog = $("#settings-dialog");
 const permissionMode = $("#permission-mode"), permissionHint = $("#permission-hint");
+const navToggle = $("#nav-toggle"), workspacePanelToggle = $("#toggle-workspace-panel");
+const workspacePanelRoot = $("#workspace-panel-root"),
+  workspaceFilesStatus = $("#workspace-files-status"),
+  workspaceFiles = $("#workspace-files"),
+  workspaceGitStatus = $("#workspace-git-status"),
+  workspaceGitSummary = $("#workspace-git-summary");
+const composerStep = $("#composer-step"), composerChangeSummary = $("#composer-change-summary");
 const settingsForm = $("#settings-form"),
   modelsInput = $("#models"),
   defaultModel = $("#default-model");
 let settings = {}, sessions = [], activeSessionId = null;
 let generationController = null;
 let cronSchedules = [];
+let runStep = 0, runToolCount = 0;
+const AUTO_SCROLL_MARGIN = 96;
+const APP_STARTED_AT = Date.now();
+const CONTEXT_TOKEN_LIMIT = 1_000_000;
+const CONTEXT_COMPACT_AT = 0.8;
+let activeWorkspaceTab = localStorage.getItem("deno-agent:workspace-tab") || "overview";
 
 function escapeHtml(value) {
   const node = document.createElement("div");
   node.textContent = value;
   return node.innerHTML;
 }
+
+function renderInlineMarkdown(value) {
+  const codeSpans = [];
+  let html = escapeHtml(value).replace(/`([^`\n]+)`/g, (_, code) => {
+    const index = codeSpans.push(`<code>${code}</code>`) - 1;
+    return `\u0000CODE${index}\u0000`;
+  });
+  html = html.replace(
+    /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (_, label, href) =>
+      `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`,
+  );
+  html = html
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_\n]+)__/g, "<strong>$1</strong>")
+    .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
+    .replace(/(^|[^\*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
+  return html.replace(/\u0000CODE(\d+)\u0000/g, (_, index) => codeSpans[Number(index)] || "");
+}
+
+function splitMarkdownTableRow(line) {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+}
+
+function isMarkdownTableSeparator(line) {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+}
+
+function renderMarkdown(markdown) {
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  let html = "", listType = "", inCode = false, codeLang = "";
+  let paragraph = [], codeLines = [];
+
+  const closeList = () => {
+    if (!listType) return;
+    html += `</${listType}>`;
+    listType = "";
+  };
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    html += `<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`;
+    paragraph = [];
+  };
+  const openList = (type) => {
+    flushParagraph();
+    if (listType === type) return;
+    closeList();
+    html += `<${type}>`;
+    listType = type;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i], trimmed = line.trim();
+
+    if (inCode) {
+      if (/^\s*```\s*$/.test(line)) {
+        const langClass = codeLang ? ` class="language-${escapeHtml(codeLang)}"` : "";
+        html += `<pre><code${langClass}>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+        inCode = false;
+        codeLang = "";
+        codeLines = [];
+      } else {
+        codeLines.push(line);
+      }
+      continue;
+    }
+
+    const fence = line.match(/^\s*```([A-Za-z0-9_-]+)?\s*$/);
+    if (fence) {
+      flushParagraph();
+      closeList();
+      inCode = true;
+      codeLang = fence[1] || "";
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    if (i + 1 < lines.length && trimmed.includes("|") && isMarkdownTableSeparator(lines[i + 1])) {
+      flushParagraph();
+      closeList();
+      const header = splitMarkdownTableRow(line);
+      const rows = [];
+      i += 2;
+      while (i < lines.length && lines[i].trim().includes("|")) {
+        rows.push(splitMarkdownTableRow(lines[i]));
+        i++;
+      }
+      i--;
+      html += `<table><thead><tr>${
+        header.map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`).join("")
+      }</tr></thead><tbody>${
+        rows.map((row) =>
+          `<tr>${row.map((cell) => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`
+        ).join("")
+      }</tbody></table>`;
+      continue;
+    }
+
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (quote) {
+      flushParagraph();
+      closeList();
+      const quoteLines = [];
+      while (i < lines.length) {
+        const match = lines[i].match(/^\s*>\s?(.*)$/);
+        if (!match) break;
+        quoteLines.push(match[1]);
+        i++;
+      }
+      i--;
+      html += `<blockquote>${renderMarkdown(quoteLines.join("\n"))}</blockquote>`;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      const level = heading[1].length;
+      html += `<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`;
+      continue;
+    }
+
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      flushParagraph();
+      closeList();
+      html += "<hr>";
+      continue;
+    }
+
+    const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+    if (unordered) {
+      openList("ul");
+      html += `<li>${renderInlineMarkdown(unordered[1])}</li>`;
+      continue;
+    }
+
+    const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+    if (ordered) {
+      openList("ol");
+      html += `<li>${renderInlineMarkdown(ordered[1])}</li>`;
+      continue;
+    }
+
+    closeList();
+    paragraph.push(trimmed);
+  }
+
+  if (inCode) html += `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+  flushParagraph();
+  closeList();
+  return html;
+}
+
 function renderToolEvent(event) {
   let input = {};
   try {
@@ -234,18 +407,138 @@ function storageKey() {
 function activeSession() {
   return sessions.find((session) => session.id === activeSessionId);
 }
-async function updateRuntimeStatus() {
+function isMessagesNearBottom() {
+  return messages.scrollHeight - messages.scrollTop - messages.clientHeight <= AUTO_SCROLL_MARGIN;
+}
+function scrollMessagesToBottom() {
+  messages.scrollTop = messages.scrollHeight;
+}
+function formatNumber(value) {
+  return Number.isFinite(value) ? Math.round(value).toLocaleString() : "—";
+}
+function formatDuration(ms) {
+  const seconds = Math.max(0, Math.round(ms / 1_000));
+  if (seconds < 60) return `${seconds}秒`;
+  const minutes = Math.floor(seconds / 60), rest = seconds % 60;
+  if (minutes < 60) return rest ? `${minutes}分${rest}秒` : `${minutes}分`;
+  const hours = Math.floor(minutes / 60), minuteRest = minutes % 60;
+  return minuteRest ? `${hours}小时${minuteRest}分` : `${hours}小时`;
+}
+function setRunStep(step) {
+  runStep = Math.max(0, Math.min(4, step));
+  composerStep.textContent = `第${runStep}/4步`;
+  composerStep.classList.toggle("active", runStep > 0 && runStep < 4);
+  composerStep.classList.toggle("done", runStep === 4);
+}
+function formatGitChangeSummary(stats = {}) {
+  const files = Number(stats.changedFiles || 0);
+  const additions = Number(stats.additions || 0);
+  const deletions = Number(stats.deletions || 0);
+  if (!files) return "工作区干净";
+  return `${files}个文件已更改 +${additions} -${deletions}`;
+}
+function updateComposerChangeSummary(stats = {}) {
+  composerChangeSummary.textContent = formatGitChangeSummary(stats);
+  composerChangeSummary.classList.toggle("dirty", Number(stats.changedFiles || 0) > 0);
+}
+async function loadComposerGitSummary() {
+  if (!settings.workspace) {
+    composerChangeSummary.textContent = "未选择工作区";
+    composerChangeSummary.classList.remove("dirty");
+    return;
+  }
+  try {
+    const response = await fetch(`${API}/workspace/git`), data = await response.json();
+    if (!response.ok || !data.isRepo) throw new Error(data.error || "当前工作区不是 Git 仓库");
+    updateComposerChangeSummary(data.stats);
+  } catch {
+    composerChangeSummary.textContent = "Git 状态不可用";
+    composerChangeSummary.classList.remove("dirty");
+  }
+}
+function estimatedSessionTokens() {
   const sessionMessages = activeSession()?.messages || [];
-  const estimatedTokens = Math.ceil(
-    sessionMessages.reduce((sum, item) => sum + item.content.length, 0) / 4,
+  return Math.ceil(sessionMessages.reduce((sum, item) => sum + item.content.length, 0) / 4);
+}
+function sessionTurnCount() {
+  return (activeSession()?.messages || []).filter((item) => item.role === "user").length;
+}
+function cacheRate(data) {
+  const cacheTotal = (data.cacheHitTokens || 0) + (data.cacheMissTokens || 0);
+  return cacheTotal ? Math.round((data.cacheHitTokens || 0) / cacheTotal * 100) : 0;
+}
+function setWorkspaceTab(tab, { refresh = true } = {}) {
+  activeWorkspaceTab = ["overview", "files", "changes"].includes(tab) ? tab : "overview";
+  localStorage.setItem("deno-agent:workspace-tab", activeWorkspaceTab);
+  document.querySelectorAll("[data-workspace-tab]").forEach((button) =>
+    button.classList.toggle("active", button.dataset.workspaceTab === activeWorkspaceTab)
   );
+  document.querySelectorAll("[data-workspace-panel]").forEach((panel) =>
+    panel.classList.toggle("active", panel.dataset.workspacePanel === activeWorkspaceTab)
+  );
+  if (refresh && document.body.classList.contains("workspace-panel-open")) refreshWorkspacePanel();
+}
+function refreshWorkspacePanel() {
+  if (activeWorkspaceTab === "files") return loadWorkspaceFiles();
+  if (activeWorkspaceTab === "changes") return loadWorkspaceGit();
+  return loadWorkspaceOverview();
+}
+function renderWorkspaceOverview(telemetry = {}) {
+  workspacePanelRoot.textContent = settings.workspace?.split("/").pop() || "未选择项目";
+  workspacePanelRoot.title = settings.workspace || "";
+  const used = estimatedSessionTokens();
+  const contextPercent = Math.min(100, Math.round(used / CONTEXT_TOKEN_LIMIT * 100));
+  const compactAt = Math.round(CONTEXT_TOKEN_LIMIT * CONTEXT_COMPACT_AT);
+  const remaining = Math.max(0, compactAt - used);
+  const hitRate = cacheRate(telemetry);
+  $("#overview-context-state").textContent = contextPercent < 80 ? "上下文充足" : "接近压缩";
+  $("#overview-context-used").textContent = `${formatNumber(used)}/${
+    formatNumber(CONTEXT_TOKEN_LIMIT)
+  }`;
+  $("#overview-context-remaining").textContent = formatNumber(remaining);
+  $("#overview-context-meter").style.width = `${contextPercent}%`;
+  $("#overview-avg-hit").textContent = hitRate ? `${hitRate}%` : "—";
+  $("#overview-requests").textContent = formatNumber(telemetry.calls || 0);
+  $("#overview-session-tokens").textContent = formatNumber(telemetry.totalTokens || 0);
+  $("#overview-turns").textContent = `${sessionTurnCount()}轮`;
+  $("#overview-last-tokens").textContent = formatNumber(telemetry.lastTotalTokens || 0);
+  $("#overview-runtime").textContent = formatDuration(Date.now() - APP_STARTED_AT);
+  $("#overview-model").textContent = modelSelect.value || settings.defaultModel || "—";
+  $("#overview-cache-meter").style.width = `${hitRate}%`;
+  $("#overview-cache-hit").textContent = formatNumber(telemetry.cacheHitTokens || 0);
+  $("#overview-cache-miss").textContent = formatNumber(telemetry.cacheMissTokens || 0);
+}
+async function loadWorkspaceOverview() {
+  try {
+    renderWorkspaceOverview(await (await fetch(`${API}/telemetry`)).json());
+  } catch {
+    renderWorkspaceOverview({});
+  }
+}
+function setNavCollapsed(collapsed) {
+  document.body.classList.toggle("nav-collapsed", collapsed);
+  navToggle.textContent = "导航";
+  navToggle.classList.toggle("active", !collapsed);
+  navToggle.title = collapsed ? "展开左侧导航" : "收起左侧导航";
+  localStorage.setItem("deno-agent:nav-collapsed", String(collapsed));
+}
+function setWorkspacePanelOpen(open, { load = true } = {}) {
+  document.body.classList.toggle("workspace-panel-open", open);
+  workspacePanelToggle.classList.toggle("active", open);
+  workspacePanelToggle.textContent = "工作区";
+  workspacePanelToggle.title = open ? "收起右侧工作区" : "展开右侧工作区";
+  localStorage.setItem("deno-agent:workspace-panel-open", String(open));
+  if (open && load) refreshWorkspacePanel();
+}
+async function updateRuntimeStatus() {
+  const estimatedTokens = estimatedSessionTokens();
   $("#runtime-model").textContent = modelSelect.value || settings.defaultModel || "—";
   $("#runtime-workspace").textContent = settings.workspace || "未选择项目";
   $("#runtime-workspace").title = settings.workspace || "";
-  $("#runtime-turns").textContent = `${
-    sessionMessages.filter((item) => item.role === "user").length
-  }轮`;
-  $("#runtime-context").textContent = `${Math.min(100, Math.round(estimatedTokens / 1280))}%`;
+  $("#runtime-turns").textContent = `${sessionTurnCount()}轮`;
+  $("#runtime-context").textContent = `${
+    Math.min(100, Math.round(estimatedTokens / CONTEXT_TOKEN_LIMIT * 100))
+  }%`;
   try {
     const data = await (await fetch(`${API}/telemetry`)).json();
     $("#runtime-session-tokens").textContent = data.totalTokens?.toLocaleString() || "—";
@@ -258,6 +551,7 @@ async function updateRuntimeStatus() {
     $("#runtime-avg-hit").textContent = cacheTotal
       ? `${Math.round(data.cacheHitTokens / cacheTotal * 100)}%`
       : "—";
+    if (document.body.classList.contains("workspace-panel-open")) renderWorkspaceOverview(data);
   } catch { /* keep the last telemetry values */ }
 }
 async function saveSessions() {
@@ -283,7 +577,7 @@ function createSession() {
   activeSessionId = session.id;
   saveSessions();
   renderSessions();
-  renderMessages();
+  renderMessages({ forceScroll: true });
 }
 
 async function loadSessions(preserveActive = false) {
@@ -313,7 +607,7 @@ async function loadSessions(preserveActive = false) {
       ? previousActive
       : sessions[0].id;
     renderSessions();
-    renderMessages();
+    renderMessages({ forceScroll: !preserveActive });
   }
 }
 
@@ -345,8 +639,140 @@ function renderWorkspaceTree() {
   }).join("");
 }
 
-function renderMessages() {
+function renderFileNode(node, depth = 0) {
+  const children = Array.isArray(node.children) && node.children.length
+    ? `<ul>${node.children.map((child) => renderFileNode(child, depth + 1)).join("")}</ul>`
+    : "";
+  const collapsed = node.type === "directory" && depth > 0 ? " collapsed" : "";
+  const icon = node.type === "directory" ? "▾" : node.type === "symlink" ? "↪" : "·";
+  return `<li class="file-node ${escapeHtml(node.type)}${collapsed}" data-path="${
+    escapeHtml(node.path)
+  }"><button class="file-node-button" data-type="${escapeHtml(node.type)}" data-path="${
+    escapeHtml(node.path)
+  }" title="${
+    escapeHtml(node.path)
+  }"><span class="file-node-icon">${icon}</span><span class="file-node-name">${
+    escapeHtml(node.name)
+  }</span></button>${children}</li>`;
+}
+
+function renderWorkspaceFiles(data) {
+  workspacePanelRoot.textContent = data.rootName || settings.workspace?.split("/").pop() ||
+    "当前项目";
+  workspacePanelRoot.title = data.workspace || settings.workspace || "";
+  workspaceFiles.innerHTML = data.entries?.length
+    ? data.entries.map((node) => renderFileNode(node)).join("")
+    : `<li class="workspace-empty">当前项目没有可显示文件</li>`;
+  workspaceFilesStatus.textContent = data.truncated
+    ? `文件较多，已显示前 ${data.limit} 项；已忽略 .git、node_modules、dist 等目录`
+    : "点击目录可折叠/展开，点击文件会用系统默认应用打开";
+}
+
+async function loadWorkspaceFiles() {
+  if (!document.body.classList.contains("workspace-panel-open")) return;
+  workspacePanelRoot.textContent = settings.workspace?.split("/").pop() || "未选择项目";
+  workspacePanelRoot.title = settings.workspace || "";
+  if (!settings.workspace) {
+    workspaceFiles.innerHTML = "";
+    workspaceFilesStatus.textContent = "请先点击左侧“新目录”选择工作目录";
+    return;
+  }
+  workspaceFilesStatus.textContent = "正在读取文件树…";
+  try {
+    const response = await fetch(`${API}/workspace/tree`), data = await response.json();
+    if (!response.ok) throw new Error(data.error || "无法读取文件树");
+    renderWorkspaceFiles(data);
+  } catch (error) {
+    workspaceFiles.innerHTML = "";
+    workspaceFilesStatus.textContent = error.message || "无法读取文件树";
+  }
+}
+
+function gitKindLabel(kind) {
+  return {
+    added: "新增",
+    modified: "修改",
+    deleted: "删除",
+    renamed: "重命名",
+    untracked: "未跟踪",
+    changed: "变更",
+  }[kind] || "变更";
+}
+
+function renderWorkspaceGit(data) {
+  workspacePanelRoot.textContent = settings.workspace?.split("/").pop() || "当前项目";
+  workspacePanelRoot.title = settings.workspace || "";
+  if (!data.isRepo) {
+    workspaceGitStatus.textContent = "当前工作区不是 Git 仓库";
+    workspaceGitSummary.innerHTML = `<div class="workspace-empty">没有可显示的 Git 信息</div>`;
+    updateComposerChangeSummary({});
+    return;
+  }
+  updateComposerChangeSummary(data.stats);
+  workspaceGitStatus.textContent = data.changes.length
+    ? `${data.branch || "detached"} · ${formatGitChangeSummary(data.stats)}`
+    : `${data.branch || "detached"} · 工作区干净`;
+  workspaceGitSummary.innerHTML = `
+    <div class="git-head-card">
+      <div><span>分支</span><b>${escapeHtml(data.branch || "detached")}</b></div>
+      <div><span>HEAD</span><b>${escapeHtml(data.shortHead || "—")}</b></div>
+      <div><span>状态</span><b>${
+    escapeHtml(data.aheadBehind || (data.changes.length ? "有改动" : "干净"))
+  }</b></div>
+    </div>
+    <div class="workspace-card">
+      <div class="workspace-card-title"><strong>未提交改动</strong><span>${data.changes.length}</span></div>
+      <div class="git-change-list">${
+    data.changes.length
+      ? data.changes.map((item) =>
+        `<button class="git-change-item ${escapeHtml(item.kind)}" data-path="${
+          escapeHtml(item.path)
+        }"><span>${escapeHtml(gitKindLabel(item.kind))}</span><b>${
+          escapeHtml(item.displayPath)
+        }</b><code>${escapeHtml(item.code)}</code></button>`
+      ).join("")
+      : `<div class="workspace-empty">没有未提交改动</div>`
+  }</div>
+    </div>
+    <div class="workspace-card">
+      <div class="workspace-card-title"><strong>最近提交</strong><span>${data.commits.length}</span></div>
+      <div class="git-commit-list">${
+    data.commits.length
+      ? data.commits.map((commit) =>
+        `<div class="git-commit-item"><code>${escapeHtml(commit.hash)}</code><b>${
+          escapeHtml(commit.subject)
+        }</b><span>${escapeHtml(commit.relativeDate)} · ${escapeHtml(commit.author)}</span></div>`
+      ).join("")
+      : `<div class="workspace-empty">当前仓库还没有提交记录</div>`
+  }</div>
+    </div>`;
+}
+
+async function loadWorkspaceGit() {
+  if (!document.body.classList.contains("workspace-panel-open")) return;
+  workspacePanelRoot.textContent = settings.workspace?.split("/").pop() || "未选择项目";
+  workspacePanelRoot.title = settings.workspace || "";
+  if (!settings.workspace) {
+    workspaceGitSummary.innerHTML = "";
+    workspaceGitStatus.textContent = "请先点击左侧“新目录”选择工作目录";
+    return;
+  }
+  workspaceGitStatus.textContent = "正在读取 Git 信息…";
+  try {
+    const response = await fetch(`${API}/workspace/git`), data = await response.json();
+    if (!response.ok) throw new Error(data.error || "无法读取 Git 信息");
+    renderWorkspaceGit(data);
+  } catch (error) {
+    workspaceGitSummary.innerHTML = "";
+    workspaceGitStatus.textContent = error.message || "无法读取 Git 信息";
+  }
+}
+
+function renderMessages({ forceScroll = false } = {}) {
   const session = activeSession();
+  const shouldFollowBottom = forceScroll || isMessagesNearBottom();
+  const previousScrollTop = messages.scrollTop;
+  $("#conversation-title").textContent = session?.title || "新的任务";
   messages.innerHTML = session?.messages.length
     ? ""
     : `<div class="welcome"><div class="orb">✦</div><h2>今天想一起构建什么？</h2><p>我可以读取代码、执行命令并完成工作区任务。</p><div class="suggestions"><button>解释这个项目的架构</button><button>检查当前代码并提出改进</button><button>创建一个新功能</button></div></div>`;
@@ -354,7 +780,8 @@ function renderMessages() {
     addMessage(message.role === "assistant" ? "agent" : "user", message.content, false)
   );
   bindSuggestions();
-  messages.scrollTop = messages.scrollHeight;
+  if (shouldFollowBottom) scrollMessagesToBottom();
+  else messages.scrollTop = previousScrollTop;
   updateRuntimeStatus();
 }
 
@@ -362,14 +789,17 @@ function addMessage(kind, text, scroll = true) {
   $(".welcome")?.remove();
   const item = document.createElement("div");
   item.className = `message ${kind}`;
-  item.textContent = text;
+  if (kind === "agent") item.innerHTML = renderMarkdown(text);
+  else item.textContent = text;
   messages.append(item);
-  if (scroll) messages.scrollTop = messages.scrollHeight;
+  if (scroll) scrollMessagesToBottom();
 }
 
 async function loadSettings() {
   const previousWorkspace = settings.workspace;
   settings = await (await fetch(`${API}/settings`)).json();
+  await loadComposerGitSummary();
+  if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
   fillModels(modelSelect, settings.models, settings.defaultModel);
   $("#base-url").value = settings.baseUrl;
   modelsInput.value = settings.models.join("\n");
@@ -406,12 +836,14 @@ form.addEventListener("submit", async (event) => {
   send.textContent = "■";
   send.title = "停止生成";
   status.textContent = "Agent 正在思考和行动…";
+  runToolCount = 0;
+  setRunStep(1);
   try {
     const thinking = document.createElement("div");
     thinking.className = "thinking-card";
     thinking.textContent = "正在分析任务…";
     messages.append(thinking);
-    messages.scrollTop = messages.scrollHeight;
+    scrollMessagesToBottom();
     const response = await fetch(`${API}/chat/stream`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -441,14 +873,16 @@ form.addEventListener("submit", async (event) => {
           status.textContent = data.message;
         }
         if (data.type === "tool") {
+          runToolCount++;
+          setRunStep(Math.min(3, 1 + runToolCount));
           thinking.textContent = `正在执行 ${data.event.name}…`;
           events.classList.remove("hidden");
-          $("#toggle-events").classList.remove("hidden");
+          $("#toggle-events").classList.add("active");
           eventsContent.insertAdjacentHTML("beforeend", renderToolEvent(data.event));
         }
         if (data.type === "hook") {
           events.classList.remove("hidden");
-          $("#toggle-events").classList.remove("hidden");
+          $("#toggle-events").classList.add("active");
           eventsContent.insertAdjacentHTML(
             "beforeend",
             `<div class="event hook-event"><b>Hook · ${
@@ -456,24 +890,34 @@ form.addEventListener("submit", async (event) => {
             }</b><span class="hook-detail">${escapeHtml(data.event.detail)}</span></div>`,
           );
         }
-        if (data.type === "answer") answer = data.answer || "任务已完成";
+        if (data.type === "answer") {
+          answer = data.answer || "任务已完成";
+          setRunStep(4);
+        }
         if (data.type === "error") throw new Error(data.error);
       }
     }
+    if (!answer) answer = "任务已完成";
+    setRunStep(4);
     thinking.remove();
     const item = document.createElement("div");
     item.className = "message agent stream-cursor";
     messages.append(item);
     for (let i = 0; i < answer.length; i += 3) {
+      const shouldFollowBottom = isMessagesNearBottom();
       item.textContent += answer.slice(i, i + 3);
-      messages.scrollTop = messages.scrollHeight;
+      if (shouldFollowBottom) scrollMessagesToBottom();
       await new Promise((resolve) => setTimeout(resolve, 7));
     }
     item.classList.remove("stream-cursor");
+    item.innerHTML = renderMarkdown(answer);
     session.messages.push({ role: "assistant", content: answer });
     await saveSessions();
+    await loadComposerGitSummary();
+    if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
     status.textContent = "Deno Runtime 已连接 · s20 Complete Harness";
   } catch (error) {
+    setRunStep(4);
     const stopped = error.name === "AbortError";
     const text = stopped
       ? "已停止生成"
@@ -482,6 +926,7 @@ form.addEventListener("submit", async (event) => {
       }\n\n建议：检查网络、API Key 和模型配置后重试；如果错误持续出现，请打开工具面板查看最后一个操作。`;
     session.messages.push({ role: "assistant", content: text });
     await saveSessions();
+    await loadComposerGitSummary();
     addMessage("agent", text);
     status.textContent = stopped ? "生成已停止" : "请求失败 · 可重试";
   } finally {
@@ -518,17 +963,71 @@ permissionMode.value = localStorage.getItem("deno-agent:permission-mode") || "as
 permissionMode.addEventListener("change", updatePermissionMode);
 updatePermissionMode();
 
-$("#toggle-events").addEventListener("click", () => events.classList.toggle("hidden"));
-$("#close-events").addEventListener("click", () => events.classList.add("hidden"));
-eventsContent.addEventListener("click", async (event) => {
-  const link = event.target.closest(".file-link");
-  if (!link) return;
+async function openWorkspacePath(path) {
   const response = await fetch(`${API}/file/open`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ path: link.dataset.path }),
+    body: JSON.stringify({ path }),
   });
-  if (!response.ok) status.textContent = (await response.json()).error || "无法打开文件";
+  if (!response.ok) throw new Error((await response.json()).error || "无法打开文件");
+}
+
+navToggle.addEventListener(
+  "click",
+  () => setNavCollapsed(!document.body.classList.contains("nav-collapsed")),
+);
+workspacePanelToggle.addEventListener(
+  "click",
+  () => setWorkspacePanelOpen(!document.body.classList.contains("workspace-panel-open")),
+);
+$("#close-workspace-panel").addEventListener("click", () => setWorkspacePanelOpen(false));
+$("#refresh-workspace-tree").addEventListener("click", () => refreshWorkspacePanel());
+document.querySelectorAll("[data-workspace-tab]").forEach((button) =>
+  button.addEventListener("click", () => setWorkspaceTab(button.dataset.workspaceTab))
+);
+workspaceFiles.addEventListener("click", async (event) => {
+  const button = event.target.closest(".file-node-button");
+  if (!button) return;
+  const node = button.closest(".file-node");
+  if (button.dataset.type === "directory") {
+    node?.classList.toggle("collapsed");
+    return;
+  }
+  workspaceFilesStatus.textContent = `正在打开 ${button.dataset.path}…`;
+  try {
+    await openWorkspacePath(button.dataset.path);
+    workspaceFilesStatus.textContent = `已打开 ${button.dataset.path}`;
+  } catch (error) {
+    workspaceFilesStatus.textContent = error.message || "无法打开文件";
+  }
+});
+workspaceGitSummary.addEventListener("click", async (event) => {
+  const button = event.target.closest(".git-change-item");
+  if (!button || button.classList.contains("deleted")) return;
+  workspaceGitStatus.textContent = `正在打开 ${button.dataset.path}…`;
+  try {
+    await openWorkspacePath(button.dataset.path);
+    workspaceGitStatus.textContent = `已打开 ${button.dataset.path}`;
+  } catch (error) {
+    workspaceGitStatus.textContent = error.message || "无法打开文件";
+  }
+});
+$("#toggle-events").addEventListener("click", () => {
+  events.classList.toggle("hidden");
+  $("#toggle-events").classList.toggle("active", !events.classList.contains("hidden"));
+});
+$("#close-events").addEventListener("click", () => {
+  events.classList.add("hidden");
+  $("#toggle-events").classList.remove("active");
+});
+eventsContent.addEventListener("click", async (event) => {
+  const link = event.target.closest(".file-link");
+  if (!link) return;
+  try {
+    await openWorkspacePath(link.dataset.path);
+  } catch (error) {
+    status.textContent = error.message || "无法打开文件";
+  }
 });
 
 $("#new-chat").addEventListener("click", createSession);
@@ -574,12 +1073,12 @@ $("#workspace-tree").addEventListener("click", async (event) => {
     if (activeSessionId === item.dataset.id) activeSessionId = sessions[0].id;
     saveSessions();
     renderSessions();
-    renderMessages();
+    renderMessages({ forceScroll: true });
     return;
   }
   activeSessionId = item.dataset.id;
   renderSessions();
-  renderMessages();
+  renderMessages({ forceScroll: true });
 });
 function bindSuggestions() {
   document.querySelectorAll(".suggestions button").forEach((button) =>
@@ -589,7 +1088,7 @@ function bindSuggestions() {
     })
   );
 }
-$("#new-workspace").addEventListener("click", async () => {
+async function chooseWorkspace() {
   status.textContent = "请选择工作目录…";
   try {
     const response = await fetch(`${API}/workspace/select`, { method: "POST" }),
@@ -600,7 +1099,8 @@ $("#new-workspace").addEventListener("click", async () => {
   } catch (error) {
     status.textContent = error.message || "已取消选择目录";
   }
-});
+}
+$("#new-workspace").addEventListener("click", chooseWorkspace);
 function renderCronSchedules() {
   const list = $("#cron-list");
   list.innerHTML = cronSchedules.length
@@ -816,9 +1316,17 @@ settingsForm.addEventListener("submit", async (event) => {
     button.disabled = false;
   }
 });
+setNavCollapsed(localStorage.getItem("deno-agent:nav-collapsed") === "true");
+setWorkspaceTab(activeWorkspaceTab, { refresh: false });
+setWorkspacePanelOpen(localStorage.getItem("deno-agent:workspace-panel-open") === "true", {
+  load: false,
+});
 connect();
 modelSelect.addEventListener("change", updateRuntimeStatus);
 setInterval(updateRuntimeStatus, 3_000);
 setInterval(() => {
-  if (!generationController && settings.workspace) loadSessions(true).catch(() => {});
+  if (!generationController && settings.workspace) {
+    loadSessions(true).catch(() => {});
+    loadComposerGitSummary().catch(() => {});
+  }
 }, 10_000);

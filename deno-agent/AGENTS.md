@@ -16,7 +16,6 @@ Electron, Node.js runtime, or a Rust application layer.
 - `src/providers/` owns model-provider clients and telemetry.
 - `desktop/main.ts` is the Deno Desktop backend and HTTP API entry point.
 - `desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
-- `src/server.ts` is the standalone HTTP service entry point.
 - `stages/s01_*.ts` through `stages/s20_*.ts` are teaching examples only.
 
 ## Critical Boundary
@@ -102,7 +101,7 @@ platform-specific error.
 Run the smallest relevant checks while developing, then run the production checks before completion:
 
 ```sh
-deno fmt --check src/harness desktop/main.ts src/server.ts README.md AGENTS.md
+deno fmt --check src/harness desktop/main.ts README.md AGENTS.md
 deno task check
 rg 'stages/' src desktop
 deno task desktop:build:mac-arm64

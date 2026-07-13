@@ -616,6 +616,21 @@ header {
   padding: 6px 11px;
   font-size: 11px;
 }
+.workspace-toggle {
+  max-width: 190px;
+  overflow: hidden;
+  border: 1px solid #2c3948;
+  background: #131b25;
+  color: #91a0b4;
+  border-radius: 18px;
+  padding: 6px 11px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-toggle.active {
+  color: #8ddcca;
+}
 .tool-toggle.hidden {
   display: none;
 }

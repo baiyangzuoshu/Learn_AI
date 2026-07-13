@@ -51,6 +51,10 @@ const assets = new Map<string, { body: string; contentType: string }>([
     body: await Deno.readTextFile(new URL("./renderer/skill.css", import.meta.url)),
     contentType: "text/css; charset=utf-8",
   }],
+  ["/layout.css", {
+    body: await Deno.readTextFile(new URL("./renderer/layout.css", import.meta.url)),
+    contentType: "text/css; charset=utf-8",
+  }],
   ["/app.js", {
     body: await Deno.readTextFile(new URL("./renderer/app.js", import.meta.url)),
     contentType: "text/javascript; charset=utf-8",
@@ -71,6 +75,245 @@ listCronSchedules().catch((error) => console.error("Unable to initialize AI sche
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
+}
+
+type WorkspaceTreeNode = {
+  name: string;
+  path: string;
+  type: "directory" | "file" | "symlink";
+  children?: WorkspaceTreeNode[];
+  truncated?: boolean;
+};
+type GitStatusItem = {
+  code: string;
+  path: string;
+  displayPath: string;
+  kind: "added" | "modified" | "deleted" | "renamed" | "untracked" | "changed";
+};
+type GitCommit = {
+  hash: string;
+  relativeDate: string;
+  author: string;
+  subject: string;
+};
+type GitDiffStats = {
+  changedFiles: number;
+  additions: number;
+  deletions: number;
+};
+
+const TREE_MAX_DEPTH = 6;
+const TREE_MAX_ENTRIES = 900;
+const TREE_IGNORED_NAMES = new Set([
+  ".git",
+  ".deno",
+  ".DS_Store",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+]);
+
+function joinWorkspacePath(base: string, name: string): string {
+  return base.endsWith("/") || base.endsWith("\\") ? `${base}${name}` : `${base}/${name}`;
+}
+
+function childRelativePath(parent: string, name: string): string {
+  return parent ? `${parent}/${name}` : name;
+}
+
+async function readWorkspaceTree(): Promise<{
+  workspace: string;
+  rootName: string;
+  entries: WorkspaceTreeNode[];
+  truncated: boolean;
+  limit: number;
+}> {
+  const workspace = await Deno.realPath(await getWorkspace());
+  const counter = { count: 0, truncated: false };
+  const readDirectory = async (
+    absolutePath: string,
+    relativePath: string,
+    depth: number,
+  ): Promise<WorkspaceTreeNode[]> => {
+    if (depth >= TREE_MAX_DEPTH || counter.count >= TREE_MAX_ENTRIES) {
+      counter.truncated = true;
+      return [];
+    }
+    let entries: Deno.DirEntry[] = [];
+    try {
+      for await (const entry of Deno.readDir(absolutePath)) {
+        if (TREE_IGNORED_NAMES.has(entry.name)) continue;
+        entries.push(entry);
+      }
+    } catch {
+      return [];
+    }
+    entries = entries.sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+      return a.name.localeCompare(b.name, "zh-Hans-CN");
+    });
+    const nodes: WorkspaceTreeNode[] = [];
+    for (const entry of entries) {
+      if (counter.count >= TREE_MAX_ENTRIES) {
+        counter.truncated = true;
+        break;
+      }
+      counter.count++;
+      const path = childRelativePath(relativePath, entry.name);
+      const node: WorkspaceTreeNode = {
+        name: entry.name,
+        path,
+        type: entry.isDirectory ? "directory" : entry.isSymlink ? "symlink" : "file",
+      };
+      if (entry.isDirectory) {
+        node.children = await readDirectory(
+          joinWorkspacePath(absolutePath, entry.name),
+          path,
+          depth + 1,
+        );
+        node.truncated = counter.truncated && depth + 1 >= TREE_MAX_DEPTH;
+      }
+      nodes.push(node);
+    }
+    return nodes;
+  };
+  return {
+    workspace,
+    rootName: workspace.split(/[\\/]/).filter(Boolean).pop() || workspace,
+    entries: await readDirectory(workspace, "", 0),
+    truncated: counter.truncated,
+    limit: TREE_MAX_ENTRIES,
+  };
+}
+
+function classifyGitStatus(code: string): GitStatusItem["kind"] {
+  if (code.includes("?")) return "untracked";
+  if (code.includes("R")) return "renamed";
+  if (code.includes("D")) return "deleted";
+  if (code.includes("A")) return "added";
+  if (code.includes("M")) return "modified";
+  return "changed";
+}
+
+async function runGit(
+  workspace: string,
+  args: string[],
+): Promise<{ success: boolean; stdout: string; stderr: string }> {
+  const result = await new Deno.Command("/usr/bin/git", {
+    args,
+    cwd: workspace,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  const decoder = new TextDecoder();
+  return {
+    success: result.success,
+    stdout: decoder.decode(result.stdout).trim(),
+    stderr: decoder.decode(result.stderr).trim(),
+  };
+}
+
+async function countSmallTextFileLines(path: string): Promise<number> {
+  try {
+    const stat = await Deno.stat(path);
+    if (!stat.isFile || stat.size > 300_000) return 0;
+    const content = await Deno.readTextFile(path);
+    if (content.includes("\u0000")) return 0;
+    if (!content) return 0;
+    return content.endsWith("\n") ? content.split("\n").length - 1 : content.split("\n").length;
+  } catch {
+    return 0;
+  }
+}
+
+async function includeUntrackedFileStats(
+  workspace: string,
+  changes: GitStatusItem[],
+  stats: GitDiffStats,
+): Promise<GitDiffStats> {
+  for (const item of changes) {
+    if (item.kind !== "untracked") continue;
+    stats.additions += await countSmallTextFileLines(joinWorkspacePath(workspace, item.path));
+  }
+  return stats;
+}
+
+async function readWorkspaceGit(): Promise<{
+  workspace: string;
+  isRepo: boolean;
+  root?: string;
+  branch?: string;
+  branchDetail?: string;
+  shortHead?: string;
+  aheadBehind?: string;
+  stats: GitDiffStats;
+  changes: GitStatusItem[];
+  commits: GitCommit[];
+}> {
+  const workspace = await Deno.realPath(await getWorkspace());
+  const root = await runGit(workspace, ["rev-parse", "--show-toplevel"]);
+  if (!root.success) {
+    return {
+      workspace,
+      isRepo: false,
+      stats: { changedFiles: 0, additions: 0, deletions: 0 },
+      changes: [],
+      commits: [],
+    };
+  }
+  const status = await runGit(workspace, ["status", "--short", "--branch", "-uall"]);
+  const lines = status.stdout.split("\n").filter(Boolean);
+  const branchDetail = lines[0]?.replace(/^##\s*/, "") || "detached";
+  const branch = branchDetail.split("...")[0].replace(/\s+\[.*\]$/, "");
+  const aheadBehind = branchDetail.match(/\[(.+)\]/)?.[1];
+  const changes = lines.slice(1).map((line) => {
+    const code = line.slice(0, 2).trim() || "??";
+    const displayPath = line.slice(3).trim();
+    const path = displayPath.includes(" -> ")
+      ? displayPath.split(" -> ").pop() || displayPath
+      : displayPath;
+    return { code, path, displayPath, kind: classifyGitStatus(code) };
+  });
+  const numstat = await runGit(workspace, ["diff", "--numstat", "HEAD", "--"]);
+  const stats = numstat.stdout.split("\n").filter(Boolean).reduce<GitDiffStats>(
+    (summary, line) => {
+      const [additions, deletions] = line.split(/\s+/);
+      const add = Number(additions), del = Number(deletions);
+      summary.additions += Number.isFinite(add) ? add : 0;
+      summary.deletions += Number.isFinite(del) ? del : 0;
+      return summary;
+    },
+    { changedFiles: changes.length, additions: 0, deletions: 0 },
+  );
+  await includeUntrackedFileStats(workspace, changes, stats);
+  const head = await runGit(workspace, ["rev-parse", "--short", "HEAD"]);
+  const log = await runGit(workspace, [
+    "log",
+    "-n",
+    "8",
+    "--pretty=format:%h%x09%cr%x09%an%x09%s",
+  ]);
+  const commits = log.success
+    ? log.stdout.split("\n").filter(Boolean).map((line) => {
+      const [hash = "", relativeDate = "", author = "", ...subject] = line.split("\t");
+      return { hash, relativeDate, author, subject: subject.join("\t") };
+    })
+    : [];
+  return {
+    workspace,
+    isRepo: true,
+    root: root.stdout,
+    branch,
+    branchDetail,
+    shortHead: head.success ? head.stdout : undefined,
+    aheadBehind,
+    stats,
+    changes,
+    commits,
+  };
 }
 
 Deno.serve(async (request) => {
@@ -142,6 +385,20 @@ Deno.serve(async (request) => {
     try {
       const body = await request.json();
       return json(await removeWorkspace(body.workspace));
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/workspace/tree" && request.method === "GET") {
+    try {
+      return json(await readWorkspaceTree());
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/workspace/git" && request.method === "GET") {
+    try {
+      return json(await readWorkspaceGit());
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 400);
     }

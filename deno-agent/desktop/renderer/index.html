@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="todo.css" />
     <link rel="stylesheet" href="subagent.css" />
     <link rel="stylesheet" href="skill.css" />
+    <link rel="stylesheet" href="layout.css" />
   </head>
   <body>
     <aside>
@@ -24,13 +25,17 @@
         class="sidebar-actions"><button id="cron-button" class="settings-button">◷ 定时任务</button><button id="settings-button" class="settings-button">⚙ 设置</button></div>
     </aside>
     <main>
+      <div class="top-controlbar">
+        <button id="nav-toggle" class="nav-toggle" type="button">导航</button>
+        <button id="toggle-workspace-panel" class="workspace-panel-toggle"
+          type="button">工作区</button>
+        <button id="toggle-events" class="tool-toggle" type="button">工具</button>
+      </div>
       <header>
         <div>
-          <h1>新的任务</h1>
+          <h1 id="conversation-title">新的任务</h1>
           <p id="status">正在连接 Deno Runtime…</p>
         </div>
-        <div
-          class="header-actions"><button id="toggle-events" class="tool-toggle hidden">工具</button><span class="pill">DeepSeek</span></div>
       </header>
       <section id="messages" class="messages">
         <div class="welcome">
@@ -46,9 +51,70 @@
           class="events-header"><span>工具执行记录</span><button id="close-events" title="隐藏工具记录">×</button></div>
         <div id="events-content"></div>
       </section>
-      <form
-        id="composer"><textarea id="prompt" rows="1" placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea><select id="model-select" class="model-side" title="选择模型"></select><button id="send" type="submit">↑</button><div class="composer-meta"><select id="permission-mode" title="工具权限模式"><option value="ask">请求批准</option><option value="auto">替我审批</option><option value="full">完全访问权限</option></select><small id="permission-hint">危险操作会请求确认</small></div></form>
+      <form id="composer">
+        <div id="composer-summary"
+          class="composer-summary"><span id="composer-step">第0/4步</span><b id="composer-change-summary">工作区状态读取中…</b></div>
+        <textarea id="prompt" rows="1"
+          placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea>
+        <select id="model-select" class="model-side" title="选择模型"></select>
+        <button id="send" type="submit">↑</button>
+        <div
+          class="composer-meta"><select id="permission-mode" title="工具权限模式"><option value="ask">请求批准</option><option value="auto">替我审批</option><option value="full">完全访问权限</option></select><small id="permission-hint">危险操作会请求确认</small></div>
+      </form>
     </main>
+    <section id="workspace-panel" class="workspace-panel" aria-label="工作区">
+      <div class="workspace-panel-header">
+        <div><strong>工作区</strong><span id="workspace-panel-root">未选择项目</span></div>
+        <div><button id="refresh-workspace-tree" title="刷新文件树">↻</button><button id="close-workspace-panel" title="收起工作区">×</button></div>
+      </div>
+      <div class="workspace-panel-tabs">
+        <button class="active" data-workspace-tab="overview">概览</button>
+        <button data-workspace-tab="files">文件</button>
+        <button data-workspace-tab="changes">改动</button>
+      </div>
+      <div class="workspace-panel-body">
+        <section class="workspace-tab-panel active" data-workspace-panel="overview">
+          <div class="workspace-card context-card">
+            <div
+              class="workspace-card-title"><strong>上下文窗口</strong><span id="overview-context-state">—</span></div>
+            <div class="context-meter"><i id="overview-context-meter"></i><em></em></div>
+            <div class="workspace-kv"><span>已用</span><b id="overview-context-used">—</b></div>
+            <div
+              class="workspace-kv"><span>距压缩</span><b id="overview-context-remaining">—</b></div>
+          </div>
+          <div class="workspace-card">
+            <div class="workspace-card-title"><strong>会话指标</strong></div>
+            <div class="workspace-metric-grid">
+              <div><span>平均命中</span><b id="overview-avg-hit">—</b></div>
+              <div><span>请求数</span><b id="overview-requests">—</b></div>
+              <div><span>累计 tokens</span><b id="overview-session-tokens">—</b></div>
+              <div><span>当前会话</span><b id="overview-turns">—</b></div>
+              <div><span>本次 tokens</span><b id="overview-last-tokens">—</b></div>
+              <div><span>运行时间</span><b id="overview-runtime">—</b></div>
+            </div>
+          </div>
+          <div class="workspace-card usage-card">
+            <div
+              class="workspace-card-title"><strong>用量分析</strong><span id="overview-model">—</span></div>
+            <div class="usage-bar"><i id="overview-cache-meter"></i></div>
+            <div
+              class="workspace-kv"><span>缓存命中 tokens</span><b id="overview-cache-hit">—</b></div>
+            <div
+              class="workspace-kv"><span>缓存未命中 tokens</span><b id="overview-cache-miss">—</b></div>
+          </div>
+        </section>
+        <section class="workspace-tab-panel" data-workspace-panel="files">
+          <div id="workspace-files-status"
+            class="workspace-panel-status">点击“展开工作区”查看当前项目文件</div>
+          <ul id="workspace-files" class="workspace-files"></ul>
+        </section>
+        <section class="workspace-tab-panel" data-workspace-panel="changes">
+          <div id="workspace-git-status"
+            class="workspace-panel-status">当前项目 Git 信息会显示在这里</div>
+          <div id="workspace-git-summary" class="workspace-git-summary"></div>
+        </section>
+      </div>
+    </section>
     <footer id="runtime-status"
       class="runtime-status"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b>—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b class="runtime-money">—</b></span><span>余额 <b class="runtime-money">—</b></span></footer>
     <dialog id="settings-dialog">

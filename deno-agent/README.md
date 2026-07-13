@@ -22,8 +22,7 @@ deno-agent/
 │   ├── harness/              # s01–s20 完整 Agent Harness
 │   ├── config/               # 设置、路径、聊天持久化
 │   ├── core/                 # 核心类型
-│   ├── providers/            # DeepSeek API 与 usage 遥测
-│   └── server.ts             # 独立 HTTP 服务入口
+│   └── providers/            # DeepSeek API 与 usage 遥测
 ├── desktop/
 │   ├── main.ts               # Deno Desktop 后端入口
 │   └── renderer/             # 原生 HTML/CSS/JS 桌面界面
@@ -31,8 +30,8 @@ deno-agent/
 └── dist/
 ```
 
-`src/harness/mod.ts` 是唯一正式 Harness 入口。`desktop/main.ts` 与 `src/server.ts`
-只依赖该入口；`stages/` 保留为 s01–s20 的教学演进示例， 不进入正式桌面运行时依赖图。
+`desktop/main.ts` 是唯一产品入口，并调用 `src/harness/mod.ts` 中的正式 Harness。 `stages/` 保留为
+s01–s20 的教学演进示例，不进入正式桌面运行时依赖图。
 
 正式 Harness 按职责拆分为：
 
@@ -51,10 +50,10 @@ deno task check
 deno task desktop:hmr
 ```
 
-`deno task s01` 到 `deno task s20` 用于学习和对照各阶段机制，正式服务入口为：
+`deno task s01` 到 `deno task s20` 用于学习和对照各阶段机制。运行桌面应用：
 
 ```sh
-deno task server
+deno task desktop
 ```
 
 ## 模型配置
@@ -150,7 +149,7 @@ dist/releases/
 ## 验证
 
 ```sh
-deno fmt --check
+deno fmt --check src/harness desktop/main.ts README.md AGENTS.md
 deno task check
 rg 'stages/' desktop src
 ```
