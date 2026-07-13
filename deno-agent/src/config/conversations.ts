@@ -1,4 +1,5 @@
 import { getWorkspace } from "./settings.ts";
+import { appDataDir } from "./paths.ts";
 
 export interface ConversationMessage {
   role: "user" | "assistant";
@@ -16,13 +17,11 @@ const MAX_MESSAGES_PER_SESSION = 500;
 const MAX_CONTENT_LENGTH = 100_000;
 
 async function conversationsPath(workspace: string): Promise<string> {
-  const home = Deno.env.get("HOME");
-  if (!home) throw new Error("HOME is unavailable");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(workspace));
   const id = [...new Uint8Array(digest)].slice(0, 12).map((byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");
-  return `${home}/Library/Application Support/DenoAgent/conversations/${id}.json`;
+  return `${appDataDir()}/conversations/${id}.json`;
 }
 
 function validateSessions(value: unknown): ConversationSession[] {

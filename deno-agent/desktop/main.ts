@@ -1,10 +1,11 @@
 import {
+  type AgentEvent,
+  agentLoop,
   listCronSchedules,
+  type PermissionMode,
   runCronSchedule,
   saveCronSchedules,
-} from "../stages/s14_cron_scheduling.ts";
-import { type AgentEvent, agentLoop } from "../stages/s20_comprehensive.ts";
-import type { PermissionMode } from "../stages/s03_permission.ts";
+} from "../src/harness/mod.ts";
 import { providerTelemetry } from "../src/providers/deepseek.ts";
 import { readConversations, saveConversations } from "../src/config/conversations.ts";
 import {

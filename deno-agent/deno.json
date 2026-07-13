@@ -24,6 +24,12 @@
     "desktop": "deno desktop --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:hmr": "deno desktop --hmr --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:build": "deno desktop --output dist/DenoAgent.app --include desktop/renderer --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write desktop/main.ts",
+    "desktop:build:mac-arm64": "deno desktop --target aarch64-apple-darwin --output dist/releases/macos-arm64/DenoAgent.app --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
+    "desktop:build:mac-x64": "deno desktop --target x86_64-apple-darwin --output dist/releases/macos-x64/DenoAgent.app --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
+    "desktop:build:windows": "deno desktop --target x86_64-pc-windows-msvc --output dist/releases/windows-x64/DenoAgent.msi --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
+    "desktop:build:linux-x64": "deno desktop --target x86_64-unknown-linux-gnu --output dist/releases/linux-x64/DenoAgent.AppImage --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
+    "desktop:build:linux-arm64": "deno desktop --target aarch64-unknown-linux-gnu --output dist/releases/linux-arm64/DenoAgent.AppImage --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
+    "desktop:build:all": "deno task desktop:build:mac-arm64 && deno task desktop:build:mac-x64 && deno task desktop:build:windows && deno task desktop:build:linux-x64 && deno task desktop:build:linux-arm64",
     "check": "deno check desktop/main.ts stages/*.ts src/**/*.ts"
   },
   "desktop": {

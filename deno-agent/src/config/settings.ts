@@ -1,5 +1,6 @@
 import type { DeepSeekConfig } from "../providers/deepseek.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { appDataDir } from "./paths.ts";
 
 const SERVICE = "com.youjunmao.deno-agent";
 const ACCOUNT = "deepseek-api-key";
@@ -23,9 +24,7 @@ interface StoredSettings {
 }
 
 function settingsPath(): string {
-  const home = Deno.env.get("HOME");
-  if (!home) throw new Error("HOME is unavailable");
-  return `${home}/Library/Application Support/DenoAgent/settings.json`;
+  return `${appDataDir()}/settings.json`;
 }
 
 async function readStored(): Promise<StoredSettings> {

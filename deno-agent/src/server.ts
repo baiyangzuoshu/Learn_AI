@@ -1,4 +1,4 @@
-import { agentLoop, type AgentEvent } from "../stages/s01_agent_loop.ts";
+import { type AgentEvent, agentLoop } from "./harness/mod.ts";
 
 const PORT = Number(Deno.env.get("DENO_AGENT_PORT") ?? "47831");
 
