@@ -22,6 +22,7 @@ let generationController = null;
 let cronSchedules = [];
 let runStep = 0, runToolCount = 0;
 let startupUpdateCheckDone = false;
+let lastUpdateCheck = null;
 const AUTO_SCROLL_MARGIN = 96;
 const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
@@ -783,6 +784,7 @@ function renderUpdateSettings(data) {
   $("#update-last-check").textContent = formatDateTime(update.lastCheckAt);
   $("#update-settings-path").textContent = data.settingsPath || settings.settingsPath || "—";
   $("#update-settings-path").title = data.settingsPath || settings.settingsPath || "";
+  setInstallUpdateAvailability(lastUpdateCheck);
 }
 
 async function loadUpdateSettings() {
@@ -810,18 +812,32 @@ async function saveUpdateSettingsFromForm({ quiet = false } = {}) {
   return data;
 }
 
+function setInstallUpdateAvailability(data) {
+  const button = $("#install-update");
+  if (!button) return;
+  const canInstall = Boolean(data?.updateAvailable && data?.downloadUrl);
+  button.disabled = !canInstall;
+  button.title = canInstall
+    ? "下载更新包，退出当前 App，替换后自动重新打开"
+    : "先检查更新；GitHub Release 需要包含 macOS arm64 .zip 资产";
+}
+
 function renderUpdateCheckResult(data, { silent = false } = {}) {
+  lastUpdateCheck = data;
+  setInstallUpdateAvailability(data);
   $("#update-current-version").textContent = data.currentVersion || "—";
   $("#update-latest-version").textContent = data.latestVersion || "—";
   $("#update-last-check").textContent = formatDateTime(data.checkedAt);
   if (silent && !data.updateAvailable) return;
-  const message = data.releaseUrl
+  let message = data.releaseUrl
     ? `${escapeHtml(data.message)} · <a href="${
       escapeHtml(data.releaseUrl)
     }" target="_blank" rel="noreferrer">查看发布页</a>`
     : escapeHtml(data.message);
+  if (data.updateAvailable && !data.downloadUrl) {
+    message += " · 未找到可自动安装的 .zip 资产";
+  }
   $("#update-status").innerHTML = message;
-  if (data.updateAvailable) status.textContent = data.message;
 }
 
 async function checkForUpdates({ silent = false } = {}) {
@@ -834,6 +850,17 @@ async function checkForUpdates({ silent = false } = {}) {
   if (!response.ok) throw new Error(data.error || "检查更新失败");
   renderUpdateCheckResult(data, { silent });
   await loadUpdateSettings();
+  return data;
+}
+
+async function installUpdate() {
+  const button = $("#install-update");
+  button.disabled = true;
+  $("#update-status").textContent = "正在下载更新包，完成后会退出并重新打开…";
+  const response = await fetch(`${API}/update/install`, { method: "POST" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "安装更新失败");
+  $("#update-status").textContent = data.message || "更新已准备完成，应用即将重启…";
   return data;
 }
 
@@ -1378,6 +1405,14 @@ $("#check-update").addEventListener("click", async () => {
     $("#update-status").textContent = `错误：${error.message}`;
   } finally {
     button.disabled = false;
+  }
+});
+$("#install-update").addEventListener("click", async () => {
+  try {
+    await installUpdate();
+  } catch (error) {
+    $("#update-status").textContent = `错误：${error.message}`;
+    setInstallUpdateAvailability(lastUpdateCheck);
   }
 });
 $("#toggle-key").addEventListener("click", () => {

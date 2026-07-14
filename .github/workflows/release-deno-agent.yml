@@ -1,0 +1,75 @@
+name: Release Deno Agent
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "deno-agent-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, for example v1.0.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    name: Build and upload macOS arm64
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: deno-agent
+    env:
+      DENO_VERSION: "2.9.2"
+      RELEASE_TAG: ${{ github.event.inputs.version || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Validate release version
+        run: |
+          APP_VERSION="$(sed -n 's/^const APP_VERSION = "\([^"]*\)";$/\1/p' desktop/main.ts)"
+          TAG_VERSION="${RELEASE_TAG#v}"
+          TAG_VERSION="${TAG_VERSION#deno-agent-v}"
+          if [ "$APP_VERSION" != "$TAG_VERSION" ]; then
+            echo "APP_VERSION=$APP_VERSION does not match release tag $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Check
+        run: |
+          deno fmt --check desktop/main.ts desktop/renderer/app.js desktop/renderer/index.html README.md
+          deno task check
+          ! grep -R 'stages/' src desktop
+
+      - name: Build app
+        run: deno task desktop:build:mac-arm64
+
+      - name: Package app
+        run: |
+          ASSET="dist/releases/macos-arm64/DenoAgent-${RELEASE_TAG}-macos-arm64.zip"
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/releases/macos-arm64/DenoAgent.app \
+            "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+
+      - name: Create or update GitHub Release
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$ASSET" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Deno Agent $RELEASE_TAG" \
+              --notes "Deno Agent $RELEASE_TAG macOS arm64 release."
+          fi

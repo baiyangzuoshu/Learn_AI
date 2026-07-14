@@ -155,7 +155,7 @@
             <section class="settings-panel" data-settings-panel="update">
               <div class="settings-card update-settings-card">
                 <b>软件更新</b>
-                <p>默认从 GitHub Releases latest API 检查版本。当前实现只做版本检测，不会自动下载或替换应用。</p>
+                <p>默认从 GitHub Releases latest API 检查版本。可下载 macOS zip 更新包，退出当前 App 后自动替换并重新打开。</p>
                 <label
                   class="developer-option"><input id="update-check-on-startup" type="checkbox" /><span><b>启动时检测新版本</b><small>使用 GitHub release API 或自定义 HTTPS manifest。</small></span></label>
                 <label>GitHub Release API / Manifest URL<input id="update-url" type="text" placeholder="https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest" /></label>
@@ -169,6 +169,7 @@
                   <button id="save-update-settings" type="button"
                     class="secondary">保存更新设置</button>
                   <button id="check-update" type="button">检查更新</button>
+                  <button id="install-update" type="button" disabled>下载并重启更新</button>
                 </div>
                 <p id="update-status" class="key-status"></p>
               </div>

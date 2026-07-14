@@ -77,6 +77,7 @@ listCronSchedules().catch((error) => console.error("Unable to initialize AI sche
 
 const APP_VERSION = "1.0.1";
 const UPDATE_CHECK_TIMEOUT_MS = 8_000;
+const UPDATE_DOWNLOAD_TIMEOUT_MS = 120_000;
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
@@ -91,6 +92,11 @@ type UpdateManifest = {
   downloadUrl?: string;
   notes?: string;
   body?: string;
+  assets?: {
+    name?: string;
+    browser_download_url?: string;
+    state?: string;
+  }[];
 };
 
 type WorkspaceTreeNode = {
@@ -350,12 +356,148 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
+function selectUpdateDownloadUrl(manifest: UpdateManifest): string | undefined {
+  if (manifest.downloadUrl) return manifest.downloadUrl;
+  const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
+  const candidates = assets
+    .filter((asset) => asset.browser_download_url && asset.state !== "deleted")
+    .filter((asset) => (asset.name ?? "").toLowerCase().endsWith(".zip"))
+    .map((asset) => {
+      const name = (asset.name ?? "").toLowerCase();
+      let score = 0;
+      if (name.includes("denoagent") || name.includes("deno-agent")) score += 4;
+      if (name.includes("macos") || name.includes("darwin")) score += 3;
+      if (name.includes("arm64") || name.includes("aarch64")) score += 3;
+      if (name.includes("x64") || name.includes("x86_64")) score -= 1;
+      return { asset, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  return candidates[0]?.asset.browser_download_url;
+}
+
+function validateUpdateDownloadUrl(downloadUrl: string): void {
+  const parsed = new URL(downloadUrl);
+  const isLocalDev = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
+  if (parsed.protocol !== "https:" && !(isLocalDev && parsed.protocol === "http:")) {
+    throw new Error("更新包下载地址必须使用 HTTPS；本地开发只允许 localhost HTTP");
+  }
+  if (!parsed.pathname.toLowerCase().endsWith(".zip")) {
+    throw new Error("当前自动更新只支持 .zip 更新包");
+  }
+}
+
+async function currentAppBundlePath(): Promise<string | undefined> {
+  let path = await Deno.realPath(Deno.execPath());
+  while (path && path !== "/") {
+    if (path.endsWith(".app")) {
+      const stat = await Deno.stat(path);
+      if (stat.isDirectory) return path;
+    }
+    const trimmed = path.replace(/\/+$/, "");
+    const slash = trimmed.lastIndexOf("/");
+    path = slash <= 0 ? "/" : trimmed.slice(0, slash);
+  }
+  return undefined;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+async function downloadUpdateArchive(downloadUrl: string, archivePath: string): Promise<void> {
+  validateUpdateDownloadUrl(downloadUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPDATE_DOWNLOAD_TIMEOUT_MS);
+  try {
+    const response = await fetch(downloadUrl, {
+      headers: { "accept": "application/octet-stream" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`更新包下载失败：HTTP ${response.status}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await Deno.writeFile(archivePath, bytes);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function installUpdateAndRestart(): Promise<{
+  ok: true;
+  version: string;
+  message: string;
+}> {
+  const update = await checkForUpdate();
+  if (!update.updateAvailable || !update.latestVersion) {
+    throw new Error("当前已是最新版本，无需更新");
+  }
+  if (!update.downloadUrl) {
+    throw new Error("GitHub Release 未找到可安装的 macOS arm64 .zip 资产");
+  }
+  const appPath = await currentAppBundlePath();
+  if (!appPath) {
+    throw new Error("开发模式不支持自动替换应用；请用打包后的 DenoAgent.app 测试");
+  }
+
+  const appParent = appPath.slice(0, appPath.lastIndexOf("/"));
+  const tempDir = await Deno.makeTempDir({ prefix: "deno-agent-update-" });
+  const archivePath = `${tempDir}/DenoAgent-${update.latestVersion}.zip`;
+  const scriptPath = `${tempDir}/install-update.sh`;
+  const backupPath = `${appPath}.bak-${Date.now()}`;
+
+  await downloadUpdateArchive(update.downloadUrl, archivePath);
+  const script = `#!/bin/sh
+set -eu
+APP_PATH=${shellQuote(appPath)}
+APP_PARENT=${shellQuote(appParent)}
+ARCHIVE_PATH=${shellQuote(archivePath)}
+BACKUP_PATH=${shellQuote(backupPath)}
+TEMP_DIR=${shellQuote(tempDir)}
+APP_PID=${Deno.pid}
+
+while kill -0 "$APP_PID" 2>/dev/null; do
+  sleep 0.2
+done
+
+rm -rf "$BACKUP_PATH"
+if [ -d "$APP_PATH" ]; then
+  mv "$APP_PATH" "$BACKUP_PATH"
+fi
+
+/usr/bin/ditto -x -k "$ARCHIVE_PATH" "$APP_PARENT"
+
+if [ ! -d "$APP_PATH" ]; then
+  if [ -d "$BACKUP_PATH" ]; then
+    mv "$BACKUP_PATH" "$APP_PATH"
+  fi
+  exit 1
+fi
+
+rm -rf "$BACKUP_PATH"
+/usr/bin/open "$APP_PATH"
+rm -rf "$TEMP_DIR"
+`;
+  await Deno.writeTextFile(scriptPath, script);
+  new Deno.Command("/bin/sh", {
+    args: [scriptPath],
+    stdin: "null",
+    stdout: "null",
+    stderr: "null",
+  }).spawn();
+  setTimeout(() => Deno.exit(0), 300);
+  return {
+    ok: true,
+    version: update.latestVersion,
+    message: `已下载 ${update.latestVersion}，应用即将退出并重新打开`,
+  };
+}
+
 async function checkForUpdate(): Promise<{
   configured: boolean;
   currentVersion: string;
   latestVersion?: string;
   updateAvailable: boolean;
   releaseUrl?: string;
+  downloadUrl?: string;
   notes?: string;
   checkedAt?: string;
   message: string;
@@ -381,8 +523,8 @@ async function checkForUpdate(): Promise<{
     const manifest = await response.json() as UpdateManifest;
     const latestVersion = extractVersion(String(manifest.version ?? manifest.tag_name ?? ""));
     if (!latestVersion) throw new Error("更新源缺少 version 或 tag_name 字段");
-    const releaseUrl = manifest.releaseUrl ?? manifest.downloadUrl ?? manifest.html_url ??
-      manifest.url;
+    const releaseUrl = manifest.releaseUrl ?? manifest.html_url ?? manifest.url;
+    const downloadUrl = selectUpdateDownloadUrl(manifest);
     const checkedAt = new Date().toISOString();
     await saveUpdateSettings({
       lastCheckAt: checkedAt,
@@ -396,6 +538,7 @@ async function checkForUpdate(): Promise<{
       latestVersion,
       updateAvailable,
       releaseUrl,
+      downloadUrl,
       notes: manifest.notes ?? manifest.body,
       checkedAt,
       message: updateAvailable ? `发现新版本 ${latestVersion}` : "当前已是最新版本",
@@ -440,6 +583,13 @@ Deno.serve(async (request) => {
   if (url.pathname === "/api/update/check" && request.method === "POST") {
     try {
       return json(await checkForUpdate());
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/update/install" && request.method === "POST") {
+    try {
+      return json(await installUpdateAndRestart());
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 400);
     }

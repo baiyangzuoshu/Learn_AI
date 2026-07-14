@@ -77,8 +77,8 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 ## 软件更新
 
-“设置 → 更新”提供版本查看、启动时检测开关和手动检查更新。更新检查只读取 GitHub Releases
-版本信息，不会自动下载或替换 `.app`。
+“设置 → 更新”提供版本查看、启动时检测开关、手动检查更新和“下载并重启更新”。自动安装流程会下载 GitHub
+Release 中的 macOS `.zip` 更新包，退出当前 App，替换 `.app` 后重新打开。
 
 默认更新源是当前 GitHub 仓库的 latest release API：
 
@@ -86,8 +86,17 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
 ```
 
-发布新版本时，在 GitHub Releases 创建 release，tag 名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。
-应用会从 `tag_name` 中提取语义版本号进行比较。
+发布新版本时，推荐直接推送 tag，让仓库根目录的 GitHub Actions workflow 自动创建 Release 并上传 zip：
+
+```sh
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+也可以在 GitHub Actions 页面手动运行 `Release Deno Agent` workflow，输入 `v1.0.1` 这类版本号。 tag
+名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。 应用会从 `tag_name`
+中提取语义版本号进行比较，并优先选择名字包含 `DenoAgent`、`macos`、 `arm64` 的 `.zip` asset
+作为自动安装包。zip 根目录需要包含 `DenoAgent.app`。
 
 当前测试更新版本为 `1.0.1`，可用 GitHub Release tag `v1.0.1` 验证更新检测链路。
 
@@ -103,6 +112,7 @@ DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releas
 {
   "version": "1.1.0",
   "url": "https://example.com/deno-agent/releases/1.1.0",
+  "downloadUrl": "https://example.com/deno-agent/releases/DenoAgent-v1.1.0-macos-arm64.zip",
   "notes": "Release notes"
 }
 ```
