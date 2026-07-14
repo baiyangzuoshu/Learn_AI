@@ -21,6 +21,7 @@ let settings = {}, sessions = [], activeSessionId = null;
 let generationController = null;
 let cronSchedules = [];
 let runStep = 0, runToolCount = 0;
+let startupUpdateCheckDone = false;
 const AUTO_SCROLL_MARGIN = 96;
 const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
@@ -424,6 +425,11 @@ function formatDuration(ms) {
   const hours = Math.floor(minutes / 60), minuteRest = minutes % 60;
   return minuteRest ? `${hours}小时${minuteRest}分` : `${hours}小时`;
 }
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+}
 function setRunStep(step) {
   runStep = Math.max(0, Math.min(4, step));
   composerStep.textContent = `第${runStep}/4步`;
@@ -768,6 +774,78 @@ async function loadWorkspaceGit() {
   }
 }
 
+function renderUpdateSettings(data) {
+  const update = data.update || {};
+  $("#update-check-on-startup").checked = Boolean(update.checkOnStartup);
+  $("#update-url").value = update.updateUrl || "";
+  $("#update-current-version").textContent = data.version || "—";
+  $("#update-latest-version").textContent = update.latestVersion || "—";
+  $("#update-last-check").textContent = formatDateTime(update.lastCheckAt);
+  $("#update-settings-path").textContent = data.settingsPath || settings.settingsPath || "—";
+  $("#update-settings-path").title = data.settingsPath || settings.settingsPath || "";
+}
+
+async function loadUpdateSettings() {
+  const response = await fetch(`${API}/update/settings`), data = await response.json();
+  if (!response.ok) throw new Error(data.error || "无法读取更新设置");
+  renderUpdateSettings(data);
+  return data;
+}
+
+async function saveUpdateSettingsFromForm({ quiet = false } = {}) {
+  const response = await fetch(`${API}/update/settings`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      checkOnStartup: $("#update-check-on-startup").checked,
+      updateUrl: $("#update-url").value.trim(),
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "无法保存更新设置");
+  settings.update = data.update;
+  settings.settingsPath = data.settingsPath;
+  renderUpdateSettings(data);
+  if (!quiet) $("#update-status").textContent = "✓ 更新设置已保存";
+  return data;
+}
+
+function renderUpdateCheckResult(data, { silent = false } = {}) {
+  $("#update-current-version").textContent = data.currentVersion || "—";
+  $("#update-latest-version").textContent = data.latestVersion || "—";
+  $("#update-last-check").textContent = formatDateTime(data.checkedAt);
+  if (silent && !data.updateAvailable) return;
+  const message = data.releaseUrl
+    ? `${escapeHtml(data.message)} · <a href="${
+      escapeHtml(data.releaseUrl)
+    }" target="_blank" rel="noreferrer">查看发布页</a>`
+    : escapeHtml(data.message);
+  $("#update-status").innerHTML = message;
+  if (data.updateAvailable) status.textContent = data.message;
+}
+
+async function checkForUpdates({ silent = false } = {}) {
+  if (!silent) {
+    $("#update-status").textContent = "正在检查更新…";
+    await saveUpdateSettingsFromForm({ quiet: true });
+  }
+  const response = await fetch(`${API}/update/check`, { method: "POST" }),
+    data = await response.json();
+  if (!response.ok) throw new Error(data.error || "检查更新失败");
+  renderUpdateCheckResult(data, { silent });
+  await loadUpdateSettings();
+  return data;
+}
+
+function maybeCheckUpdateOnStartup() {
+  const update = settings.update || {};
+  if (startupUpdateCheckDone || !update.checkOnStartup || !update.updateUrl) return;
+  startupUpdateCheckDone = true;
+  checkForUpdates({ silent: true }).catch(() => {
+    // Startup checks should never block normal app use.
+  });
+}
+
 function renderMessages({ forceScroll = false } = {}) {
   const session = activeSession();
   const shouldFollowBottom = forceScroll || isMessagesNearBottom();
@@ -798,6 +876,11 @@ function addMessage(kind, text, scroll = true) {
 async function loadSettings() {
   const previousWorkspace = settings.workspace;
   settings = await (await fetch(`${API}/settings`)).json();
+  renderUpdateSettings({
+    version: "—",
+    settingsPath: settings.settingsPath,
+    update: settings.update || {},
+  });
   await loadComposerGitSummary();
   if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
   fillModels(modelSelect, settings.models, settings.defaultModel);
@@ -808,6 +891,7 @@ async function loadSettings() {
   $("#developer-mode").checked = localStorage.getItem("deno-agent:developer-mode") === "true";
   if (previousWorkspace !== settings.workspace) await loadSessions();
   else renderWorkspaceTree();
+  maybeCheckUpdateOnStartup();
 }
 
 async function connect(retries = 30) {
@@ -1249,6 +1333,7 @@ $("#cron-list").addEventListener("click", async (event) => {
 });
 $("#settings-button").addEventListener("click", async () => {
   await loadSettings();
+  await loadUpdateSettings();
   $("#mcp-workspace").textContent = settings.workspace || "尚未选择工作区";
   const data = await (await fetch(`${API}/settings/key`)).json(),
     key = $("#api-key"),
@@ -1262,6 +1347,7 @@ const settingsTabText = {
   model: ["模型", "密钥安全保存在 macOS Keychain"],
   mcp: ["MCP与工具", "管理工作区插件与工具连接"],
   general: ["通用", "运行时、开发者模式与本地数据"],
+  update: ["更新", "检查软件更新并查看版本信息"],
 };
 document.querySelectorAll("[data-settings-tab]").forEach((button) =>
   button.addEventListener("click", () => {
@@ -1276,6 +1362,24 @@ document.querySelectorAll("[data-settings-tab]").forEach((button) =>
     $("#settings-subtitle").textContent = settingsTabText[tab][1];
   })
 );
+$("#save-update-settings").addEventListener("click", async () => {
+  try {
+    await saveUpdateSettingsFromForm();
+  } catch (error) {
+    $("#update-status").textContent = `错误：${error.message}`;
+  }
+});
+$("#check-update").addEventListener("click", async () => {
+  const button = $("#check-update");
+  button.disabled = true;
+  try {
+    await checkForUpdates();
+  } catch (error) {
+    $("#update-status").textContent = `错误：${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
 $("#toggle-key").addEventListener("click", () => {
   const key = $("#api-key"), hidden = key.type === "password";
   key.type = hidden ? "text" : "password";
@@ -1295,6 +1399,11 @@ settingsForm.addEventListener("submit", async (event) => {
   const button = $("#save-settings");
   button.disabled = true;
   try {
+    const activeTab = document.querySelector("[data-settings-tab].active")?.dataset.settingsTab;
+    if (activeTab === "update") {
+      await saveUpdateSettingsFromForm();
+      return;
+    }
     localStorage.setItem("deno-agent:developer-mode", String($("#developer-mode").checked));
     const response = await fetch(`${API}/settings`, {
         method: "POST",

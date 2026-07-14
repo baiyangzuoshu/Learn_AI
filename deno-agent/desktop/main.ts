@@ -15,7 +15,9 @@ import {
   removeWorkspace,
   revealApiKey,
   saveSettings,
+  saveUpdateSettings,
   selectWorkspace,
+  settingsFilePath,
 } from "../src/config/settings.ts";
 
 const assets = new Map<string, { body: string; contentType: string }>([
@@ -73,9 +75,23 @@ const mainWindow = new Deno.BrowserWindow({
 mainWindow.addEventListener("close", () => Deno.exit(0));
 listCronSchedules().catch((error) => console.error("Unable to initialize AI schedules", error));
 
+const APP_VERSION = "1.0.1";
+const UPDATE_CHECK_TIMEOUT_MS = 8_000;
+
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
 }
+
+type UpdateManifest = {
+  version?: string;
+  tag_name?: string;
+  url?: string;
+  html_url?: string;
+  releaseUrl?: string;
+  downloadUrl?: string;
+  notes?: string;
+  body?: string;
+};
 
 type WorkspaceTreeNode = {
   name: string;
@@ -316,10 +332,83 @@ async function readWorkspaceGit(): Promise<{
   };
 }
 
+function extractVersion(value: string): string {
+  return value.match(/\d+(?:\.\d+){1,3}/)?.[0] ?? "";
+}
+
+function compareVersions(left: string, right: string): number {
+  const parse = (value: string) =>
+    extractVersion(value).split(".").map((part) => Number(part)).filter((part) =>
+      Number.isFinite(part)
+    );
+  const a = parse(left), b = parse(right);
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const diff = (a[index] ?? 0) - (b[index] ?? 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+async function checkForUpdate(): Promise<{
+  configured: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  updateAvailable: boolean;
+  releaseUrl?: string;
+  notes?: string;
+  checkedAt?: string;
+  message: string;
+}> {
+  const settings = await getPublicSettings();
+  const updateUrl = settings.update.updateUrl.trim();
+  if (!updateUrl) {
+    return {
+      configured: false,
+      currentVersion: APP_VERSION,
+      updateAvailable: false,
+      message: "未配置更新源；可在设置中填写 HTTPS manifest 或 GitHub release API URL",
+    };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPDATE_CHECK_TIMEOUT_MS);
+  try {
+    const response = await fetch(updateUrl, {
+      headers: { "accept": "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`更新源返回 HTTP ${response.status}`);
+    const manifest = await response.json() as UpdateManifest;
+    const latestVersion = extractVersion(String(manifest.version ?? manifest.tag_name ?? ""));
+    if (!latestVersion) throw new Error("更新源缺少 version 或 tag_name 字段");
+    const releaseUrl = manifest.releaseUrl ?? manifest.downloadUrl ?? manifest.html_url ??
+      manifest.url;
+    const checkedAt = new Date().toISOString();
+    await saveUpdateSettings({
+      lastCheckAt: checkedAt,
+      latestVersion,
+      releaseUrl,
+    });
+    const updateAvailable = compareVersions(latestVersion, APP_VERSION) > 0;
+    return {
+      configured: true,
+      currentVersion: APP_VERSION,
+      latestVersion,
+      updateAvailable,
+      releaseUrl,
+      notes: manifest.notes ?? manifest.body,
+      checkedAt,
+      message: updateAvailable ? `发现新版本 ${latestVersion}` : "当前已是最新版本",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 Deno.serve(async (request) => {
   const url = new URL(request.url);
   if (url.pathname === "/api/health") {
-    return json({ ok: true, stage: "s20", version: "1.0.0", capabilities: 20 });
+    return json({ ok: true, stage: "s20", version: APP_VERSION, capabilities: 20 });
   }
   if (url.pathname === "/api/telemetry") return json(providerTelemetry());
   if (url.pathname === "/api/settings" && request.method === "GET") {
@@ -327,6 +416,33 @@ Deno.serve(async (request) => {
   }
   if (url.pathname === "/api/settings/key" && request.method === "GET") {
     return json({ apiKey: await revealApiKey() });
+  }
+  if (url.pathname === "/api/update/settings" && request.method === "GET") {
+    const settings = await getPublicSettings();
+    return json({
+      version: APP_VERSION,
+      settingsPath: settingsFilePath(),
+      update: settings.update,
+    });
+  }
+  if (url.pathname === "/api/update/settings" && request.method === "POST") {
+    try {
+      const settings = await saveUpdateSettings(await request.json());
+      return json({
+        version: APP_VERSION,
+        settingsPath: settings.settingsPath,
+        update: settings.update,
+      });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+  }
+  if (url.pathname === "/api/update/check" && request.method === "POST") {
+    try {
+      return json(await checkForUpdate());
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
   if (url.pathname === "/api/conversations" && request.method === "GET") {
     try {

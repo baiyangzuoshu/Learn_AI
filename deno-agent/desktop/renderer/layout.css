@@ -154,11 +154,23 @@ body.nav-collapsed main {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 38px;
   padding: 7px 28px;
   border-bottom: 1px solid #202833;
   background: #0d1218;
+}
+
+.top-control-left,
+.top-control-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-control-right {
+  margin-left: auto;
 }
 
 .top-controlbar button {

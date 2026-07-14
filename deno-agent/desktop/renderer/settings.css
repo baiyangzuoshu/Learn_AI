@@ -287,6 +287,71 @@ dialog::backdrop {
   font-size: 11px;
   color: #5ed8bf;
 }
+
+.update-settings-card .developer-option {
+  margin: 14px 0;
+}
+
+.update-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.update-info-grid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #26313f;
+  border-radius: 9px;
+  background: #0a1017;
+}
+
+.update-info-grid span,
+.update-info-grid b {
+  display: block;
+}
+
+.update-info-grid span {
+  margin-bottom: 5px;
+  color: #778397;
+  font-size: 10px;
+}
+
+.update-info-grid b {
+  overflow: hidden;
+  color: #d6e0ea;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.update-actions button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #54dbc0;
+  color: #08201b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.update-actions .secondary {
+  background: #252d38;
+  color: #b6c0cf;
+}
+
+#update-status a {
+  color: #83ead5;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

@@ -75,6 +75,38 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 发布构建不会读取或嵌入 `.env.local`。
 
+## 软件更新
+
+“设置 → 更新”提供版本查看、启动时检测开关和手动检查更新。更新检查只读取 GitHub Releases
+版本信息，不会自动下载或替换 `.app`。
+
+默认更新源是当前 GitHub 仓库的 latest release API：
+
+```text
+https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
+```
+
+发布新版本时，在 GitHub Releases 创建 release，tag 名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。
+应用会从 `tag_name` 中提取语义版本号进行比较。
+
+当前测试更新版本为 `1.0.1`，可用 GitHub Release tag `v1.0.1` 验证更新检测链路。
+
+也可以在设置页或环境变量中覆盖更新源：
+
+```sh
+DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
+```
+
+除 GitHub latest release API 返回的 `tag_name`、`html_url`、`body` 字段外，也支持简单 manifest：
+
+```json
+{
+  "version": "1.1.0",
+  "url": "https://example.com/deno-agent/releases/1.1.0",
+  "notes": "Release notes"
+}
+```
+
 ## 本地数据
 
 | 平台    | 数据目录                                                 |

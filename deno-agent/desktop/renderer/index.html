@@ -26,10 +26,14 @@
     </aside>
     <main>
       <div class="top-controlbar">
-        <button id="nav-toggle" class="nav-toggle" type="button">导航</button>
-        <button id="toggle-workspace-panel" class="workspace-panel-toggle"
-          type="button">工作区</button>
-        <button id="toggle-events" class="tool-toggle" type="button">工具</button>
+        <div class="top-control-left">
+          <button id="nav-toggle" class="nav-toggle" type="button">导航</button>
+        </div>
+        <div class="top-control-right">
+          <button id="toggle-workspace-panel" class="workspace-panel-toggle"
+            type="button">工作区</button>
+          <button id="toggle-events" class="tool-toggle" type="button">工具</button>
+        </div>
       </div>
       <header>
         <div>
@@ -121,7 +125,7 @@
       <form id="settings-form" method="dialog">
         <div class="settings-shell">
           <aside
-            class="settings-nav"><div><h2>设置</h2><p>Deno Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button></aside>
+            class="settings-nav"><div><h2>设置</h2><p>Deno Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button><button type="button" data-settings-tab="update">更新</button></aside>
           <div class="settings-content">
             <div
               class="settings-top"><div><h2 id="settings-title">模型</h2><p id="settings-subtitle">密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
@@ -147,6 +151,27 @@
                 class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
               <div
                 class="settings-card"><b>运行时</b><p>Deno Desktop · 系统WebView · 无Electron</p></div>
+            </section>
+            <section class="settings-panel" data-settings-panel="update">
+              <div class="settings-card update-settings-card">
+                <b>软件更新</b>
+                <p>默认从 GitHub Releases latest API 检查版本。当前实现只做版本检测，不会自动下载或替换应用。</p>
+                <label
+                  class="developer-option"><input id="update-check-on-startup" type="checkbox" /><span><b>启动时检测新版本</b><small>使用 GitHub release API 或自定义 HTTPS manifest。</small></span></label>
+                <label>GitHub Release API / Manifest URL<input id="update-url" type="text" placeholder="https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest" /></label>
+                <div class="update-info-grid">
+                  <div><span>当前版本</span><b id="update-current-version">—</b></div>
+                  <div><span>最新版本</span><b id="update-latest-version">—</b></div>
+                  <div><span>上次检查</span><b id="update-last-check">—</b></div>
+                  <div><span>配置文件</span><b id="update-settings-path">—</b></div>
+                </div>
+                <div class="update-actions">
+                  <button id="save-update-settings" type="button"
+                    class="secondary">保存更新设置</button>
+                  <button id="check-update" type="button">检查更新</button>
+                </div>
+                <p id="update-status" class="key-status"></p>
+              </div>
             </section>
             <div
               class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="save-settings" value="default">保存设置</button></div>

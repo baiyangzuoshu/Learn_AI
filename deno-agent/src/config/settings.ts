@@ -5,6 +5,7 @@ import { appDataDir } from "./paths.ts";
 const SERVICE = "com.youjunmao.deno-agent";
 const ACCOUNT = "deepseek-api-key";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+const DEFAULT_UPDATE_URL = "https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest";
 const workspaceContext = new AsyncLocalStorage<string>();
 
 export interface PublicSettings {
@@ -14,6 +15,8 @@ export interface PublicSettings {
   hasApiKey: boolean;
   workspace?: string;
   workspaces: string[];
+  settingsPath: string;
+  update: UpdateSettings;
 }
 interface StoredSettings {
   baseUrl: string;
@@ -21,17 +24,48 @@ interface StoredSettings {
   defaultModel: string;
   workspace?: string;
   workspaces?: string[];
+  update?: Partial<UpdateSettings>;
+}
+export interface UpdateSettings {
+  checkOnStartup: boolean;
+  updateUrl: string;
+  lastCheckAt?: string;
+  latestVersion?: string;
+  releaseUrl?: string;
 }
 
 function settingsPath(): string {
   return `${appDataDir()}/settings.json`;
 }
 
+export function settingsFilePath(): string {
+  return settingsPath();
+}
+
+function defaultUpdateSettings(): UpdateSettings {
+  return {
+    checkOnStartup: true,
+    updateUrl: Deno.env.get("DENO_AGENT_UPDATE_URL")?.trim() || DEFAULT_UPDATE_URL,
+  };
+}
+
+function normalizeUpdateSettings(input?: Partial<UpdateSettings>): UpdateSettings {
+  const fallback = defaultUpdateSettings();
+  return {
+    checkOnStartup: input?.checkOnStartup ?? fallback.checkOnStartup,
+    updateUrl: input?.updateUrl?.trim() || fallback.updateUrl,
+    lastCheckAt: input?.lastCheckAt,
+    latestVersion: input?.latestVersion,
+    releaseUrl: input?.releaseUrl,
+  };
+}
+
 async function readStored(): Promise<StoredSettings> {
-  const fallback = {
+  const fallback: StoredSettings = {
     baseUrl: Deno.env.get("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com",
     models: DEFAULT_MODELS,
     defaultModel: Deno.env.get("DEEPSEEK_MODEL") ?? "deepseek-v4-flash",
+    update: defaultUpdateSettings(),
   };
   try {
     const parsed = JSON.parse(await Deno.readTextFile(settingsPath())) as Partial<StoredSettings>;
@@ -52,6 +86,7 @@ async function readStored(): Promise<StoredSettings> {
         : models[0],
       workspace,
       workspaces,
+      update: normalizeUpdateSettings(parsed.update),
     };
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) return fallback;
@@ -81,7 +116,13 @@ export async function revealApiKey(): Promise<string> {
 
 export async function getPublicSettings(): Promise<PublicSettings> {
   const stored = await readStored();
-  return { ...stored, workspaces: stored.workspaces ?? [], hasApiKey: Boolean(await readKey()) };
+  return {
+    ...stored,
+    workspaces: stored.workspaces ?? [],
+    update: normalizeUpdateSettings(stored.update),
+    settingsPath: settingsPath(),
+    hasApiKey: Boolean(await readKey()),
+  };
 }
 
 export async function saveSettings(
@@ -116,11 +157,29 @@ export async function saveSettings(
         defaultModel: input.defaultModel,
         workspace: current.workspace,
         workspaces: current.workspaces ?? [],
+        update: normalizeUpdateSettings(current.update),
       },
       null,
       2,
     ),
   );
+  return await getPublicSettings();
+}
+
+export async function saveUpdateSettings(input: Partial<UpdateSettings>): Promise<PublicSettings> {
+  const current = await readStored();
+  const update = normalizeUpdateSettings({ ...current.update, ...input });
+  if (
+    update.updateUrl &&
+    !update.updateUrl.startsWith("https://") &&
+    !update.updateUrl.startsWith("http://127.0.0.1") &&
+    !update.updateUrl.startsWith("http://localhost")
+  ) {
+    throw new Error("更新源必须使用 HTTPS；本地开发只允许 localhost HTTP");
+  }
+  const path = settingsPath();
+  await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+  await Deno.writeTextFile(path, JSON.stringify({ ...current, update }, null, 2));
   return await getPublicSettings();
 }
 
