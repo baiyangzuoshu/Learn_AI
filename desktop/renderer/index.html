@@ -16,7 +16,7 @@
   <body>
     <aside>
       <div
-        class="brand"><span class="logo">D</span><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
+        class="brand"><img class="logo" src="/app-icon.png" alt="白羊左树" /><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
       <button id="new-chat" class="new-chat">＋ 新对话</button>
       <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
       <div
@@ -130,8 +130,13 @@
             <div
               class="settings-top"><div><h2 id="settings-title">模型</h2><p id="settings-subtitle">密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
             <section class="settings-panel active" data-settings-panel="model">
-              <label>DeepSeek API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
-              <label>Base URL<input id="base-url" type="url" required /></label>
+              <div class="provider-toolbar">
+                <label>默认供应商<select id="provider-select"></select></label>
+                <div><button id="add-provider" type="button" class="secondary">+ 添加供应商</button><button id="remove-provider" type="button" class="secondary">移除</button></div>
+              </div>
+              <label>供应商名称<input id="provider-name" type="text" required placeholder="例如：DeepSeek 官方 / Mini" /></label>
+              <label>API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
+              <label>Base URL<input id="base-url" type="url" required placeholder="https://api.example.com/v1" /></label>
               <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
               <label>默认模型<select id="default-model"></select></label>
               <p id="key-status" class="key-status"></p>

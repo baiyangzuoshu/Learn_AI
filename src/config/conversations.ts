@@ -1,10 +1,11 @@
 import { getWorkspace } from "./settings.ts";
 import { appDataDir } from "./paths.ts";
-
+//会话信息
 export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
+//会话结构体
 export interface ConversationSession {
   id: string;
   title: string;
@@ -12,10 +13,10 @@ export interface ConversationSession {
   createdAt: number;
 }
 
-const MAX_SESSIONS = 100;
+const MAX_SESSIONS = 100;//最大会话
 const MAX_MESSAGES_PER_SESSION = 500;
 const MAX_CONTENT_LENGTH = 100_000;
-
+//上下文路径
 async function conversationsPath(workspace: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(workspace));
   const id = [...new Uint8Array(digest)].slice(0, 12).map((byte) =>
@@ -23,7 +24,7 @@ async function conversationsPath(workspace: string): Promise<string> {
   ).join("");
   return `${appDataDir()}/conversations/${id}.json`;
 }
-
+//校验会话
 function validateSessions(value: unknown): ConversationSession[] {
   if (!Array.isArray(value)) throw new Error("sessions must be an array");
   if (value.length > MAX_SESSIONS) throw new Error(`最多保存 ${MAX_SESSIONS} 个对话`);
@@ -52,7 +53,7 @@ function validateSessions(value: unknown): ConversationSession[] {
     return { id, title, messages, createdAt };
   });
 }
-
+//读取会话
 export async function readConversations(
   workspace?: string,
 ): Promise<ConversationSession[]> {
@@ -64,7 +65,7 @@ export async function readConversations(
     throw error;
   }
 }
-
+//异步保存会话
 export async function saveConversations(
   value: unknown,
   workspace?: string,
@@ -77,7 +78,7 @@ export async function saveConversations(
   await Deno.rename(temporary, path);
   return sessions;
 }
-
+//拼接会话
 export async function appendConversation(
   workspace: string,
   session: ConversationSession,

@@ -14,13 +14,14 @@ import {
   getWorkspace,
   removeWorkspace,
   revealApiKey,
+  revealApiKeys,
   saveSettings,
   saveUpdateSettings,
   selectWorkspace,
   settingsFilePath,
 } from "../src/config/settings.ts";
 
-const assets = new Map<string, { body: string; contentType: string }>([
+const assets = new Map<string, { body: BodyInit; contentType: string }>([
   ["/", {
     body: await Deno.readTextFile(new URL("./renderer/index.html", import.meta.url)),
     contentType: "text/html; charset=utf-8",
@@ -60,6 +61,10 @@ const assets = new Map<string, { body: string; contentType: string }>([
   ["/app.js", {
     body: await Deno.readTextFile(new URL("./renderer/app.js", import.meta.url)),
     contentType: "text/javascript; charset=utf-8",
+  }],
+  ["/app-icon.png", {
+    body: await Deno.readFile(new URL("./assets/app-icon.png", import.meta.url)),
+    contentType: "image/png",
   }],
 ]);
 
@@ -558,7 +563,7 @@ Deno.serve(async (request) => {
     return json(await getPublicSettings());
   }
   if (url.pathname === "/api/settings/key" && request.method === "GET") {
-    return json({ apiKey: await revealApiKey() });
+    return json({ apiKey: await revealApiKey(), apiKeys: await revealApiKeys() });
   }
   if (url.pathname === "/api/update/settings" && request.method === "GET") {
     const settings = await getPublicSettings();
@@ -696,6 +701,7 @@ Deno.serve(async (request) => {
     try {
       const body = await request.json() as {
         message?: string;
+        providerId?: string;
         model?: string;
         permissionMode?: PermissionMode;
         history?: Array<{ role: "user" | "assistant"; content: string }>;
@@ -708,6 +714,9 @@ Deno.serve(async (request) => {
         body.model,
         body.history ?? [],
         body.permissionMode ?? "ask",
+        undefined,
+        undefined,
+        body.providerId,
       );
       return json({ answer, events });
     } catch (error) {
@@ -718,6 +727,7 @@ Deno.serve(async (request) => {
   if (url.pathname === "/api/chat/stream" && request.method === "POST") {
     const body = await request.json() as {
       message?: string;
+      providerId?: string;
       model?: string;
       permissionMode?: PermissionMode;
       developerMode?: boolean;
@@ -756,6 +766,7 @@ Deno.serve(async (request) => {
             (event) => {
               if (body.developerMode) emit({ type: "hook", event });
             },
+            body.providerId,
           )
             .then((answer) => {
               emit({ type: "status", message: "正在组织答案…" });

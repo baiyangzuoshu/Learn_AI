@@ -31,9 +31,11 @@ export async function agentLoop(
   permissionMode: PermissionMode = "ask",
   signal?: AbortSignal,
   onHook: (event: HarnessEvent) => void = () => {},
+  providerId?: string,
 ): Promise<string> {
   return await harness.run({
     query,
+    providerId,
     model,
     history,
     permissionMode,

@@ -15,6 +15,7 @@ export interface CronSchedule {
   dayOfMonth?: number;
   month?: number;
   timeoutSeconds: number;
+  providerId?: string;
   model?: string;
   permissionMode: PermissionMode;
   enabled: boolean;
@@ -89,6 +90,9 @@ function validate(value: unknown): CronSchedule[] {
       workspace: item.workspace === null || item.workspace === "global"
         ? null
         : String(item.workspace ?? "").trim() || null,
+      providerId: typeof item.providerId === "string" && item.providerId
+        ? item.providerId
+        : undefined,
       time: frequency === "interval" ? undefined : time,
       weekday: frequency === "weekly" ? weekday : undefined,
       dayOfMonth: ["monthly", "yearly"].includes(frequency) ? dayOfMonth : undefined,
@@ -196,6 +200,7 @@ async function execute(id: string) {
     answer = await runner({
       query: schedule.prompt,
       workspace,
+      providerId: schedule.providerId,
       model: schedule.model,
       permissionMode: schedule.permissionMode,
       signal: controller.signal,

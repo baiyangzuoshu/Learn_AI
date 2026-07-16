@@ -34,6 +34,7 @@ export interface HarnessEvent {
 }
 export interface RunOptions {
   query: string;
+  providerId?: string;
   model?: string;
   history?: Message[];
   workspace?: string;

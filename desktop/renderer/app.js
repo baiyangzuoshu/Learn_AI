@@ -15,9 +15,12 @@ const workspacePanelRoot = $("#workspace-panel-root"),
   workspaceGitSummary = $("#workspace-git-summary");
 const composerStep = $("#composer-step"), composerChangeSummary = $("#composer-change-summary");
 const settingsForm = $("#settings-form"),
+  providerSelect = $("#provider-select"),
+  providerNameInput = $("#provider-name"),
   modelsInput = $("#models"),
   defaultModel = $("#default-model");
 let settings = {}, sessions = [], activeSessionId = null;
+let providerApiKeys = {}, activeProviderId = null;
 let generationController = null;
 let cronSchedules = [];
 let runStep = 0, runToolCount = 0;
@@ -398,10 +401,110 @@ function renderToolEvent(event) {
     event.output ? `<span class="event-output">${escapeHtml(event.output)}</span>` : ""
   }</div>`;
 }
-function fillModels(select, models, selected) {
-  select.innerHTML = models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
-    .join("");
-  select.value = selected || models[0];
+function providerList() {
+  if (Array.isArray(settings.providers) && settings.providers.length) return settings.providers;
+  return [{
+    id: settings.defaultProviderId || "deepseek",
+    name: "DeepSeek 官方",
+    protocol: "openai",
+    baseUrl: settings.baseUrl || "https://api.deepseek.com",
+    models: settings.models || [],
+    defaultModel: settings.defaultModel,
+    hasApiKey: Boolean(settings.hasApiKey),
+    builtIn: true,
+  }];
+}
+function modelOptionValue(providerId, model) {
+  return `${encodeURIComponent(providerId)}:${encodeURIComponent(model)}`;
+}
+function selectedModel(select) {
+  const option = select.selectedOptions?.[0];
+  return {
+    providerId: option?.dataset.providerId || settings.defaultProviderId || providerList()[0]?.id,
+    model: option?.dataset.model || select.value || settings.defaultModel,
+  };
+}
+function selectedModelLabel(select) {
+  const option = select.selectedOptions?.[0];
+  return option?.textContent || settings.defaultModel || "—";
+}
+function fillModels(select, selected = {}) {
+  const providers = providerList();
+  const selectedProviderId = typeof selected === "object" && selected.providerId
+    ? selected.providerId
+    : settings.defaultProviderId || providers[0]?.id;
+  const selectedModelName = typeof selected === "string" ? selected : selected.model ||
+    providers.find((provider) => provider.id === selectedProviderId)?.defaultModel;
+  select.innerHTML = providers.map((provider) =>
+    `<optgroup label="${escapeHtml(provider.name)}">${
+      (provider.models || []).map((model) =>
+        `<option value="${escapeHtml(modelOptionValue(provider.id, model))}" data-provider-id="${
+          escapeHtml(provider.id)
+        }" data-model="${escapeHtml(model)}">${escapeHtml(model)}</option>`
+      ).join("")
+    }</optgroup>`
+  ).join("");
+  const selectedValue = modelOptionValue(selectedProviderId, selectedModelName || "");
+  select.value = selectedValue;
+  if (!select.value && select.options.length) select.selectedIndex = 0;
+}
+function activeProvider() {
+  return providerList().find((provider) => provider.id === activeProviderId) || providerList()[0];
+}
+function fillDefaultModel(provider) {
+  const models = (provider?.models || []).filter(Boolean);
+  defaultModel.innerHTML = models.map((model) =>
+    `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`
+  ).join("");
+  defaultModel.value = provider?.defaultModel && models.includes(provider.defaultModel)
+    ? provider.defaultModel
+    : models[0] || "";
+}
+function syncActiveProviderDraft() {
+  if (!activeProviderId) return;
+  const providers = providerList().map((provider) => ({ ...provider }));
+  const provider = providers.find((item) => item.id === activeProviderId);
+  if (!provider) return;
+  provider.name = providerNameInput.value.trim() || provider.name;
+  provider.baseUrl = $("#base-url").value.trim();
+  provider.models = modelsInput.value.split("\n").map((item) => item.trim()).filter(Boolean);
+  provider.defaultModel = defaultModel.value || provider.models[0] || "";
+  provider.protocol = "openai";
+  providerApiKeys[provider.id] = $("#api-key").value.trim();
+  settings.providers = providers;
+}
+function renderProviderEditor() {
+  const providers = providerList();
+  activeProviderId = activeProviderId && providers.some((item) => item.id === activeProviderId)
+    ? activeProviderId
+    : settings.defaultProviderId || providers[0]?.id;
+  providerSelect.innerHTML = providers.map((provider) =>
+    `<option value="${escapeHtml(provider.id)}">${escapeHtml(provider.name)}</option>`
+  ).join("");
+  providerSelect.value = activeProviderId;
+  const provider = activeProvider();
+  providerNameInput.value = provider?.name || "";
+  $("#base-url").value = provider?.baseUrl || "";
+  modelsInput.value = (provider?.models || []).join("\n");
+  fillDefaultModel(provider);
+  $("#api-key").value = providerApiKeys[provider?.id] || "";
+  $("#key-status").textContent = provider?.hasApiKey || providerApiKeys[provider?.id]
+    ? `✓ ${provider.name} 已配置 API Key`
+    : `${provider?.name || "当前供应商"} 尚未配置 API Key`;
+  $("#remove-provider").disabled = providers.length <= 1;
+}
+function collectProvidersForSave() {
+  syncActiveProviderDraft();
+  return providerList().map((provider) => ({
+    id: provider.id,
+    name: provider.name,
+    protocol: "openai",
+    baseUrl: provider.baseUrl,
+    models: provider.models || [],
+    defaultModel: provider.defaultModel,
+    builtIn: provider.builtIn,
+    apiKey: providerApiKeys[provider.id] || "",
+  }));
 }
 function storageKey() {
   return `deno-agent:sessions:${settings.workspace || "none"}`;
@@ -510,7 +613,7 @@ function renderWorkspaceOverview(telemetry = {}) {
   $("#overview-turns").textContent = `${sessionTurnCount()}轮`;
   $("#overview-last-tokens").textContent = formatNumber(telemetry.lastTotalTokens || 0);
   $("#overview-runtime").textContent = formatDuration(Date.now() - APP_STARTED_AT);
-  $("#overview-model").textContent = modelSelect.value || settings.defaultModel || "—";
+  $("#overview-model").textContent = selectedModelLabel(modelSelect);
   $("#overview-cache-meter").style.width = `${hitRate}%`;
   $("#overview-cache-hit").textContent = formatNumber(telemetry.cacheHitTokens || 0);
   $("#overview-cache-miss").textContent = formatNumber(telemetry.cacheMissTokens || 0);
@@ -539,7 +642,7 @@ function setWorkspacePanelOpen(open, { load = true } = {}) {
 }
 async function updateRuntimeStatus() {
   const estimatedTokens = estimatedSessionTokens();
-  $("#runtime-model").textContent = modelSelect.value || settings.defaultModel || "—";
+  $("#runtime-model").textContent = selectedModelLabel(modelSelect);
   $("#runtime-workspace").textContent = settings.workspace || "未选择项目";
   $("#runtime-workspace").title = settings.workspace || "";
   $("#runtime-turns").textContent = `${sessionTurnCount()}轮`;
@@ -910,11 +1013,9 @@ async function loadSettings() {
   });
   await loadComposerGitSummary();
   if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
-  fillModels(modelSelect, settings.models, settings.defaultModel);
-  $("#base-url").value = settings.baseUrl;
-  modelsInput.value = settings.models.join("\n");
-  fillModels(defaultModel, settings.models, settings.defaultModel);
-  $("#key-status").textContent = settings.hasApiKey ? "✓ 已配置 API Key" : "尚未配置 API Key";
+  activeProviderId = settings.defaultProviderId;
+  fillModels(modelSelect, { providerId: settings.defaultProviderId, model: settings.defaultModel });
+  renderProviderEditor();
   $("#developer-mode").checked = localStorage.getItem("deno-agent:developer-mode") === "true";
   if (previousWorkspace !== settings.workspace) await loadSessions();
   else renderWorkspaceTree();
@@ -955,12 +1056,14 @@ form.addEventListener("submit", async (event) => {
     thinking.textContent = "正在分析任务…";
     messages.append(thinking);
     scrollMessagesToBottom();
+    const chosenModel = selectedModel(modelSelect);
     const response = await fetch(`${API}/chat/stream`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         message: prompt,
-        model: modelSelect.value,
+        providerId: chosenModel.providerId,
+        model: chosenModel.model,
         permissionMode: permissionMode.value,
         developerMode: $("#developer-mode").checked,
         history,
@@ -1283,7 +1386,10 @@ $("#cron-button").addEventListener("click", async () => {
         }</option>`
       ).join("")
     }`;
-    fillModels($("#cron-model"), settings.models, settings.defaultModel);
+    fillModels($("#cron-model"), {
+      providerId: settings.defaultProviderId,
+      model: settings.defaultModel,
+    });
     await loadCronSchedules();
     $("#cron-status").textContent = "";
     $("#cron-dialog").showModal();
@@ -1298,6 +1404,7 @@ $("#cron-form").addEventListener("submit", async (event) => {
   if (!confirm(`确认创建定时AI对话任务？\n\n${prompt}`)) return;
   const title = $("#cron-title").value.trim();
   const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "task";
+  const cronModel = selectedModel($("#cron-model"));
   cronSchedules.push({
     id: `${base}-${Date.now().toString(36)}`,
     title,
@@ -1310,7 +1417,8 @@ $("#cron-form").addEventListener("submit", async (event) => {
     dayOfMonth: Number($("#cron-day").value),
     month: Number($("#cron-month").value),
     timeoutSeconds: Number($("#cron-timeout").value),
-    model: $("#cron-model").value,
+    providerId: cronModel.providerId,
+    model: cronModel.model,
     permissionMode: $("#cron-permission").value,
     enabled: $("#cron-enabled").checked,
   });
@@ -1363,10 +1471,10 @@ $("#settings-button").addEventListener("click", async () => {
   await loadUpdateSettings();
   $("#mcp-workspace").textContent = settings.workspace || "尚未选择工作区";
   const data = await (await fetch(`${API}/settings/key`)).json(),
-    key = $("#api-key"),
     toggle = $("#toggle-key");
-  key.value = data.apiKey || "";
-  key.type = "text";
+  providerApiKeys = data.apiKeys || {};
+  renderProviderEditor();
+  $("#api-key").type = "text";
   toggle.textContent = "隐藏";
   settingsDialog.showModal();
 });
@@ -1420,13 +1528,45 @@ $("#toggle-key").addEventListener("click", () => {
   key.type = hidden ? "text" : "password";
   $("#toggle-key").textContent = hidden ? "隐藏" : "显示";
 });
+providerSelect.addEventListener("change", () => {
+  syncActiveProviderDraft();
+  activeProviderId = providerSelect.value;
+  renderProviderEditor();
+});
+$("#add-provider").addEventListener("click", () => {
+  syncActiveProviderDraft();
+  const id = `custom-${Date.now().toString(36)}`;
+  settings.providers = [...providerList(), {
+    id,
+    name: "自定义供应商",
+    protocol: "openai",
+    baseUrl: "https://api.example.com/v1",
+    models: ["model-name"],
+    defaultModel: "model-name",
+    hasApiKey: false,
+  }];
+  providerApiKeys[id] = "";
+  activeProviderId = id;
+  renderProviderEditor();
+});
+$("#remove-provider").addEventListener("click", () => {
+  const providers = providerList();
+  if (providers.length <= 1) return;
+  const provider = activeProvider();
+  if (!confirm(`确定移除供应商“${provider.name}”吗？\n\n已保存的 Keychain 密钥不会被删除。`)) {
+    return;
+  }
+  settings.providers = providers.filter((item) => item.id !== provider.id);
+  delete providerApiKeys[provider.id];
+  activeProviderId = settings.providers[0]?.id;
+  renderProviderEditor();
+});
 modelsInput.addEventListener("input", () => {
   const models = modelsInput.value.split("\n").map((x) => x.trim()).filter(Boolean);
-  fillModels(
-    defaultModel,
+  fillDefaultModel({
     models,
-    models.includes(defaultModel.value) ? defaultModel.value : models[0],
-  );
+    defaultModel: models.includes(defaultModel.value) ? defaultModel.value : models[0],
+  });
 });
 settingsForm.addEventListener("submit", async (event) => {
   if (event.submitter?.value === "cancel") return;
@@ -1444,10 +1584,8 @@ settingsForm.addEventListener("submit", async (event) => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          apiKey: $("#api-key").value,
-          baseUrl: $("#base-url").value,
-          models: modelsInput.value.split("\n"),
-          defaultModel: defaultModel.value,
+          defaultProviderId: activeProviderId,
+          providers: collectProvidersForSave(),
         }),
       }),
       data = await response.json();

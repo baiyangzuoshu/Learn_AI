@@ -1,5 +1,5 @@
 import { createChatCompletion, ProviderError } from "../providers/deepseek.ts";
-import { getWorkspace, resolveDeepSeekConfig } from "../config/settings.ts";
+import { getWorkspace, resolveProviderConfig } from "../config/settings.ts";
 import type { Message } from "../core/types.ts";
 import type { HarnessFeature, RunOptions } from "./contracts.ts";
 import { ToolRegistry } from "./registry.ts";
@@ -17,7 +17,7 @@ export class AgentRuntime {
   }
   async run(options: RunOptions): Promise<string> {
     const workspace = options.workspace ?? await getWorkspace();
-    const config = await resolveDeepSeekConfig(options.model);
+    const config = await resolveProviderConfig(options.providerId, options.model);
     const compacted = compactHistory(options.history ?? []);
     if (compacted.compacted) {
       options.onEvent?.({
@@ -77,7 +77,7 @@ export class AgentRuntime {
     }
   }
   async #complete(
-    config: Awaited<ReturnType<typeof resolveDeepSeekConfig>>,
+    config: Awaited<ReturnType<typeof resolveProviderConfig>>,
     messages: Message[],
     options: RunOptions,
   ) {

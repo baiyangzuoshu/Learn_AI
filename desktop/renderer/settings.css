@@ -212,6 +212,20 @@ dialog::backdrop {
   font: 10px ui-monospace,monospace;
   overflow-wrap: anywhere;
 }
+.provider-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+.provider-toolbar > div {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 14px;
+}
+.provider-toolbar .secondary {
+  white-space: nowrap;
+}
 @media (max-width:680px) {
   #settings-dialog {
     height: calc(100vh - 30px);

@@ -48,10 +48,12 @@ body.nav-collapsed > aside {
 }
 
 .brand .logo {
+  display: block;
+  object-fit: cover;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  font-size: 13px;
+  background: #f97316;
 }
 
 .brand b {

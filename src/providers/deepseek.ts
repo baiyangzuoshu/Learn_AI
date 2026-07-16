@@ -1,10 +1,16 @@
 import type { ChatResponse, Message, ToolDefinition } from "../core/types.ts";
 
-export interface DeepSeekConfig {
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  protocol: "openai";
   apiKey: string;
   baseUrl: string;
   model: string;
 }
+
+export type DeepSeekConfig = ProviderConfig;
+
 const telemetry = {
   calls: 0,
   promptTokens: 0,
@@ -14,6 +20,9 @@ const telemetry = {
   cacheMissTokens: 0,
   lastTotalTokens: 0,
   lastCacheHitTokens: 0,
+  lastProviderId: "",
+  lastProviderName: "",
+  lastModel: "",
 };
 export function providerTelemetry() {
   return { ...telemetry };
@@ -35,6 +44,9 @@ export function deepSeekConfigFromEnv(): DeepSeekConfig {
   const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
   if (!apiKey) throw new Error("Missing DEEPSEEK_API_KEY");
   return {
+    id: "deepseek",
+    name: "DeepSeek",
+    protocol: "openai",
     apiKey,
     baseUrl: (Deno.env.get("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com").replace(/\/$/, ""),
     model: Deno.env.get("DEEPSEEK_MODEL") ?? "deepseek-chat",
@@ -42,7 +54,7 @@ export function deepSeekConfigFromEnv(): DeepSeekConfig {
 }
 
 export async function createChatCompletion(
-  config: DeepSeekConfig,
+  config: ProviderConfig,
   messages: Message[],
   tools: ToolDefinition[],
   signal?: AbortSignal,
@@ -60,7 +72,7 @@ export async function createChatCompletion(
     const detail = (await response.text()).slice(0, 2_000);
     const retryAfter = Number(response.headers.get("retry-after"));
     throw new ProviderError(
-      `DeepSeek API ${response.status}: ${detail}`,
+      `${config.name} API ${response.status}: ${detail}`,
       response.status,
       response.status === 408 || response.status === 429 || response.status >= 500,
       Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined,
@@ -76,6 +88,9 @@ export async function createChatCompletion(
     telemetry.cacheMissTokens += payload.usage.prompt_cache_miss_tokens ?? 0;
     telemetry.lastTotalTokens = payload.usage.total_tokens ?? 0;
     telemetry.lastCacheHitTokens = payload.usage.prompt_cache_hit_tokens ?? 0;
+    telemetry.lastProviderId = config.id;
+    telemetry.lastProviderName = config.name;
+    telemetry.lastModel = config.model;
   }
   return payload;
 }
