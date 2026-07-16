@@ -14,6 +14,11 @@ Rust 工具链，完整实现 `learn-claude-code` 的 s01–s20 Agent Harness。
 - 多工作区、多对话、聊天持久化、Keychain 密钥管理
 - DeepSeek 模型切换、Token/缓存命中状态栏和开发者事件抽屉
 
+## 文档
+
+- [架构说明](docs/ARCHITECTURE.md)：系统分层、Agent Runtime、Feature、权限、持久化和更新架构。
+- [部署与发布](docs/DEPLOYMENT.md)：开发运行、打包、版本号、GitHub Release 上传和自动更新流程。
+
 ## 源码结构
 
 ```text
@@ -80,11 +85,15 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 “设置 → 更新”提供版本查看、启动时检测开关、手动检查更新和“下载并重启更新”。自动安装流程会下载 GitHub
 Release 中的 macOS `.zip` 更新包，退出当前 App，替换 `.app` 后重新打开。
 
-默认更新源是当前 GitHub 仓库的 latest release API：
+默认更新源是当前公开 GitHub 仓库的 latest release API：
 
 ```text
 https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
 ```
+
+GitHub Releases 必须能被匿名访问；如果仓库是 private，GitHub API 会对未授权请求返回 404，App
+内的更新检查和自动下载都会失败。若源码仓库需要保持 private，建议额外创建一个只放发布包的 public
+release 仓库，并把更新源改到那个仓库。
 
 发布新版本有两种方式。
 
@@ -105,8 +114,8 @@ git tag v1.0.1
 git push origin v1.0.1
 ```
 
-也可以在 GitHub Actions 页面手动运行 `Release Deno Agent` workflow，输入 `v1.0.1` 这类版本号。 tag
-名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。
+也可以在 GitHub Actions 页面手动运行 `Release Deno Agent` workflow，输入 `v1.0.1` 这类版本号。
+标签名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。
 
 应用会从 `tag_name` 中提取语义版本号进行比较，并优先选择名字包含 `DenoAgent`、`macos`、`arm64` 的
 `.zip` asset 作为自动安装包。zip 根目录需要包含 `DenoAgent.app`。

@@ -1,2 +1,0 @@
-[permissions]
-allow = ["Bash(node --version && date -u +%Y%m%d-%H%M%S)", "Bash(mkdir -p:*)", "Edit"]
