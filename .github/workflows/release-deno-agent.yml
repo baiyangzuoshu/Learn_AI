@@ -19,9 +19,6 @@ jobs:
   macos-arm64:
     name: Build and upload macOS arm64
     runs-on: macos-14
-    defaults:
-      run:
-        working-directory: deno-agent
     env:
       DENO_VERSION: "2.9.2"
       RELEASE_TAG: ${{ github.event.inputs.version || github.ref_name }}

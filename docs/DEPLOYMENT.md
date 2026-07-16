@@ -1,12 +1,12 @@
 # Deno Agent 部署与发布
 
-本文说明如何从源码运行、构建桌面产物、更新版本号、创建 GitHub Release，并让已安装的 App 通过“设置 →
-更新”自动下载和重启更新。
+本文说明如何开发、构建、发布和更新 Deno Agent 客户端。发布目标是一个可安装的本地 Agent
+客户端；GitHub Release 提供客户端下载包，已安装客户端通过“设置 → 更新”完成下载、退出、替换和重启。
 
 ## 前提条件
 
 - Deno 2.9 或更新版本。
-- macOS 开发机。当前自动发布脚本主要构建 macOS arm64。
+- macOS 开发机。当前自动发布脚本主要构建 macOS arm64 客户端。
 - Git 仓库已推送到 GitHub。
 - GitHub Releases 可以被匿名访问；公开仓库可直接使用。
 
@@ -19,7 +19,7 @@ deno --version
 ## 本地开发
 
 ```sh
-cd /Users/youjunmao/WORK/Learn_AI/deno-agent
+cd /Users/youjunmao/WORK/Learn_AI
 deno task check
 deno task desktop
 ```
@@ -30,14 +30,14 @@ HMR 开发：
 deno task desktop:hmr
 ```
 
-教学阶段示例：
+内部演进示例：
 
 ```sh
 deno task s01
 deno task s20
 ```
 
-`stages/` 只用于学习和对照，不能被生产代码引用。
+`stages/` 只用于理解内部机制和对照实现，不能被生产代码引用。
 
 ## 模型与密钥
 
@@ -142,7 +142,7 @@ source ~/.zshrc
 
 ```sh
 cd /Users/youjunmao/WORK/Learn_AI
-git add deno-agent
+git add .
 git commit -m "Release Deno Agent v1.0.2"
 git push origin main
 ```
@@ -150,7 +150,7 @@ git push origin main
 ### 4. 发布
 
 ```sh
-cd /Users/youjunmao/WORK/Learn_AI/deno-agent
+cd /Users/youjunmao/WORK/Learn_AI
 deno task release:github v1.0.2
 ```
 
