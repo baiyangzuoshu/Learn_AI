@@ -41,9 +41,13 @@ rg 'stages/' src desktop
 - Pass the workspace explicitly through `RunOptions` and `ToolContext`.
 - Preserve `AbortSignal` propagation through provider calls, tools, nested agents, background work,
   and scheduled tasks.
+- A cancelled run must terminate or explicitly detach any child process it started. Do not leave
+  Shell commands, background jobs, nested agents, or scheduled executions running accidentally.
 - Emit user-visible tool events and developer-only hook events through `HarnessEvent`.
 - Nested agent, team, and autonomous execution must be bounded and must prevent uncontrolled
   recursive delegation.
+- Bound the main tool-use loop as well as nested orchestration. Add explicit limits for tool calls,
+  iterations, concurrency, and retained output instead of relying on the model to stop itself.
 - Keep tool output bounded. File tools should normally return paths and concise metadata instead of
   dumping large file contents into the UI.
 
@@ -55,12 +59,23 @@ The three permission modes are:
 - `auto`: automatically approve ordinary workspace-scoped actions while retaining safety checks.
 - `full`: allow unrestricted tool execution only when explicitly selected by the user.
 
-Do not weaken permission behavior to make a test pass. New mutating tools must be classified by the
-permission system.
+Do not weaken permission behavior to make a test pass. Every new tool must be explicitly classified
+as read-only, mutating, externally effectful, or dangerous by the permission system. Shell commands
+are externally effectful and must request approval in `ask` mode even when the command is not on a
+hard-deny list. Memory, task graph, scheduler, background-process, Git worktree, and MCP mutations
+must follow the same rule.
+
+Hard-deny checks are a safety backstop, not a substitute for approval. Validate workspace paths at
+execution time, and do not let `auto` mode escape the active workspace or bypass destructive-command
+guards. `full` mode is valid only after an explicit user selection.
 
 Never commit API keys, tokens, passwords, Keychain output, `.env.local`, or user conversation data.
 Release builds must not embed development environment files. API keys must use the platform
 credential mechanism or explicitly provided environment variables.
+
+Do not return plaintext credentials from general-purpose HTTP endpoints or include them in logs,
+telemetry, tool events, error messages, or renderer state. A credential reveal flow, if retained,
+must be explicit, narrowly scoped, local-only, and must avoid persisting the revealed value.
 
 Remote MCP endpoints must use HTTPS. Plain HTTP is allowed only for localhost development endpoints.
 
@@ -90,6 +105,8 @@ platform-specific error.
 - Enter submits; Shift+Enter inserts a newline.
 - Streaming must tolerate cancellation and client disconnect without closing or enqueueing an
   already-closed stream.
+- Local HTTP APIs must bind to loopback only. Validate request bodies at the backend boundary and do
+  not assume that requests from the bundled renderer are inherently trusted.
 - Do not display full file contents in tool cards. Show a clickable file path and concise operation
   result.
 - Model, workspace, token, context, compression, cost, and balance telemetry belong in the bottom
@@ -140,3 +157,25 @@ application shutdown on each target operating system.
   commands change.
 - Do not report a migration complete until production imports, type checks, and at least one
   production desktop build have been verified.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and
+cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing
+anything else.
+
+Rules:
+
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json
+  exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for
+  focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw
+  grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are
+  not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph
+  output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do
+  not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
