@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../providers/deepseek.ts";
+import type { ProviderConfig } from "../providers/contracts.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appDataDir } from "./paths.ts";
 

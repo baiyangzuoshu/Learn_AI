@@ -1,4 +1,5 @@
-import { createChatCompletion, ProviderError } from "../providers/deepseek.ts";
+import { ProviderError } from "../providers/openai_compatible.ts";
+import { getModelProvider } from "../providers/registry.ts";
 import { getWorkspace, resolveProviderConfig } from "../config/settings.ts";
 import type { Message } from "../core/types.ts";
 import type { HarnessFeature, RunOptions } from "./contracts.ts";
@@ -111,7 +112,7 @@ export class AgentRuntime {
     for (let attempt = 0;; attempt++) {
       try {
         //
-        return await createChatCompletion(
+        return await getModelProvider(config).createChatCompletion(
           config,
           messages,
           this.tools.definitions(),

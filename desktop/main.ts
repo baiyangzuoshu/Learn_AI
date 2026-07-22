@@ -6,7 +6,7 @@ import {
   runCronSchedule,
   saveCronSchedules,
 } from "../src/harness/mod.ts";
-import { providerTelemetry } from "../src/providers/deepseek.ts";
+import { providerTelemetry } from "../src/providers/openai_compatible.ts";
 import { readConversations, saveConversations } from "../src/config/conversations.ts";
 import {
   chooseWorkspace,
