@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../../core/types.ts";
+
 const def = (
   name: string,
   description: string,
@@ -10,16 +11,20 @@ const def = (
   type: "function",
   function: { name, description, parameters: { type: "object", properties, required } },
 });
+
 const nested = new AsyncLocalStorage<boolean>();
+
 interface TeamContext {
   id: string;
   member: string;
 }
+
 const teamContext = new AsyncLocalStorage<TeamContext>(), boards = new Map<string, unknown[]>();
 
 export const orchestration: HarnessFeature = {
   id: "orchestration",
   register({ tools, prompts, run }) {
+    //subagent
     tools.register(
       def("subagent", "Delegate one focused isolated task", { task: { type: "string" } }, ["task"]),
       async (input, context) => {
@@ -35,6 +40,7 @@ export const orchestration: HarnessFeature = {
           }));
       },
     );
+    //team_send
     tools.register(
       def("team_send", "Send a message inside an active team", {
         to: { type: "string" },
@@ -55,6 +61,7 @@ export const orchestration: HarnessFeature = {
         return JSON.stringify(message);
       },
     );
+    //team_inbox
     tools.register(
       def("team_inbox", "Read messages for the active team member", {}, []),
       async () => {
@@ -67,6 +74,7 @@ export const orchestration: HarnessFeature = {
         );
       },
     );
+    //team_run
     tools.register(
       def("team_run", "Run 2 to 4 specialists in parallel", {
         objective: { type: "string" },
@@ -120,6 +128,7 @@ export const orchestration: HarnessFeature = {
         });
       },
     );
+    //autonomous_run
     tools.register(
       def("autonomous_run", "Run a bounded observe-act-verify loop", {
         objective: { type: "string" },
@@ -155,6 +164,7 @@ export const orchestration: HarnessFeature = {
         });
       },
     );
+    //orchestration
     prompts.register({
       id: "orchestration",
       title: "Delegation and autonomy",

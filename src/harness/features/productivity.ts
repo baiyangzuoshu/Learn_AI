@@ -11,12 +11,14 @@ const def = (
   type: "function",
   function: { name, description, parameters: { type: "object", properties, required } },
 });
+//
 async function key(workspace: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(workspace));
   return [...new Uint8Array(digest)].slice(0, 12).map((value) =>
     value.toString(16).padStart(2, "0")
   ).join("");
 }
+//
 async function readOptional(path: string) {
   try {
     return await Deno.readTextFile(path);
@@ -25,16 +27,18 @@ async function readOptional(path: string) {
     throw error;
   }
 }
+//
 async function writeData(path: string, content: string) {
   await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
   const temp = `${path}.${crypto.randomUUID()}.tmp`;
   await Deno.writeTextFile(temp, content);
   await Deno.rename(temp, path);
 }
-
+//
 export const productivity: HarnessFeature = {
   id: "productivity",
   register({ tools, prompts }) {
+    //todo_write
     tools.register(
       def("todo_write", "Update the temporary checklist", { todos: { type: "array" } }, ["todos"]),
       async (input) => {
@@ -44,12 +48,14 @@ export const productivity: HarnessFeature = {
         } completed)`;
       },
     );
+    //memory_read
     tools.register(
       def("memory_read", "Read durable project memory", {}),
       async (_input, context) =>
         await readOptional(`${appDataDir()}/memory/${await key(context.workspace)}.md`) ||
         "(project memory is empty)",
     );
+    //memory_append
     tools.register(
       def("memory_append", "Append a durable project fact", { content: { type: "string" } }, [
         "content",
@@ -68,6 +74,7 @@ export const productivity: HarnessFeature = {
         return "Project memory updated";
       },
     );
+    //memory_replace
     tools.register(
       def("memory_replace", "Replace project memory with a concise version", {
         content: { type: "string" },
@@ -82,12 +89,14 @@ export const productivity: HarnessFeature = {
         return "Project memory replaced";
       },
     );
+    //task_graph_read
     tools.register(
       def("task_graph_read", "Read the persistent task graph", {}),
       async (_input, context) =>
         await readOptional(`${appDataDir()}/task-graphs/${await key(context.workspace)}.json`) ||
         JSON.stringify({ version: 1, nodes: [] }),
     );
+    //task_graph_write
     tools.register(
       def("task_graph_write", "Replace the persistent task graph", { nodes: { type: "array" } }, [
         "nodes",
@@ -117,6 +126,7 @@ export const productivity: HarnessFeature = {
         return `Saved task graph: ${input.nodes.length} nodes`;
       },
     );
+    //list_skills
     tools.register(
       def("list_skills", "List workspace skills without loading them", {}),
       async (_input, context) => {
@@ -139,6 +149,7 @@ export const productivity: HarnessFeature = {
         return [...new Set(names)].sort().join("\n") || "(no workspace skills found)";
       },
     );
+    //load_skill
     tools.register(
       def("load_skill", "Load one workspace SKILL.md", { name: { type: "string" } }, ["name"]),
       async (input, context) => {
@@ -157,6 +168,7 @@ export const productivity: HarnessFeature = {
         throw new Error(`skill not found: ${name}`);
       },
     );
+    //
     prompts.register({
       id: "productivity",
       title: "Planning and durable state",

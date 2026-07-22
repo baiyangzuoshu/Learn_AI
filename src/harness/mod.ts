@@ -23,12 +23,13 @@ export interface AgentEvent {
   input: string;
   output: string;
 }
+//主循环
 export async function agentLoop(
   query: string,
   onEvent: (event: AgentEvent) => void = () => {},
   model?: string,
   history: Message[] = [],
-  permissionMode: PermissionMode = "ask",
+  permissionMode: PermissionMode = "ask",//权限
   signal?: AbortSignal,
   onHook: (event: HarnessEvent) => void = () => {},
   providerId?: string,

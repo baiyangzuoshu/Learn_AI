@@ -1,5 +1,6 @@
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../../core/types.ts";
+
 const def = (
   name: string,
   description: string,
@@ -9,6 +10,7 @@ const def = (
   type: "function",
   function: { name, description, parameters: { type: "object", properties, required } },
 });
+
 interface Job {
   id: string;
   workspace: string;
@@ -17,8 +19,10 @@ interface Job {
   output: string;
   process: Deno.ChildProcess;
 }
+//
 const jobs = new Map<string, Job>(),
-  worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
+worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
+  //
 async function git(cwd: string, args: string[]) {
   const result = await new Deno.Command(Deno.build.os === "windows" ? "git.exe" : "git", {
     args,
@@ -30,25 +34,31 @@ async function git(cwd: string, args: string[]) {
   if (!result.success) throw new Error(text);
   return text.trim();
 }
+//
 async function mcpRpc(url: string, method: string, params: unknown) {
   const parsed = new URL(url), local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+  
   if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) {
     throw new Error("MCP requires HTTPS or local HTTP");
   }
+
   const response = await fetch(parsed, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
     body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
   });
+
   if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
+  
   const text = await response.text(),
-    data = response.headers.get("content-type")?.includes("text/event-stream")
-      ? text.split("\n").find((line) => line.startsWith("data:"))?.slice(5)
-      : text;
+  data = response.headers.get("content-type")?.includes("text/event-stream")? text.split("\n").find((line) => line.startsWith("data:"))?.slice(5): text;
   const payload = JSON.parse(data || "{}");
+  
   if (payload.error) throw new Error(payload.error.message);
+  
   return payload.result;
 }
+//
 async function mcpServers(workspace: string) {
   for (const path of [`${workspace}/.deno-agent/mcp.json`, `${workspace}/mcp.json`]) {
     try {
@@ -59,18 +69,18 @@ async function mcpServers(workspace: string) {
   }
   return [];
 }
-
+//
 export const integrations: HarnessFeature = {
   id: "integrations",
+
   register({ tools, prompts, run }) {
-    tools.register(
-      def("background_start", "Start a supervised background command", {
-        command: { type: "string" },
-      }, ["command"]),
+    //background_start
+    tools.register(def("background_start", "Start a supervised background command", {command: { type: "string" },}, ["command"]),
       async (input, context) => {
         if ([...jobs.values()].filter((job) => job.status === "running").length >= 4) {
           throw new Error("at most 4 background tasks may run");
         }
+
         const command = String(input.command),
           shell = Deno.build.os === "windows" ? "cmd.exe" : "/bin/sh",
           process = new Deno.Command(shell, {
@@ -97,6 +107,7 @@ export const integrations: HarnessFeature = {
         return JSON.stringify({ id: job.id, status: job.status, command });
       },
     );
+    //background_status
     tools.register(
       def("background_status", "Get background task status", { id: { type: "string" } }),
       async (input, context) =>
@@ -106,6 +117,7 @@ export const integrations: HarnessFeature = {
           ).map(({ process: _, ...job }) => job),
         ),
     );
+    //background_cancel
     tools.register(
       def("background_cancel", "Cancel a background task", { id: { type: "string" } }, ["id"]),
       async (input) => {
@@ -118,6 +130,7 @@ export const integrations: HarnessFeature = {
         return JSON.stringify({ id: job.id, status: job.status });
       },
     );
+    //worktree_create
     tools.register(
       def("worktree_create", "Create an isolated Git worktree", { id: { type: "string" } }, ["id"]),
       async (input, context) => {
@@ -132,10 +145,12 @@ export const integrations: HarnessFeature = {
         return JSON.stringify(record);
       },
     );
+    //worktree_list
     tools.register(
       def("worktree_list", "List managed Git worktrees", {}),
       async () => JSON.stringify([...worktrees.values()]),
     );
+    //worktree_agent
     tools.register(
       def("worktree_agent", "Run a task inside an isolated worktree", {
         id: { type: "string" },
@@ -152,6 +167,7 @@ export const integrations: HarnessFeature = {
         });
       },
     );
+    //worktree_remove
     tools.register(
       def("worktree_remove", "Remove a clean worktree", { id: { type: "string" } }, ["id"]),
       async (input) => {
@@ -167,10 +183,12 @@ export const integrations: HarnessFeature = {
         return "Worktree removed";
       },
     );
+    //mcp_servers
     tools.register(
       def("mcp_servers", "List workspace MCP servers", {}),
       async (_input, context) => JSON.stringify(await mcpServers(context.workspace)),
     );
+    //mcp_list_tools
     tools.register(
       def("mcp_list_tools", "List tools from an MCP server", { server: { type: "string" } }, [
         "server",
@@ -183,6 +201,7 @@ export const integrations: HarnessFeature = {
         return JSON.stringify(await mcpRpc(server.url, "tools/list", {}));
       },
     );
+    //mcp_call
     tools.register(
       def("mcp_call", "Call an MCP tool", {
         server: { type: "string" },
@@ -199,6 +218,7 @@ export const integrations: HarnessFeature = {
         );
       },
     );
+    //integrations
     prompts.register({
       id: "integrations",
       title: "Background, isolation, and plugins",

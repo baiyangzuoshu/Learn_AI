@@ -27,18 +27,21 @@ export const scheduling: HarnessFeature = {
       definition("cron_list", "List recurring AI conversation tasks", {}),
       async () => JSON.stringify(await listCronSchedules()),
     );
+    //cron_write
     tools.register(
       definition("cron_write", "Replace recurring AI conversation tasks", {
         schedules: { type: "array" },
       }, ["schedules"]),
       async (input) => JSON.stringify(await saveCronSchedules(input.schedules)),
     );
+    //cron_run_now
     tools.register(
       definition("cron_run_now", "Run one recurring AI conversation task immediately", {
         id: { type: "string" },
       }, ["id"]),
       async (input) => JSON.stringify(await runCronSchedule(String(input.id ?? ""))),
     );
+    //scheduling
     prompts.register({
       id: "scheduling",
       title: "Scheduled conversations",

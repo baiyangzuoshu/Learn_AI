@@ -1,7 +1,7 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../../core/types.ts";
-
+//根据模型提供相对路径，防止工具越权读取工作区外的文件
 function safePath(workspace: string, requested: string) {
   const root = resolve(workspace), path = resolve(root, requested), rel = relative(root, path);
   if (
@@ -19,9 +19,11 @@ const definition = (
   type: "function",
   function: { name, description, parameters: { type: "object", properties, required } },
 });
+
 export const coreTools: HarnessFeature = {
   id: "core-tools",
   register({ tools, prompts }) {
+    //bash工具
     tools.register(
       definition("bash", "Run a shell command in the workspace", { command: { type: "string" } }, [
         "command",
@@ -39,6 +41,7 @@ export const coreTools: HarnessFeature = {
           `(exit ${result.code})`).slice(0, 50_000);
       },
     );
+    //读取工具
     tools.register(
       definition("read_file", "Read a UTF-8 workspace file", {
         path: { type: "string" },
@@ -51,6 +54,7 @@ export const coreTools: HarnessFeature = {
           : text).slice(0, 50_000);
       },
     );
+    //写入工具
     tools.register(
       definition("write_file", "Write a UTF-8 workspace file", {
         path: { type: "string" },
@@ -63,6 +67,7 @@ export const coreTools: HarnessFeature = {
         return `Wrote ${String(input.content ?? "").length} characters to ${input.path}`;
       },
     );
+    //编辑工具
     tools.register(
       definition("edit_file", "Replace one unique text fragment", {
         path: { type: "string" },
@@ -82,6 +87,7 @@ export const coreTools: HarnessFeature = {
         return `Edited ${input.path}`;
       },
     );
+    //指导模型完成任务
     prompts.register({
       id: "workflow",
       title: "Execution workflow",
