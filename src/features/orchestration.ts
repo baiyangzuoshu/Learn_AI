@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { HarnessFeature } from "../contracts.ts";
-import type { ToolDefinition } from "../../core/types.ts";
+import type { ToolDefinition } from "../core/types.ts";
 
 const def = (
   name: string,

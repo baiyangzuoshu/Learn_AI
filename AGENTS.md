@@ -5,12 +5,12 @@ Electron, Node.js runtime, or a Rust application layer.
 
 ## Product Architecture
 
-- `src/harness/mod.ts` is the only production Harness entry point.
-- `src/harness/runtime.ts` owns the agent loop, permission checks, hooks, context compaction, tool
+- `src/mod.ts` is the only production Harness entry point.
+- `src/runtime.ts` owns the agent loop, permission checks, hooks, context compaction, tool
   execution, and provider retry behavior.
-- `src/harness/features/` contains production feature modules. Register new tools and prompt
-  sections through the feature registration contract.
-- `src/harness/scheduler.ts` owns recurring AI conversation scheduling and persistence.
+- `src/features/` contains production feature modules. Register new tools and prompt sections
+  through the feature registration contract.
+- `src/scheduler.ts` owns recurring AI conversation scheduling and persistence.
 - `src/config/` owns settings, secrets integration, application paths, workspaces, and conversation
   persistence.
 - `src/providers/` owns model-provider clients and telemetry.
@@ -24,7 +24,7 @@ Production code under `src/` and `desktop/` must never import from `stages/`.
 
 Do not implement a production feature by moving, renaming, or directly importing a stage file. Use
 the stage only as behavioral reference, then design the production implementation around the
-contracts in `src/harness/`.
+contracts in `src/`.
 
 After architecture changes, this command must return no matches:
 
@@ -118,7 +118,7 @@ platform-specific error.
 Run the smallest relevant checks while developing, then run the production checks before completion:
 
 ```sh
-deno fmt --check src/harness desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop/main.ts README.md AGENTS.md
 deno task check
 rg 'stages/' src desktop
 deno task desktop:build:mac-arm64

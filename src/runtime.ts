@@ -1,7 +1,7 @@
-import { ProviderError } from "../providers/openai_compatible.ts";
-import { getModelProvider } from "../providers/registry.ts";
-import { getWorkspace, resolveProviderConfig } from "../config/settings.ts";
-import type { Message } from "../core/types.ts";
+import { ProviderError } from "./providers/openai_compatible.ts";
+import { getModelProvider } from "./providers/registry.ts";
+import { getWorkspace, resolveProviderConfig } from "./config/settings.ts";
+import type { Message } from "./core/types.ts";
 import type { HarnessFeature, RunOptions } from "./contracts.ts";
 import { ToolRegistry } from "./registry.ts";
 import { PromptRegistry } from "./prompt.ts";
@@ -130,7 +130,7 @@ export class AgentRuntime {
         const delay = error instanceof ProviderError && error.retryAfterMs
           ? Math.min(error.retryAfterMs, 10_000)
           : delays[attempt];
-          //
+        //
         options.onEvent?.({
           type: "hook",
           name: "ErrorRecovery",

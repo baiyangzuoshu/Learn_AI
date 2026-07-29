@@ -5,7 +5,7 @@ import {
   runCronSchedule,
   saveCronSchedules,
 } from "../scheduler.ts";
-import type { ToolDefinition } from "../../core/types.ts";
+import type { ToolDefinition } from "../core/types.ts";
 
 function definition(
   name: string,

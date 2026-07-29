@@ -4,7 +4,8 @@ Deno Agent 是一个本地优先的开发者 Agent 客户端。它使用 Deno De
 Electron、Node.js 运行时或 Rust 应用层。
 
 从产品角度看，它是一个桌面客户端：负责工作区、会话、模型配置、工具权限、MCP/Skill 扩展、Git
-信息、用量遥测和软件更新。从技术角度看，`src/harness/` 是客户端内部的 Agent 引擎。
+信息、用量遥测和软件更新。从技术角度看，`src/` 根目录的 Runtime 和 Feature 模块组成客户端 内部的
+Agent 引擎。
 
 ## 设计目标
 
@@ -34,12 +35,15 @@ Deno Agent 客户端由四层组成：
   ↓
 desktop/renderer/           原生桌面 UI
   ↓ HTTP / NDJSON stream
-desktop/main.ts             Deno Desktop 后端、HTTP API、静态资源、更新服务
+desktop/main.ts             Deno Desktop 组装入口
+  ├── desktop/backend.ts    窗口、静态资源和后端初始化
+  ├── desktop/http.ts       HTTP API 路由
+  └── desktop/services/     工作区、Git、更新和 Chat 服务
   ↓
-src/harness/mod.ts          Agent 引擎组合入口
+src/mod.ts                  Agent 引擎组合入口
   ↓
-src/harness/runtime.ts      Agent loop、权限、上下文、Hooks、工具执行
-  ├── src/harness/features/ 工具与系统提示 Feature
+src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执行
+  ├── src/features/         工具与系统提示 Feature
   ├── src/providers/        模型 Provider
   └── src/config/           设置、密钥、对话、工作区和本地路径
 ```
@@ -55,15 +59,14 @@ src/harness/runtime.ts      Agent loop、权限、上下文、Hooks、工具执�
 │   ├── core/                # Message、ToolDefinition 等核心类型
 │   ├── config/              # 设置、Keychain、工作区、会话持久化、跨平台路径
 │   ├── providers/           # DeepSeek API 客户端与 usage telemetry
-│   └── harness/             # Agent 引擎生产实现
-│       ├── mod.ts           # Agent 引擎组合根和对外入口
-│       ├── runtime.ts       # AgentRuntime 主循环
-│       ├── registry.ts      # 工具注册中心
-│       ├── prompt.ts        # 系统提示注册与组装
-│       ├── permissions.ts   # 权限模式和安全规则
-│       ├── context.ts       # 对话上下文压缩
-│       ├── scheduler.ts     # 周期性 AI 对话调度
-│       └── features/        # 可拆卸 Feature 模块
+│   ├── mod.ts               # Agent 引擎组合根和对外入口
+│   ├── runtime.ts           # AgentRuntime 主循环
+│   ├── registry.ts          # 工具注册中心
+│   ├── prompt.ts            # 系统提示注册与组装
+│   ├── permissions.ts       # 权限模式和安全规则
+│   ├── context.ts           # 对话上下文压缩
+│   ├── scheduler.ts         # 周期性 AI 对话调度
+│   └── features/            # 可拆卸 Feature 模块
 ├── stages/                  # 演进示例，不进入生产依赖图
 ├── scripts/                 # 本地发布脚本
 ├── docs/                    # 开源文档
@@ -86,14 +89,14 @@ src/harness/runtime.ts      Agent loop、权限、上下文、Hooks、工具执�
   - `/api/telemetry`
   - `/api/update/check`
   - `/api/update/install`
-- 调用 `src/harness/mod.ts` 暴露的 `agentLoop()`。
+- 调用 `src/mod.ts` 暴露的 `agentLoop()`。
 - 管理软件更新检查、下载、退出替换和重启。
 
 桌面关闭时进程会主动退出，避免 `Deno.serve()` 继续保持后台进程。
 
 ## Agent 引擎组合入口
 
-`src/harness/mod.ts` 是生产 Agent 引擎的组合根：
+`src/mod.ts` 是生产 Agent 引擎的组合根：
 
 ```ts
 export const harness = new AgentRuntime([
@@ -253,7 +256,7 @@ GitHub Release 必须公开可访问。私有仓库的未授权 latest release A
 架构相关修改完成后至少运行：
 
 ```sh
-deno fmt --check src/harness desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop/main.ts README.md AGENTS.md
 deno task check
 rg 'stages/' src desktop
 deno task desktop:build:mac-arm64

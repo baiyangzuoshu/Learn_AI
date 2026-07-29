@@ -13,7 +13,7 @@ export interface ConversationSession {
   createdAt: number;
 }
 
-const MAX_SESSIONS = 100;//最大会话
+const MAX_SESSIONS = 100; //最大会话
 const MAX_MESSAGES_PER_SESSION = 500;
 const MAX_CONTENT_LENGTH = 100_000;
 //上下文路径

@@ -1,4 +1,4 @@
-import { listCronSchedules } from "../src/harness/mod.ts";
+import { listCronSchedules } from "../src/mod.ts";
 
 export type DesktopAsset = {
   body: BodyInit;

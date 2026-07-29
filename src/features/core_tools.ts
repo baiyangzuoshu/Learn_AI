@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import type { HarnessFeature } from "../contracts.ts";
-import type { ToolDefinition } from "../../core/types.ts";
+import type { ToolDefinition } from "../core/types.ts";
 //根据模型提供相对路径，防止工具越权读取工作区外的文件
 function safePath(workspace: string, requested: string) {
   const root = resolve(workspace), path = resolve(root, requested), rel = relative(root, path);

@@ -1,4 +1,4 @@
-import type { Message, ToolDefinition } from "../core/types.ts";
+import type { Message, ToolDefinition } from "./core/types.ts";
 
 export type PermissionMode = "ask" | "auto" | "full";
 export interface ToolContext {

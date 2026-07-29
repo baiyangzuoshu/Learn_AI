@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "../core/types.ts";
+import type { ToolDefinition } from "./core/types.ts";
 import type { RegisteredTool, ToolHandler, ToolRegistryContract } from "./contracts.ts";
 
 export class ToolRegistry implements ToolRegistryContract {

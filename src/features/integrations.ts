@@ -1,5 +1,5 @@
 import type { HarnessFeature } from "../contracts.ts";
-import type { ToolDefinition } from "../../core/types.ts";
+import type { ToolDefinition } from "../core/types.ts";
 
 const def = (
   name: string,
@@ -21,8 +21,8 @@ interface Job {
 }
 //
 const jobs = new Map<string, Job>(),
-worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
-  //
+  worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
+//
 async function git(cwd: string, args: string[]) {
   const result = await new Deno.Command(Deno.build.os === "windows" ? "git.exe" : "git", {
     args,
@@ -37,7 +37,7 @@ async function git(cwd: string, args: string[]) {
 //
 async function mcpRpc(url: string, method: string, params: unknown) {
   const parsed = new URL(url), local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
-  
+
   if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) {
     throw new Error("MCP requires HTTPS or local HTTP");
   }
@@ -49,13 +49,15 @@ async function mcpRpc(url: string, method: string, params: unknown) {
   });
 
   if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
-  
+
   const text = await response.text(),
-  data = response.headers.get("content-type")?.includes("text/event-stream")? text.split("\n").find((line) => line.startsWith("data:"))?.slice(5): text;
+    data = response.headers.get("content-type")?.includes("text/event-stream")
+      ? text.split("\n").find((line) => line.startsWith("data:"))?.slice(5)
+      : text;
   const payload = JSON.parse(data || "{}");
-  
+
   if (payload.error) throw new Error(payload.error.message);
-  
+
   return payload.result;
 }
 //
@@ -75,7 +77,10 @@ export const integrations: HarnessFeature = {
 
   register({ tools, prompts, run }) {
     //background_start
-    tools.register(def("background_start", "Start a supervised background command", {command: { type: "string" },}, ["command"]),
+    tools.register(
+      def("background_start", "Start a supervised background command", {
+        command: { type: "string" },
+      }, ["command"]),
       async (input, context) => {
         if ([...jobs.values()].filter((job) => job.status === "running").length >= 4) {
           throw new Error("at most 4 background tasks may run");

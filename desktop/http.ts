@@ -1,4 +1,4 @@
-import { listCronSchedules, runCronSchedule, saveCronSchedules } from "../src/harness/mod.ts";
+import { listCronSchedules, runCronSchedule, saveCronSchedules } from "../src/mod.ts";
 import { providerTelemetry } from "../src/providers/openai_compatible.ts";
 import { readConversations, saveConversations } from "../src/config/conversations.ts";
 import {

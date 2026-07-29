@@ -1,4 +1,4 @@
-import type { Message } from "../core/types.ts";
+import type { Message } from "./core/types.ts";
 const BUDGET = 24_000, KEEP = 10, SUMMARY = 8_000;
 export function compactHistory(history: Message[]) {
   const before = history.reduce((sum, item) => sum + String(item.content ?? "").length, 0);

@@ -1,6 +1,6 @@
-import { appendConversation } from "../config/conversations.ts";
-import { appDataDir } from "../config/paths.ts";
-import { getWorkspace } from "../config/settings.ts";
+import { appendConversation } from "./config/conversations.ts";
+import { appDataDir } from "./config/paths.ts";
+import { getWorkspace } from "./config/settings.ts";
 import type { PermissionMode, RunOptions } from "./contracts.ts";
 
 export interface CronSchedule {

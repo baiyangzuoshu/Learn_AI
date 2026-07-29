@@ -1,4 +1,4 @@
-import { type AgentEvent, agentLoop, type PermissionMode } from "../../src/harness/mod.ts";
+import { type AgentEvent, agentLoop, type PermissionMode } from "../../src/mod.ts";
 
 export type ChatRequest = {
   message?: string;

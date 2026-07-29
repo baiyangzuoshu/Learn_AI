@@ -4,7 +4,8 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 工具、技能、定时任务、软件更新和模型用量遥测整合到一个桌面应用里。
 
 项目基于 Deno 2.9 Desktop 和系统 WebView 构建，不依赖 Electron、Node.js 运行时或 Rust 应用层。
-`src/harness/` 是内部 Agent 引擎，`desktop/` 是客户端产品壳层。
+`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent 引擎， `desktop/`
+是客户端产品壳层。
 
 ## 客户端能力
 
@@ -28,7 +29,14 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 ```text
 .
 ├── src/
-│   ├── harness/              # Agent Runtime、工具、提示、权限和调度
+│   ├── mod.ts                # Agent 引擎组合入口
+│   ├── runtime.ts            # Agent Runtime 主循环
+│   ├── features/             # 工具与系统提示 Feature
+│   ├── registry.ts           # 工具注册中心
+│   ├── prompt.ts             # 系统提示注册与组装
+│   ├── permissions.ts        # 权限模式和安全规则
+│   ├── context.ts            # 对话上下文压缩
+│   ├── scheduler.ts          # 周期性 AI 对话调度
 │   ├── config/               # 设置、路径、聊天持久化
 │   ├── core/                 # 核心类型
 │   └── providers/            # 运行时 Provider 路由、适配器与 usage 遥测
@@ -41,7 +49,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 └── dist/
 ```
 
-`desktop/main.ts` 是唯一产品入口，并调用 `src/harness/mod.ts` 中的 Agent 引擎。 `stages/`
+`desktop/main.ts` 是唯一产品入口，并调用 `src/mod.ts` 中的 Agent 引擎。`stages/`
 保留为内部演进和对照示例，不进入正式桌面运行时依赖图。
 
 内部 Agent 引擎按职责拆分为：
@@ -245,7 +253,7 @@ macOS App 图标使用 `desktop/assets/app-icon.icns`，界面品牌图使用
 ## 验证
 
 ```sh
-deno fmt --check src/harness desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop/main.ts README.md AGENTS.md
 deno task check
 rg 'stages/' desktop src
 ```

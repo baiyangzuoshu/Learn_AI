@@ -1,6 +1,6 @@
 import type { HarnessFeature } from "../contracts.ts";
-import type { ToolDefinition } from "../../core/types.ts";
-import { appDataDir } from "../../config/paths.ts";
+import type { ToolDefinition } from "../core/types.ts";
+import { appDataDir } from "../config/paths.ts";
 
 const def = (
   name: string,
