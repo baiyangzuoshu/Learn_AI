@@ -16,7 +16,7 @@ Electron, Node.js runtime, or a Rust application layer.
 - `src/providers/` owns model-provider clients and telemetry.
 - `desktop/main.ts` is the Deno Desktop backend and HTTP API entry point.
 - `desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
-- `stages/s01_*.ts` through `stages/s20_*.ts` are teaching examples only.
+- `stages/s01_*.ts` through `stages/s30_*.ts` are teaching examples only.
 
 ## Critical Boundary
 
