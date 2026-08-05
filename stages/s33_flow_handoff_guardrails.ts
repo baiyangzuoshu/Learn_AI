@@ -2,74 +2,42 @@ import { type AgentEvent, agentLoop as previousAgentLoop } from "./s32_reasoning
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-export type Handoff = {
-  task: string;
-  objective: string;
-  evidence: string[];
-  allowedTools: string[];
-  acceptance: string[];
+export type Delivery = {
+  mode: "embedded" | "api" | "worker";
+  latency: "realtime" | "interactive" | "async";
+  protocol: "websocket" | "http-sse" | "queue";
 };
-
-export function route(task: string): "research" | "build" | "review" {
-  const text = task.toLowerCase();
-  if (/review|audit|check|验证/.test(text)) return "review";
-  if (/build|write|implement|实现/.test(text)) return "build";
-  return "research";
+export function chooseDelivery(latency: Delivery["latency"]): Delivery {
+  return latency === "realtime"
+    ? { mode: "embedded", latency, protocol: "websocket" }
+    : latency === "interactive"
+    ? { mode: "api", latency, protocol: "http-sse" }
+    : { mode: "worker", latency, protocol: "queue" };
 }
-
-export function validateHandoff(handoff: Handoff): string[] {
-  const errors: string[] = [];
-  if (!handoff.task.trim() || !handoff.objective.trim()) {
-    errors.push("task and objective are required");
-  }
-  if (!handoff.acceptance.length) errors.push("at least one acceptance criterion is required");
-  if (handoff.allowedTools.some((tool) => tool.startsWith("dangerous:"))) {
-    errors.push("dangerous tools require an explicit approval boundary");
-  }
-  return errors;
-}
-
-export function guardrail(stage: string, handoff: Handoff, output: string) {
-  const errors = validateHandoff(handoff);
-  if (output.length > 10_000) errors.push("output exceeds stage limit");
-  return { stage, allowed: errors.length === 0, errors };
-}
-
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "flow_handoff_check",
-    description: "Route a task and validate a typed agent handoff",
+    name: "deployment_topology",
+    description: "Choose embedded, API, or worker topology and the matching communication wire",
     parameters: {
       type: "object",
-      properties: {
-        task: { type: "string" },
-        handoff: { type: "object" },
-        output: { type: "string" },
-      },
-      required: ["task", "handoff", "output"],
+      properties: { latency: { type: "string" } },
+      required: ["latency"],
     },
   },
 };
-registerTool(definition, async (input) => {
-  const handoff = input.handoff as Handoff;
-  return JSON.stringify(guardrail(route(String(input.task)), handoff, String(input.output)));
-});
+registerTool(
+  definition,
+  async (input) => JSON.stringify(chooseDelivery(String(input.latency) as Delivery["latency"])),
+);
 registerSystemPromptSection({
-  id: "s33-flow-handoff-guardrails",
-  title: "Flow, handoff, and guardrails",
-  priority: 14,
+  id: "s33-deployment",
+  title: "Deployment topology and streaming",
+  priority: 44,
   content:
-    "A flow chooses the next specialist; a handoff carries objective, evidence, tools, and acceptance criteria. Guardrails validate the contract before and after every boundary.",
+    "Choose embedded/WebSocket for realtime UX, API/SSE for streamed request-response, and durable queues for long work. Keep a light front door and typed workers behind it.",
 });
-
 export { type AgentEvent };
 export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
   return await previousAgentLoop(...args);
-}
-
-if (import.meta.main) {
-  console.log(route("review the generated patch"));
-  const query = prompt("s33 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
 }

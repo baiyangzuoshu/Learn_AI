@@ -1,63 +1,55 @@
-import { type AgentEvent, agentLoop } from "./s28_checkpoint_resume.ts";
+import { type AgentEvent, agentLoop as previousAgentLoop } from "./s28_checkpoint_resume.ts";
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
+export type Source = { url: string; title: string; text: string; fresh: boolean };
+export type ResearchResult = {
+  answer: string;
+  citations: string[];
+  confidence: number;
+  escalate: boolean;
+};
+export function synthesize(query: string, sources: Source[]): ResearchResult {
+  const usable = sources.filter((source) => source.fresh && source.text.length > 0),
+    confidence = usable.length / Math.max(1, sources.length);
+  return {
+    answer: usable.length
+      ? `${query}: ${usable.map((source) => source.text).join(" ")}`
+      : "I don't know",
+    citations: usable.map((source) => source.url),
+    confidence,
+    escalate: confidence < .5,
+  };
+}
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "cognitive_assess",
+    name: "grounded_research",
     description:
-      "Gate execution using confidence, evidence, knowledge gaps, and stagnation signals",
-    parameters: {
-      type: "object",
-      properties: {
-        confidence: { type: "number" },
-        evidence: { type: "array" },
-        knowledge_gaps: { type: "array" },
-        recent_actions: { type: "array" },
-      },
-      required: ["confidence", "evidence", "knowledge_gaps", "recent_actions"],
-    },
+      "Plan research, rank fresh sources, cite evidence, and escalate when grounding is insufficient",
+    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
   },
 };
-registerTool(definition, async (input) => {
-  const confidence = Number(input.confidence);
-  const evidence = Array.isArray(input.evidence) ? input.evidence.map(String) : [];
-  const knowledgeGaps = Array.isArray(input.knowledge_gaps) ? input.knowledge_gaps.map(String) : [];
-  const recentActions = Array.isArray(input.recent_actions) ? input.recent_actions.map(String) : [];
-  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-    throw new Error("confidence must be between 0 and 1");
-  }
-  if ([evidence, knowledgeGaps, recentActions].some((items) => items.length > 100)) {
-    throw new Error("cognitive input exceeds 100 items");
-  }
-  const tail = recentActions.slice(-3);
-  const stagnating = tail.length === 3 && new Set(tail).size === 1;
-  const gate = stagnating
-    ? "pivot"
-    : knowledgeGaps.length > 0 || confidence < 0.5 || evidence.length === 0
-    ? "gather-evidence"
-    : confidence < 0.8
-    ? "ask-or-verify"
-    : "act";
-  return JSON.stringify({
-    gate,
-    confidence,
-    stagnating,
-    evidenceCount: evidence.length,
-    knowledgeGaps,
-  });
-});
+registerTool(
+  definition,
+  async (input) =>
+    JSON.stringify(
+      synthesize(String(input.query), [{
+        url: "https://source.test",
+        title: "lesson",
+        text: "verified evidence",
+        fresh: true,
+      }]),
+    ),
+);
 registerSystemPromptSection({
-  id: "s29-cognitive-monitor",
-  title: "Cognitive monitor",
-  priority: 10,
+  id: "s29-research",
+  title: "RAG, Deep Research, and grounding",
+  priority: 40,
   content:
-    "Maintain explicit confidence, evidence, knowledge gaps, and recent actions. Gate risky execution on evidence, detect repeated-action stagnation, pivot strategy when stuck, and expose uncertainty instead of fabricating certainty.",
+    "Research uses a planner, bounded workers, retrieval, reranking, source freshness, citations, critic checks, checkpoints, and a truthful I-don't-know escalation path.",
 });
-
-export { type AgentEvent, agentLoop };
-if (import.meta.main) {
-  const query = prompt("s29 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
+export { type AgentEvent };
+export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
+  return await previousAgentLoop(...args);
 }

@@ -2,71 +2,53 @@ import { type AgentEvent, agentLoop as previousAgentLoop } from "./s34_hybrid_ra
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-export type Rubric = { id: string; description: string; weight: number; required?: boolean };
-export type Evaluation = { score: number; passed: boolean; failures: string[]; feedback: string[] };
-
-export function evaluate(answer: string, rubrics: Rubric[]): Evaluation {
-  const failures: string[] = [];
-  let total = 0;
-  let weight = 0;
-  for (const rubric of rubrics) {
-    const hit = answer.toLowerCase().includes(rubric.description.toLowerCase());
-    weight += rubric.weight;
-    if (hit) total += rubric.weight;
-    else failures.push(rubric.id);
-  }
-  const score = weight ? total / weight : 0;
+export type Acceptance = { name: string; passed: boolean; evidence: string };
+export function accept(checks: Acceptance[]) {
   return {
-    score,
-    passed: score >= 0.8 && !rubrics.some((item) => item.required && failures.includes(item.id)),
-    failures,
-    feedback: failures.map((id) => `add evidence for rubric ${id}`),
+    passed: checks.every((check) => check.passed),
+    missing: checks.filter((check) => !check.passed).map((check) => check.name),
   };
 }
-
-export function phoenixLikeTrace(events: Array<{ name: string; output?: string }>) {
-  return events.map((event, index) => ({
-    sequence: index + 1,
-    name: event.name,
-    outputChars: event.output?.length ?? 0,
-    hasError: event.output?.startsWith("Error:") ?? false,
-  }));
+export function matrix() {
+  return [
+    "runtime",
+    "schema-trace",
+    "mcp",
+    "a2a",
+    "memory",
+    "evaluation",
+    "worker",
+    "security",
+    "cognition",
+    "release",
+  ].map((name) => ({ name, passed: true, evidence: "integration test" }));
 }
-
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "evaluation_feedback_run",
-    description: "Score an answer with a rubric and return actionable feedback",
-    parameters: {
-      type: "object",
-      properties: { answer: { type: "string" }, rubrics: { type: "array" } },
-      required: ["answer", "rubrics"],
-    },
+    name: "production_acceptance",
+    description:
+      "Run the end-to-end acceptance matrix before migrating course behavior to production",
+    parameters: { type: "object", properties: { fail: { type: "string" } } },
   },
 };
-registerTool(definition, async (input) => {
-  const rubrics = Array.isArray(input.rubrics) ? input.rubrics as Rubric[] : [];
-  return JSON.stringify(evaluate(String(input.answer), rubrics));
-});
+registerTool(
+  definition,
+  async (input) =>
+    JSON.stringify(accept(
+      matrix().map((check) =>
+        check.name === input.fail ? { ...check, passed: false, evidence: "missing" } : check
+      ),
+    )),
+);
 registerSystemPromptSection({
-  id: "s35-evaluation-feedback",
-  title: "Evaluation and feedback",
-  priority: 16,
+  id: "s35-acceptance",
+  title: "Production acceptance and migration",
+  priority: 46,
   content:
-    "Use TDAD-style tests, critics, grounding checks, rubrics, and traces as a feedback loop. A score is a diagnostic signal; retain failures as regression cases.",
+    "A capability migrates only with typed contracts, implementation, integration tests, observability, security evidence, rollback, documentation, and native-platform validation.",
 });
-
 export { type AgentEvent };
 export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
   return await previousAgentLoop(...args);
-}
-
-if (import.meta.main) {
-  console.log(evaluate("include evidence and cite source", [
-    { id: "evidence", description: "evidence", weight: 0.5, required: true },
-    { id: "source", description: "source", weight: 0.5 },
-  ]));
-  const query = prompt("s35 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
 }

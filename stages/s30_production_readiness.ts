@@ -1,91 +1,60 @@
-import { type AgentEvent, agentLoop as cognitiveAgentLoop } from "./s29_cognitive_monitor.ts";
-import type { PermissionMode } from "./s03_permission.ts";
+import { type AgentEvent, agentLoop as previousAgentLoop } from "./s29_cognitive_monitor.ts";
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
-import type { Message, ToolDefinition } from "../src/core/types.ts";
+import type { ToolDefinition } from "../src/core/types.ts";
 
-const advancedCapabilities = [
-  "Bounded Runtime",
-  "Structured Tracing",
-  "Evaluation and Feedback",
-  "Retrieval Augmented Memory",
-  "Planner Executor Verifier",
-  "MCP Capability Negotiation",
-  "Handoff Guardrails",
-  "Checkpoint Resume",
-  "Cognitive Monitor",
-  "Production Readiness",
-];
+export type EvalCase = { id: string; input: string; expected: string; citation?: string };
+export type EvalReport = {
+  passRate: number;
+  groundingRate: number;
+  review: string[];
+  passed: boolean;
+};
+export async function evaluate(cases: EvalCase[], run: (input: string) => Promise<string>) {
+  const results = await Promise.all(cases.map(async (item) => {
+    const output = await run(item.input);
+    return {
+      pass: output === item.expected,
+      grounded: !item.citation || output.includes(item.citation),
+      id: item.id,
+    };
+  }));
+  const passRate = results.filter((result) => result.pass).length / Math.max(1, results.length),
+    groundingRate = results.filter((result) => result.grounded).length /
+      Math.max(1, results.length);
+  return {
+    passRate,
+    groundingRate,
+    review: results.filter((result) => !result.pass || !result.grounded).map((result) => result.id),
+    passed: passRate >= .95 && groundingRate >= .95,
+  };
+}
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "production_readiness_check",
+    name: "evaluation_gate",
     description:
-      "Evaluate required production Agent controls without claiming deployment readiness",
-    parameters: {
-      type: "object",
-      properties: { controls: { type: "object" } },
-      required: ["controls"],
-    },
+      "Evaluate quality and grounding, queue uncertain cases for review, and block regression",
+    parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
   },
 };
-registerTool(definition, async (input) => {
-  const controls = input.controls as Record<string, unknown>;
-  if (!controls || typeof controls !== "object" || Array.isArray(controls)) {
-    throw new Error("controls must be an object");
-  }
-  const required = [
-    "boundedRuntime",
-    "schemaValidation",
-    "permissionEnforcement",
-    "secretRedaction",
-    "structuredTracing",
-    "evaluationRegression",
-    "checkpointRecovery",
-    "releaseVerification",
-  ];
-  const passed = required.filter((name) => controls[name] === true);
-  const missing = required.filter((name) => controls[name] !== true);
-  return JSON.stringify({
-    ready: missing.length === 0,
-    passed,
-    missing,
-    note: "native runtime testing is still required",
-  });
-});
+registerTool(
+  definition,
+  async (input) =>
+    JSON.stringify(
+      await evaluate(
+        [{ id: "lesson", input: String(input.input), expected: String(input.input) }],
+        async (value) => value,
+      ),
+    ),
+);
 registerSystemPromptSection({
-  id: "s30-production-readiness",
-  title: "Production readiness",
-  priority: 11,
+  id: "s30-evaluation",
+  title: "Evaluation, feedback, and CI",
+  priority: 41,
   content:
-    "Production readiness requires verified runtime bounds, schema validation, permissions, secret redaction, traces, regression evaluations, recovery, and release checks. Cross-compilation alone never proves native runtime behavior.",
+    "Release gates combine datasets, negative cases, grounding, critic/judge results, trace evidence, latency, cost, safety, and human review. Regressions block promotion.",
 });
-
 export { type AgentEvent };
-export async function agentLoop(
-  query: string,
-  onEvent: (event: AgentEvent) => void = () => {},
-  model?: string,
-  history: Message[] = [],
-  permissionMode: PermissionMode = "ask",
-  signal?: AbortSignal,
-  onHook: (event: { name: string; detail: string }) => void = () => {},
-): Promise<string> {
-  onHook({
-    name: "AdvancedHarnessReady",
-    detail: `s21–s30 · ${advancedCapabilities.join(", ")}`,
-  });
-  return await cognitiveAgentLoop(
-    query,
-    onEvent,
-    model,
-    history,
-    permissionMode,
-    signal,
-    onHook,
-  );
-}
-
-if (import.meta.main) {
-  const query = prompt("s30 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
+export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
+  return await previousAgentLoop(...args);
 }

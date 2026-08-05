@@ -1,40 +1,21 @@
-# s29：认知监控
+# s29：RAG, Deep Research, and Grounding
 
-源码：[s29_cognitive_monitor.ts](../s29_cognitive_monitor.ts)
+## 合并范围
 
-## 学习目标
+整合 Reasoning Strategies、Sequential Thinking、Deep Research、Research Worker、Citation 和
+Grounding。
 
-- 显式表达置信度、证据和知识缺口。
-- 检测最近动作重复导致的停滞。
-- 根据状态选择行动、验证、补证据或转向策略。
+## 学习重点
 
-## 核心机制
+Research 是 Planner + 有界
+Worker：检索、抓取、质量检查、综合和引用。来源不足、过期或矛盾时必须返回不确定并升级。
 
-`cognitive_assess` 返回 `act`、`ask-or-verify`、`gather-evidence` 或 `pivot`
-门控结果。连续三次相同动作被视为停滞，低置信度、无证据或存在知识缺口会阻止直接行动。
+## 练习
 
-## 把“我不确定”变成控制信号
+1. 给抓取增加并发上限、重试、Checkpoint 和 freshness。
+2. 加入 Critic 验证每个事实都有来源。
+3. 让 UI 流式显示计划、部分发现和最终引用。
 
-模型可以表达置信度，但自报数字未必校准，因此不能单独决定高风险动作。本课把置信度与证据数量、明确知识缺口和最近动作结合，形成执行前门控。
+## 生产迁移
 
-`cognitive_assess` 验证输入上限，检查最后三次动作是否完全相同。停滞优先返回
-`pivot`；存在缺口、无证据或置信度低时返回 `gather-evidence`；中等置信度要求
-`ask-or-verify`；只有证据存在且高置信才 `act`。
-
-门控不是替模型思考的固定工作流，而是防止在明显缺证据或重复失败时继续产生副作用。它的阈值是教学启发式，不应被包装成科学概率。生产系统应通过
-Eval 校准不同任务风险下的阈值，并把权限类别纳入决策：只读探索可以更宽松，外部写入需要更强证据。
-
-`pivot` 也不能只换一种措辞重试，应改变工具、信息源、计划或请求用户输入，并把结果反馈给下一轮。
-
-## 运行与观察
-
-```sh
-deno task s29
-```
-
-改变置信度、证据和最近动作，观察门控决策如何变化。
-
-## 局限与练习
-
-用历史 Eval 数据校准置信区间，并按 read/mutate/external 设置不同门槛。记录 pivot
-前后的动作签名，验证策略确实改变而非改写描述。
+真实 Search/Fetcher 需要权限、robots、费用预算和审计。

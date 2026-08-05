@@ -1,99 +1,59 @@
-import { type AgentEvent, agentLoop as boundedAgentLoop } from "./s21_bounded_runtime.ts";
-import type { PermissionMode } from "./s03_permission.ts";
+import { type AgentEvent, agentLoop as previousAgentLoop } from "./s21_bounded_runtime.ts";
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
-import type { Message, ToolDefinition } from "../src/core/types.ts";
+import type { ToolDefinition } from "../src/core/types.ts";
 
-export interface TraceRecord {
-  runId: string;
-  sequence: number;
-  timestamp: string;
-  type: "tool" | "hook";
-  name: string;
-  detail: string;
+export type Trace = { traceId: string; spanId: string; parent?: string; name: string; ms: number };
+export class TraceBook {
+  readonly spans: Trace[] = [];
+  async span<T>(name: string, work: (trace: Trace) => Promise<T>, parent?: Trace) {
+    const trace = {
+        traceId: parent?.traceId ?? crypto.randomUUID(),
+        spanId: crypto.randomUUID().slice(0, 8),
+        parent: parent?.spanId,
+        name,
+        ms: 0,
+      },
+      started = performance.now();
+    try {
+      return await work(trace);
+    } finally {
+      trace.ms = Math.round(performance.now() - started);
+      this.spans.push(trace);
+    }
+  }
 }
-
-const summarizeDefinition: ToolDefinition = {
+export function validate(input: unknown, required: string[]) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("object input required");
+  }
+  for (const key of required) if (!(key in input)) throw new Error(`missing ${key}`);
+  return input as Record<string, unknown>;
+}
+const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "trace_summarize",
-    description: "Summarize a bounded list of structured Agent trace records",
-    parameters: {
-      type: "object",
-      properties: { records: { type: "array" } },
-      required: ["records"],
-    },
+    name: "typed_trace",
+    description: "Validate structured input and emit trace-linked model and tool spans",
+    parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
   },
 };
-registerTool(summarizeDefinition, async (input) => {
-  if (!Array.isArray(input.records) || input.records.length > 1_000) {
-    throw new Error("records must be an array with at most 1000 items");
-  }
-  const records = input.records as Array<Record<string, unknown>>;
-  const counts: Record<string, number> = {};
-  for (const record of records) {
-    const name = String(record.name ?? "unknown");
-    counts[name] = (counts[name] ?? 0) + 1;
-  }
-  return JSON.stringify({ total: records.length, counts });
+registerTool(definition, async (input) => {
+  const traces = new TraceBook();
+  const result = await traces.span(
+    "agent",
+    async (root) =>
+      await traces.span("tool", async () => String(validate(input, ["text"]).text), root),
+  );
+  return JSON.stringify({ result, spans: traces.spans });
 });
 registerSystemPromptSection({
-  id: "s22-structured-tracing",
-  title: "Structured tracing",
-  priority: 3,
+  id: "s22-contracts",
+  title: "Structured contracts and tracing",
+  priority: 33,
   content:
-    "Treat every run as a trace with ordered tool and hook records. Preserve parent-child causality, bound trace detail, and never include secrets in trace attributes.",
+    "Validate inputs and outputs at every boundary. Propagate one trace through UI, agent, provider, tool, protocol, worker, and evaluation events.",
 });
-
 export { type AgentEvent };
-export async function agentLoop(
-  query: string,
-  onEvent: (event: AgentEvent) => void = () => {},
-  model?: string,
-  history: Message[] = [],
-  permissionMode: PermissionMode = "ask",
-  signal?: AbortSignal,
-  onHook: (event: { name: string; detail: string }) => void = () => {},
-): Promise<string> {
-  const runId = `run-${crypto.randomUUID()}`;
-  const started = performance.now();
-  let sequence = 0;
-  const emit = (type: TraceRecord["type"], name: string, detail: string) => {
-    const record: TraceRecord = {
-      runId,
-      sequence: ++sequence,
-      timestamp: new Date().toISOString(),
-      type,
-      name,
-      detail: detail.slice(0, 2_000),
-    };
-    onHook({ name: "TraceRecord", detail: JSON.stringify(record) });
-  };
-  emit("hook", "RunStarted", query.slice(0, 200));
-  try {
-    const answer = await boundedAgentLoop(
-      query,
-      (event) => {
-        emit("tool", event.name, `${event.input.length} input · ${event.output.length} output`);
-        onEvent(event);
-      },
-      model,
-      history,
-      permissionMode,
-      signal,
-      (event) => {
-        emit("hook", event.name, event.detail);
-        onHook(event);
-      },
-    );
-    emit("hook", "RunCompleted", `${Math.round(performance.now() - started)}ms`);
-    return answer;
-  } catch (error) {
-    emit("hook", "RunFailed", error instanceof Error ? error.message : String(error));
-    throw error;
-  }
-}
-
-if (import.meta.main) {
-  const query = prompt("s22 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
+export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
+  return await previousAgentLoop(...args);
 }

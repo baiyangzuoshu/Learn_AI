@@ -1,89 +1,69 @@
-import { type AgentEvent, agentLoop } from "./s27_handoff_guardrails.ts";
+import { type AgentEvent, agentLoop as previousAgentLoop } from "./s27_handoff_guardrails.ts";
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-interface Checkpoint {
+export type Memory = {
   id: string;
-  objective: string;
-  iteration: number;
-  completed: string[];
-  pending: string[];
-  evidence: string[];
-  updatedAt: string;
-}
-const checkpointPath = (workspace: string, id: string) => {
-  if (!/^[A-Za-z0-9._-]{1,64}$/.test(id)) throw new Error("invalid checkpoint id");
-  return `${workspace}/.deno-agent/checkpoints/${id}.json`;
+  tenant: string;
+  kind: "semantic" | "episodic" | "procedural";
+  text: string;
+  vector: number[];
+  deleted?: boolean;
+  expiresAt?: number;
 };
-async function writeAtomic(path: string, value: unknown) {
-  await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-  const temporary = `${path}.${crypto.randomUUID()}.tmp`;
-  await Deno.writeTextFile(temporary, `${JSON.stringify(value, null, 2)}\n`);
-  await Deno.rename(temporary, path);
+export function embedding(text: string) {
+  return Array.from(
+    { length: 6 },
+    (_, index) =>
+      [...text].reduce(
+        (sum, char, position) => sum + (position % 6 === index ? char.charCodeAt(0) : 0),
+        0,
+      ),
+  );
 }
-
-const writeDefinition: ToolDefinition = {
+export function retrieve(records: Memory[], tenant: string, query: string) {
+  const terms = new Set(query.toLowerCase().split(/\W+/));
+  return records.filter((item) =>
+    item.tenant === tenant && !item.deleted && (!item.expiresAt || item.expiresAt > Date.now())
+  ).map((item) => ({
+    item,
+    score: [...terms].filter((term) => term && item.text.toLowerCase().includes(term)).length,
+  })).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score);
+}
+const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "checkpoint_write",
-    description: "Atomically persist bounded Agent loop state for later resume",
-    parameters: {
-      type: "object",
-      properties: {
-        id: { type: "string" },
-        objective: { type: "string" },
-        iteration: { type: "number" },
-        completed: { type: "array" },
-        pending: { type: "array" },
-        evidence: { type: "array" },
-      },
-      required: ["id", "objective", "iteration", "completed", "pending", "evidence"],
-    },
+    name: "hybrid_memory",
+    description:
+      "Store typed tenant memory and retrieve grounded semantic, episodic, or procedural evidence",
+    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
   },
 };
-const readDefinition: ToolDefinition = {
-  type: "function",
-  function: {
-    name: "checkpoint_read",
-    description: "Read one persisted Agent loop checkpoint",
-    parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
-  },
-};
-registerTool(writeDefinition, async (input, workspace) => {
-  const arrays = [input.completed, input.pending, input.evidence];
-  if (arrays.some((value) => !Array.isArray(value) || value.length > 200)) {
-    throw new Error("checkpoint arrays must contain at most 200 items");
-  }
-  const checkpoint: Checkpoint = {
-    id: String(input.id ?? ""),
-    objective: String(input.objective ?? "").trim(),
-    iteration: Math.floor(Number(input.iteration)),
-    completed: (input.completed as unknown[]).map(String),
-    pending: (input.pending as unknown[]).map(String),
-    evidence: (input.evidence as unknown[]).map(String),
-    updatedAt: new Date().toISOString(),
-  };
-  if (!checkpoint.objective || checkpoint.objective.length > 10_000 || checkpoint.iteration < 0) {
-    throw new Error("checkpoint state is invalid");
-  }
-  await writeAtomic(checkpointPath(workspace, checkpoint.id), checkpoint);
-  return JSON.stringify({ id: checkpoint.id, iteration: checkpoint.iteration, saved: true });
-});
 registerTool(
-  readDefinition,
-  async (input, workspace) =>
-    (await Deno.readTextFile(checkpointPath(workspace, String(input.id ?? "")))).slice(0, 50_000),
+  definition,
+  async (input) =>
+    JSON.stringify(
+      retrieve(
+        [{
+          id: "m1",
+          tenant: "lesson",
+          kind: "semantic",
+          text: "MCP sessions require initialization",
+          vector: embedding("MCP sessions require initialization"),
+        }],
+        "lesson",
+        String(input.query),
+      ),
+    ),
 );
 registerSystemPromptSection({
-  id: "s28-checkpoint-resume",
-  title: "Checkpoint and resume",
-  priority: 9,
+  id: "s28-memory",
+  title: "RAG and long-term memory",
+  priority: 39,
   content:
-    "Checkpoint long loops after verified progress. Resume from persisted objective, completed work, pending work, and evidence; never repeat completed side effects merely because conversational context was lost.",
+    "Retrieve before prompting. Keep tenant-scoped semantic, episodic, and procedural memory in durable stores with hybrid ranking, citations, retention, migration, tombstones, and forgetting.",
 });
-
-export { type AgentEvent, agentLoop };
-if (import.meta.main) {
-  const query = prompt("s28 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
+export { type AgentEvent };
+export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
+  return await previousAgentLoop(...args);
 }

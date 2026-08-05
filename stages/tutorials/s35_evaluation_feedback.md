@@ -1,40 +1,20 @@
-# s35：TDAD、Rubric 与反馈
+# s35：Production Acceptance and Migration
 
-## 要解决的问题
+## 合并范围
 
-只看一次对话“感觉不错”无法证明 Agent 变好了。评测要把要求拆成可重复的
-rubric，把失败保留为回归样例，再把 Trace 和反馈送回开发流程。
+整合 s81–s90 的生产迁移适配器、Gateway、Worker、红队和验收矩阵。
 
-## 代码地图
+## 学习重点
 
-- `Rubric`：为每个标准声明权重和是否必需。
-- `evaluate`：计算加权分数、必需项失败和修复建议。
-- `phoenixLikeTrace`：把事件压成可检索的序列、输出长度和错误标记。
-- `evaluation_feedback_run`：在工具边界运行一次评测。
-
-## 运行
-
-```sh
-deno check stages/s35_evaluation_feedback.ts
-deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s35_evaluation_feedback.ts
-```
-
-使用一个只满足普通标准、不满足 required 标准的答案，观察 `score` 可能很高但 `passed` 仍为 false。
-
-## 评测闭环
-
-1. TDAD：先写任务、期望工具调用和安全负例，再实现。
-2. Critic：检查答案与证据，而不是只检查字符串相似度。
-3. Rubric：固定判分维度，避免每次人工标准漂移。
-4. Trace/Phoenix：定位是检索、规划、工具还是模型输出失败。
-5. Feedback：将失败样例加入回归集，比较改动前后分数。
+能力不能因“有代码”就进入 `src/`。它需要公开契约、Feature
+设计、集成测试、Trace、安全、回滚和文档；任何一项缺证据都阻断迁移。
 
 ## 练习
 
-- 增加 groundedness 检查，要求答案包含证据 ID。
-- 记录每个 rubric 的 before/after，生成差异报告。
-- 加入“不可接受行为”负向测试，例如泄露密钥或绕过权限。
+1. 将矩阵中的占位 `verified` 换为真实测试证据。
+2. 为每项能力指定生产模块、负责人和回滚方案。
+3. 故意制造失败，验证发布不可继续。
 
-## 与生产的边界
+## 生产迁移
 
-字符串包含只是教学代理指标。生产评测要结合结构化断言、人工抽样、模型裁判校准和隐私处理；评测数据不得混入用户秘密。
+迁移后保持 `rg 'stages/' src desktop` 无匹配。

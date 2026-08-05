@@ -1,70 +1,48 @@
-import { type AgentEvent, agentLoop } from "./s22_structured_tracing.ts";
+import { type AgentEvent, agentLoop as previousAgentLoop } from "./s22_structured_tracing.ts";
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-interface Criterion {
-  type: "contains" | "not_contains" | "exact";
-  value: string;
-  weight: number;
+export type ToolPolicy = { name: string; mutation: boolean; scopes: string[]; maxOutput: number };
+export type Principal = { id: string; scopes: Set<string>; expiresAt: number };
+export function authorize(policy: ToolPolicy, principal: Principal) {
+  if (
+    principal.expiresAt <= Date.now() || policy.scopes.some((scope) => !principal.scopes.has(scope))
+  ) throw new Error("tool policy denied");
+  return policy;
 }
-
-export function evaluateText(actual: string, criteria: Criterion[]) {
-  const results = criteria.map((criterion) => {
-    const passed = criterion.type === "contains"
-      ? actual.includes(criterion.value)
-      : criterion.type === "not_contains"
-      ? !actual.includes(criterion.value)
-      : actual.trim() === criterion.value.trim();
-    return { ...criterion, passed };
-  });
-  const possible = results.reduce((sum, item) => sum + item.weight, 0);
-  const earned = results.filter((item) => item.passed).reduce((sum, item) => sum + item.weight, 0);
-  return {
-    passed: results.every((item) => item.passed),
-    score: possible ? earned / possible : 0,
-    results,
-  };
+export function boundedOutput(value: string, policy: ToolPolicy) {
+  return value.slice(0, policy.maxOutput);
 }
-
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "evaluation_score",
-    description: "Run deterministic contains, not-contains, and exact graders on an Agent answer",
-    parameters: {
-      type: "object",
-      properties: { actual: { type: "string" }, criteria: { type: "array" } },
-      required: ["actual", "criteria"],
-    },
+    name: "tool_policy",
+    description: "Apply typed tool scope, expiration, mutation classification, and bounded output",
+    parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
   },
 };
-registerTool(definition, async (input) => {
-  if (!Array.isArray(input.criteria) || input.criteria.length > 100) {
-    throw new Error("criteria must contain at most 100 items");
-  }
-  const criteria = input.criteria.map((raw) => {
-    const item = raw as Record<string, unknown>;
-    const type = String(item.type) as Criterion["type"];
-    const value = String(item.value ?? "");
-    const weight = Number(item.weight ?? 1);
-    if (!(["contains", "not_contains", "exact"] as string[]).includes(type) || !value) {
-      throw new Error("invalid evaluation criterion");
-    }
-    if (!Number.isFinite(weight) || weight <= 0) throw new Error("weight must be positive");
-    return { type, value, weight };
-  });
-  return JSON.stringify(evaluateText(String(input.actual ?? ""), criteria));
-});
+registerTool(
+  definition,
+  async (input) =>
+    JSON.stringify({
+      output: boundedOutput(
+        String(input.text),
+        authorize({ name: "lookup", mutation: false, scopes: ["read"], maxOutput: 200 }, {
+          id: "lesson",
+          scopes: new Set(["read"]),
+          expiresAt: Date.now() + 60_000,
+        }),
+      ),
+    }),
+);
 registerSystemPromptSection({
-  id: "s23-evaluation-feedback",
-  title: "Evaluation and feedback",
-  priority: 4,
+  id: "s23-tool-safety",
+  title: "Tool contracts and permission",
+  priority: 34,
   content:
-    "Define measurable success criteria before execution. Prefer deterministic graders, preserve failed evidence, and use evaluation feedback to improve the next run rather than declaring success from confidence alone.",
+    "Tools are single-purpose contracts with schema, scope, mutation class, bounded output, explicit approval, and auditable failure. Never let a model grant its own permission.",
 });
-
-export { type AgentEvent, agentLoop };
-if (import.meta.main) {
-  const query = prompt("s23 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
+export { type AgentEvent };
+export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
+  return await previousAgentLoop(...args);
 }

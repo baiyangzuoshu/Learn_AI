@@ -2,84 +2,45 @@ import { type AgentEvent, agentLoop as previousAgentLoop } from "./s38_cost_late
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-export type LoopState = {
-  iteration: number;
-  toolCalls: number;
-  elapsedMs: number;
-  status: "running" | "done" | "stopped";
+export type SupportFlow = {
+  intent: string;
+  route: "triage" | "retrieve" | "ground" | "act" | "escalate";
+  cited: boolean;
 };
-export function terminationGate(
-  state: LoopState,
-  limits: { iterations: number; toolCalls: number; timeoutMs: number },
-) {
-  if (state.iteration >= limits.iterations) return "iteration-limit";
-  if (state.toolCalls >= limits.toolCalls) return "tool-limit";
-  if (state.elapsedMs >= limits.timeoutMs) return "timeout";
-  return null;
+export function supportFlow(intent: string, hasEvidence: boolean, canAct: boolean): SupportFlow {
+  return !intent
+    ? { intent, route: "triage", cited: false }
+    : !hasEvidence
+    ? { intent, route: "retrieve", cited: false }
+    : !canAct
+    ? { intent, route: "escalate", cited: true }
+    : { intent, route: "act", cited: true };
 }
-
-export class IdempotencyLedger {
-  private readonly seen = new Set<string>();
-  claim(key: string): boolean {
-    if (this.seen.has(key)) return false;
-    this.seen.add(key);
-    return true;
-  }
-}
-
-export function replay<T extends { id: string }>(events: T[], uptoId?: string): T[] {
-  const index = uptoId ? events.findIndex((event) => event.id === uptoId) : events.length - 1;
-  return index < 0 ? [] : events.slice(0, index + 1);
-}
-
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "loop_control_demo",
-    description: "Apply termination, idempotency, and replay rules",
+    name: "support_architecture",
+    description:
+      "Compose router, retrieval, grounding, action guardrail, and human escalation into one evidence-first product flow",
     parameters: {
       type: "object",
-      properties: { iterations: { type: "number" }, toolCalls: { type: "number" } },
-      required: ["iterations", "toolCalls"],
+      properties: { intent: { type: "string" } },
+      required: ["intent"],
     },
   },
 };
-registerTool(definition, async (input) => {
-  const state: LoopState = {
-    iteration: Number(input.iterations),
-    toolCalls: Number(input.toolCalls),
-    elapsedMs: 0,
-    status: "running",
-  };
-  const ledger = new IdempotencyLedger();
-  const first = ledger.claim("request-1");
-  return JSON.stringify({
-    stopReason: terminationGate(state, { iterations: 10, toolCalls: 20, timeoutMs: 30_000 }),
-    first,
-    duplicate: ledger.claim("request-1"),
-  });
-});
+registerTool(
+  definition,
+  async (input) => JSON.stringify(supportFlow(String(input.intent), true, true)),
+);
 registerSystemPromptSection({
-  id: "s39-loop-control-replay",
-  title: "Loops, termination, and replay",
-  priority: 20,
+  id: "s39-product-flow",
+  title: "Evidence-first product architecture",
+  priority: 50,
   content:
-    "Control internal, task, and meta loops with explicit termination gates. Use idempotency keys for retries and replay only verified event prefixes; never let a model-defined loop run unbounded.",
+    "Real products compose narrow agents: triage, retrieval, grounding, action guardrail, answer, and escalation. Claims require evidence; risky actions require identity and approval.",
 });
-
 export { type AgentEvent };
 export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
   return await previousAgentLoop(...args);
-}
-
-if (import.meta.main) {
-  console.log(
-    terminationGate({ iteration: 10, toolCalls: 0, elapsedMs: 0, status: "running" }, {
-      iterations: 10,
-      toolCalls: 20,
-      timeoutMs: 1000,
-    }),
-  );
-  const query = prompt("s39 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
 }

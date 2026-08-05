@@ -1,42 +1,21 @@
-# s21：有界运行时
+# s21：Production Agent Runtime
 
-源码：[s21_bounded_runtime.ts](../s21_bounded_runtime.ts)
+## 合并范围
 
-## 学习目标
+整合原预算、Agent Runtime、Schema/Trace 适配和生产迁移课程。目标是理解：所有能力最终必须经由同一个
+Agent Loop 执行。
 
-- 为 Agent 设置工具次数和总运行时间预算。
-- 让外部取消与内部超时共享取消链路。
-- 理解无界 `while` 循环的生产风险。
+## 学习重点
 
-## 核心机制
+`RuntimeBudget` 将迭代、工具、输出和成本变成硬限制。`runBounded` 在每一步检查取消信号；任何 Feature
+都只能带着 workspace、trace 和预算进入 Runtime，不能自建循环。
 
-`runtime_budget_check` 校验预算；包装后的 `agentLoop` 使用 `AbortController`
-传播超时与外部取消，并统计工具事件。预算结束时发出开始和停止 Hook。
+## 练习
 
-## 为什么“模型会自己停”不成立
+1. 加入 deadline、token 和并发预算。
+2. 让超限生成开发者 Hook，而不是静默失败。
+3. 为 Provider、MCP、Nested Agent 分配子预算。
 
-工具循环可能因重复失败、提示冲突或外部状态不变而持续运行。生产系统必须在代码层拥有独立于模型的停止条件：总时间、迭代、工具调用、并发和保留输出都应有明确上限。
+## 生产迁移
 
-`RunBudget` 表达最大工具数和超时；`normalizeBudget()` 把模型传入值转成整数并限制合法区间；包装后的
-Loop 用内部 `AbortController` 合并计时器与外部
-`AbortSignal`，并通过工具事件统计消耗。`runtime_budget_check`
-让模型在长任务前检查预算，但真正强制不能依赖模型主动调用它。
-
-取消应形成一条完整链：用户或超时 → Runtime → Provider 请求 → 当前工具 → 子 Agent /
-子进程。仅抛出错误但留下后台进程不算取消成功。清理计时器和监听器也应放进 `finally`。
-
-当前在工具事件出现后才知道预算已超，意味着超额动作可能已经执行。生产实现应在 `PreToolUse`
-原子预扣额度，并为并发调用处理竞争。
-
-## 运行与观察
-
-```sh
-deno task s21
-```
-
-使用很小的工具预算运行多步骤任务，观察取消发生的位置和最终错误。
-
-## 局限与练习
-
-将预算下沉到
-`PreToolUse`，在执行前原子扣减。再加入迭代、并发和累计输出预算，并测试外部取消与内部超时同时发生时只产生一个终止原因。
+未来应将此模型重新设计为 `RunOptions` 和 `AgentRuntime` 的契约，不导入阶段代码。

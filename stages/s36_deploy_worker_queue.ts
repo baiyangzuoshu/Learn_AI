@@ -2,73 +2,64 @@ import { type AgentEvent, agentLoop as previousAgentLoop } from "./s35_evaluatio
 import { registerSystemPromptSection, registerTool } from "./s02_tool_use.ts";
 import type { ToolDefinition } from "../src/core/types.ts";
 
-export type Job = {
+export type Provider = {
   id: string;
-  payload: string;
-  attempts: number;
-  status: "queued" | "running" | "done" | "failed";
+  capabilities: Set<string>;
+  quality: number;
+  latency: number;
+  cost: number;
+  failures: number;
 };
-
-export class TeachingQueue {
-  readonly jobs = new Map<string, Job>();
-  enqueue(payload: string): Job {
-    const job: Job = { id: `job-${this.jobs.size + 1}`, payload, attempts: 0, status: "queued" };
-    this.jobs.set(job.id, job);
-    return job;
-  }
-  async work(handler: (payload: string) => Promise<void>): Promise<Job | undefined> {
-    const job = [...this.jobs.values()].find((item) => item.status === "queued");
-    if (!job) return undefined;
-    job.status = "running";
-    job.attempts++;
-    try {
-      await handler(job.payload);
-      job.status = "done";
-    } catch {
-      job.status = job.attempts < 3 ? "queued" : "failed";
-    }
-    return job;
-  }
+export function selectProvider(providers: Provider[], capability: string) {
+  const selected =
+    providers.filter((item) => item.capabilities.has(capability) && item.failures < 3).sort((
+      a,
+      b,
+    ) => (b.quality - a.quality) - (a.cost - b.cost) - (a.latency - b.latency))[0];
+  if (!selected) throw new Error("no provider route");
+  return selected;
 }
-
-export function apiEnvelope<T>(requestId: string, result: T) {
-  return { requestId, ok: true, result, error: null };
-}
-
 const definition: ToolDefinition = {
   type: "function",
   function: {
-    name: "worker_queue_demo",
-    description: "Enqueue and process one bounded worker job",
+    name: "provider_router",
+    description: "Route models by capability, quality, latency, cost, and circuit-breaker state",
     parameters: {
       type: "object",
-      properties: { payload: { type: "string" } },
-      required: ["payload"],
+      properties: { capability: { type: "string" } },
+      required: ["capability"],
     },
   },
 };
-registerTool(definition, async (input) => {
-  const queue = new TeachingQueue();
-  const job = queue.enqueue(String(input.payload));
-  await queue.work(async () => {});
-  return JSON.stringify(apiEnvelope(crypto.randomUUID(), job));
-});
+registerTool(
+  definition,
+  async (input) =>
+    JSON.stringify(
+      selectProvider([{
+        id: "fast",
+        capabilities: new Set(["chat"]),
+        quality: .8,
+        latency: 100,
+        cost: .02,
+        failures: 0,
+      }, {
+        id: "quality",
+        capabilities: new Set(["chat", "reasoning"]),
+        quality: .98,
+        latency: 800,
+        cost: .2,
+        failures: 0,
+      }], String(input.capability)),
+    ),
+);
 registerSystemPromptSection({
-  id: "s36-deploy-worker-queue",
-  title: "Deployment, workers, and queues",
-  priority: 17,
+  id: "s36-providers",
+  title: "Provider routing and resilience",
+  priority: 47,
   content:
-    "Separate the HTTP boundary, durable queue, and worker loop. Make jobs idempotent, retryable, observable, and bounded; a teaching Map stands in for a real queue only to expose the protocol.",
+    "Provider adapters expose capability, usage, retryability, latency, and cost. Route deliberately, open circuits on repeated failure, use bounded fallback, and never expose credentials in telemetry.",
 });
-
 export { type AgentEvent };
 export async function agentLoop(...args: Parameters<typeof previousAgentLoop>) {
   return await previousAgentLoop(...args);
-}
-
-if (import.meta.main) {
-  const queue = new TeachingQueue();
-  console.log(queue.enqueue("hello"));
-  const query = prompt("s36 >> ")?.trim();
-  if (query) console.log(`\n${await agentLoop(query)}`);
 }
