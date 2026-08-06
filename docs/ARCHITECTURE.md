@@ -67,7 +67,7 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 │   ├── context.ts           # 对话上下文压缩
 │   ├── scheduler.ts         # 周期性 AI 对话调度
 │   └── features/            # 可拆卸 Feature 模块
-├── stages/                  # 演进示例，不进入生产依赖图
+├── stages/                  # 每课一个 README.md + code.ts，不进入生产依赖图
 ├── scripts/                 # 本地发布脚本
 ├── docs/                    # 开源文档
 ├── deno.json                # 任务、构建 target、Deno Desktop 配置

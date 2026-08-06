@@ -1,81 +1,126 @@
 # Deno Agent：从一个循环到生产级 Harness
 
-`stages/` 是一套可运行、可修改、可观察的 Agent Harness 课程。模型决定下一步，Harness
-提供工具、状态、协议、权限和运行边界。
+`stages/` 是一套可运行、可修改、可观察的 Harness Engineering 课程。模型负责判断下一步，Harness
+提供工具、知识、状态、权限、协议和运行边界。
 
 > Agent 产品 = 模型 + Harness。
 
+课程组织借鉴 [learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)
+的章节风格：每章都是独立目录，包含完整叙事与可运行代码。本项目使用
+Deno/TypeScript，并把学习路线继续扩展到生产运行时、评估、安全、部署和验收。
+
+## 目录约定
+
+```text
+stages/
+├── README.md
+├── s01_agent_loop/
+│   ├── README.md     # 问题、方案、机制、观察、练习和生产差距
+│   └── code.ts       # 本章可运行实现
+├── s02_tool_use/
+│   ├── README.md
+│   └── code.ts
+└── ... s40_cognitive_workspace/
+```
+
+不再维护独立的 `tutorials/`：教程和源码放在同一课程目录，避免链接、编号和内容演进不同步。
+
 ## 学习路线
 
-### 第一部分：工具、上下文与边界（s01–s10）
+### 第一部分：让 Agent 能行动（s01–s10）
 
-从最小 Agent Loop 开始，建立工具注册、权限、Hook、计划、子 Agent、技能、上下文压缩、记忆和 Prompt
-组装的基础。
+建立 Agent Loop、工具、权限、Hook、计划、委派、技能、压缩、记忆和 Prompt 组装。
 
-### 第二部分：持久任务与协作（s11–s20）
+### 第二部分：让 Agent 能长期协作（s11–s20）
 
-加入错误恢复、任务图、后台任务、调度、团队协议、自治、Worktree 和 MCP，并在 s20 汇入单一 Harness。
+加入恢复、持久任务、后台执行、调度、团队协议、自治、Worktree、MCP，并汇入单一 Harness。
 
-### 第三部分：生产级 Agent 系统（s21–s40）
+### 第三部分：把机制收紧为生产系统（s21–s30）
 
-原 `s21–s90`
-已合并为二十门整合课程：Runtime、Trace、工具安全、长任务、Worker、MCP、A2A、Memory、Deep
-Research、评估、安全、认知、部署、发布和生产验收。它们仍只作为教学行为参考，不直接进入 `src/`。
+把预算、Trace、工具策略、任务恢复、Worker、MCP、A2A、Memory、Research 和 Eval 变成可执行约束。
+
+### 第四部分：完成安全、部署与验收闭环（s31–s40）
+
+覆盖身份与 DLP、认知控制、部署拓扑、发布回滚、Provider 路由、红队、可观测性、产品流和架构总验收。
 
 ## 如何学习
 
-1. 阅读教程，理解问题、边界和生产差距。
-2. 执行 `deno task sXX` 或 `deno run ... stages/sXX_*.ts`。
-3. 修改一个预算、策略或失败条件，并运行 `deno check stages/sXX_*.ts`。
-4. 完成后将行为映射为生产 `HarnessFeature`，不要从 `src/` 或 `desktop/` 导入课程代码。
+1. 进入课程目录，先读 `README.md`，明确本章解决的问题。
+2. 运行 `deno task sXX`，观察工具、事件、状态或 Gate 的实际变化。
+3. 修改一个预算、策略或失败条件，再运行 `deno check stages/sXX_name/code.ts`。
+4. 完成 README 的练习，并用自己的话画出执行链。
+5. 若迁移到产品代码，围绕生产契约重新设计，绝不从 `src/` 或 `desktop/` 直接导入课程。
 
 ## 课程地图
 
-| 阶段 | 本课原则                                        | 教程                                                            |
-| ---- | ----------------------------------------------- | --------------------------------------------------------------- |
-| s01  | 一个工具和一个循环构成最小 Agent                | [Agent Loop](tutorials/s01_agent_loop.md)                       |
-| s02  | 能力经由工具池注册，不改主循环                  | [Tool Use](tutorials/s02_tool_use.md)                           |
-| s03  | 先划权限边界，再给行动自由                      | [Permission](tutorials/s03_permission.md)                       |
-| s04  | 扩展点挂在循环上                                | [Hooks](tutorials/s04_hooks.md)                                 |
-| s05  | 计划把目标变成进度                              | [TodoWrite](tutorials/s05_todo_write.md)                        |
-| s06  | 子 Agent 隔离上下文                             | [Subagent](tutorials/s06_subagent.md)                           |
-| s07  | 技能按需发现和加载                              | [Skill Loading](tutorials/s07_skill_loading.md)                 |
-| s08  | 历史可以压缩，意图不能丢失                      | [Context Compact](tutorials/s08_context_compact.md)             |
-| s09  | 只保留跨会话有价值的事实                        | [Memory](tutorials/s09_memory.md)                               |
-| s10  | Prompt 是有优先级的组装结果                     | [System Prompt](tutorials/s10_system_prompt.md)                 |
-| s11  | 错误是分类和恢复的输入                          | [Error Recovery](tutorials/s11_error_recovery.md)               |
-| s12  | 长任务需要持久化依赖图                          | [Task Graph](tutorials/s12_persistent_task_graph.md)            |
-| s13  | 慢操作脱离主循环                                | [Background Tasks](tutorials/s13_background_tasks.md)           |
-| s14  | Scheduler 唤醒，Agent 判断                      | [Cron Scheduling](tutorials/s14_cron_scheduling.md)             |
-| s15  | 团队依靠身份、状态和邮箱                        | [Agent Teams](tutorials/s15_agent_teams.md)                     |
-| s16  | 协作消息必须机器可验证                          | [Team Protocol](tutorials/s16_team_protocol.md)                 |
-| s17  | 看板支持自主认领                                | [Autonomous Agent](tutorials/s17_autonomous_agent.md)           |
-| s18  | Worktree 隔离文件                               | [Git Worktree](tutorials/s18_git_worktree.md)                   |
-| s19  | MCP 接入外部能力                                | [MCP Plugins](tutorials/s19_mcp_plugins.md)                     |
-| s20  | 机制很多，主循环只有一个                        | [Comprehensive Harness](tutorials/s20_comprehensive.md)         |
-| s21  | Runtime 预算与取消必须可执行                    | [Production Runtime](tutorials/s21_bounded_runtime.md)          |
-| s22  | Schema 与 Trace 贯穿边界                        | [Structured Trace](tutorials/s22_structured_tracing.md)         |
-| s23  | 工具契约和权限共同守住执行面                    | [Tool Policy](tutorials/s23_evaluation_feedback.md)             |
-| s24  | 任务状态、检查点和重放必须有证据                | [Task State](tutorials/s24_retrieval_augmented_memory.md)       |
-| s25  | 后台、调度和 Worker 使用 Lease                  | [Worker Workloads](tutorials/s25_planner_executor_verifier.md)  |
-| s26  | MCP 是可管理的协议 Session                      | [MCP Management](tutorials/s26_mcp_capability_negotiation.md)   |
-| s27  | A2A Handoff 传递角色、证据和边界                | [A2A Teams](tutorials/s27_handoff_guardrails.md)                |
-| s28  | RAG 和 Memory 是独立长期服务                    | [Memory Service](tutorials/s28_checkpoint_resume.md)            |
-| s29  | Research 必须 Grounded 并可升级                 | [Deep Research](tutorials/s29_cognitive_monitor.md)             |
-| s30  | 评估、反馈和 CI 决定是否晋级                    | [Evaluation CI](tutorials/s30_production_readiness.md)          |
-| s31  | 身份、沙箱、出口和 DLP 在运行时执行             | [Security Boundary](tutorials/s31_structured_io.md)             |
-| s32  | 认知信号路由推理、检索和升级                    | [Cognitive Control](tutorials/s32_reasoning_strategies.md)      |
-| s33  | 延迟决定 API、SSE、实时或 Worker 拓扑           | [Deployment Topology](tutorials/s33_flow_handoff_guardrails.md) |
-| s34  | Release、Canary、Rollback 和 AIOps 同属一条门禁 | [Release AIOps](tutorials/s34_hybrid_rag.md)                    |
-| s35  | 每次迁移都必须有生产验收证据                    | [Production Acceptance](tutorials/s35_evaluation_feedback.md)   |
-| s36  | Provider 按能力、质量、成本和故障路由           | [Provider Routing](tutorials/s36_deploy_worker_queue.md)        |
-| s37  | 红队负例是安全发布条件                          | [Security Assurance](tutorials/s37_security_governance.md)      |
-| s38  | Trace、成本和 SLO 驱动 AIOps                    | [Observability](tutorials/s38_cost_latency_routing.md)          |
-| s39  | 产品由窄职责 Agent 和证据流组成                 | [Product Flow](tutorials/s39_loop_control_replay.md)            |
-| s40  | 六层验收收束完整生产 Agent 架构                 | [Architecture Capstone](tutorials/s40_cognitive_workspace.md)   |
+| 阶段 | 主题                                                             | 本课原则                                      |
+| ---- | ---------------------------------------------------------------- | --------------------------------------------- |
+| s01  | [Agent Loop](s01_agent_loop/README.md)                           | 一个工具和一个循环构成最小 Agent              |
+| s02  | [Tool Use](s02_tool_use/README.md)                               | 能力经由 Registry 注册，不改主循环            |
+| s03  | [Permission](s03_permission/README.md)                           | 模型请求动作，Harness 决定是否授权            |
+| s04  | [Hooks](s04_hooks/README.md)                                     | 扩展点挂在生命周期上                          |
+| s05  | [TodoWrite](s05_todo_write/README.md)                            | 短期计划让进度可见                            |
+| s06  | [Subagent](s06_subagent/README.md)                               | 聚焦子任务使用干净上下文                      |
+| s07  | [Skill Loading](s07_skill_loading/README.md)                     | 知识按需发现和加载                            |
+| s08  | [Context Compact](s08_context_compact/README.md)                 | 压缩成本，但保留目标和证据                    |
+| s09  | [Memory](s09_memory/README.md)                                   | 只保存跨会话有价值的事实                      |
+| s10  | [System Prompt](s10_system_prompt/README.md)                     | Prompt 是可测试的运行时组装结果               |
+| s11  | [Error Recovery](s11_error_recovery/README.md)                   | 先分类，再有限恢复                            |
+| s12  | [Task Graph](s12_persistent_task_graph/README.md)                | 长期目标用持久依赖图表达                      |
+| s13  | [Background Tasks](s13_background_tasks/README.md)               | 慢操作离开关键路径                            |
+| s14  | [Cron Scheduling](s14_cron_scheduling/README.md)                 | Scheduler 唤醒同一个 Agent Loop               |
+| s15  | [Agent Teams](s15_agent_teams/README.md)                         | 独立专家并行，保留部分成功                    |
+| s16  | [Team Protocol](s16_team_protocol/README.md)                     | 协作消息必须结构化和可路由                    |
+| s17  | [Bounded Autonomy](s17_autonomous_agent/README.md)               | 自治是有成功标准的反馈循环                    |
+| s18  | [Git Worktree](s18_git_worktree/README.md)                       | 用独立目录隔离并行修改                        |
+| s19  | [MCP Plugins](s19_mcp_plugins/README.md)                         | 外部协议能力仍受本地权限约束                  |
+| s20  | [Comprehensive Harness](s20_comprehensive/README.md)             | 机制很多，主循环只有一个                      |
+| s21  | [Production Runtime](s21_bounded_runtime/README.md)              | 预算和取消必须真实可执行                      |
+| s22  | [Structured Trace](s22_structured_tracing/README.md)             | Schema 与 Trace 贯穿所有边界                  |
+| s23  | [Tool Policy](s23_evaluation_feedback/README.md)                 | 职责、范围、身份和输出共同守边界              |
+| s24  | [Task State & Replay](s24_retrieval_augmented_memory/README.md)  | 从证据恢复，避免重复副作用                    |
+| s25  | [Worker Workloads](s25_planner_executor_verifier/README.md)      | Lease、Retry 与 Dead Letter 管长任务          |
+| s26  | [MCP Management](s26_mcp_capability_negotiation/README.md)       | Session 生命周期与 Transport 分离             |
+| s27  | [A2A Handoff](s27_handoff_guardrails/README.md)                  | 交接角色、范围、证据和有界权限                |
+| s28  | [RAG & Memory Service](s28_checkpoint_resume/README.md)          | 检索先于 Prompt，删除必须可证明               |
+| s29  | [Grounded Research](s29_cognitive_monitor/README.md)             | 来源不足时说不知道并升级                      |
+| s30  | [Evaluation CI](s30_production_readiness/README.md)              | 回归与负例决定是否晋级                        |
+| s31  | [Security Boundary](s31_structured_io/README.md)                 | 身份、沙箱、出口和 DLP 在执行时强制           |
+| s32  | [Cognitive Control](s32_reasoning_strategies/README.md)          | 认知信号选择 act、retrieve、pivot 或 escalate |
+| s33  | [Deployment Topology](s33_flow_handoff_guardrails/README.md)     | 延迟决定 WebSocket、SSE 或 Queue              |
+| s34  | [Release AIOps](s34_hybrid_rag/README.md)                        | Canary、SLO 与 Rollback 属于一条门禁          |
+| s35  | [Production Acceptance](s35_evaluation_feedback/README.md)       | 每次迁移都需要完整证据矩阵                    |
+| s36  | [Provider Routing](s36_deploy_worker_queue/README.md)            | 按能力、质量、延迟、成本和故障路由            |
+| s37  | [Security Assurance](s37_security_governance/README.md)          | 红队负例是发布条件                            |
+| s38  | [Observability](s38_cost_latency_routing/README.md)              | Trace、成本和 SLO 驱动 AIOps                  |
+| s39  | [Evidence-first Product Flow](s39_loop_control_replay/README.md) | 窄职责 Agent 通过证据流组合                   |
+| s40  | [Architecture Capstone](s40_cognitive_workspace/README.md)       | 六层验收收束完整生产架构                      |
+
+## 快速开始
+
+```sh
+# 最小 Agent Loop
+deno task s01
+
+# 前二十课综合 Harness
+deno task s20
+
+# 完整四十课终点
+deno task s40
+```
+
+课程任务可能调用模型、Shell、文件系统或外部协议。请先配置项目要求的 Provider
+凭据，并在测试工作区中运行涉及写入、后台进程或 Worktree 的课程。
 
 ## 教学代码与生产代码的边界
 
-阶段代码为了突出机制会使用内存 Map、占位向量和简化协议。生产实现必须通过
-`AgentRuntime`、`ToolRegistry`、`PromptRegistry` 和 `HarnessFeature`
-重新设计；完成迁移后，`rg 'stages/' src desktop` 必须没有匹配。
+课程代码为了突出单一机制，会使用内存 Map、简化向量、占位证据和紧凑协议。生产实现必须通过
+`AgentRuntime`、`ToolRegistry`、`PromptRegistry` 和 `HarnessFeature` 重新设计。
+
+架构变更后必须确认：
+
+```sh
+rg 'stages/' src desktop
+```
+
+命令应无匹配。课程完成代表理解机制，不代表已经通过生产迁移、桌面打包或目标操作系统运行验收。

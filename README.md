@@ -23,7 +23,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 - [架构说明](docs/ARCHITECTURE.md)：客户端分层、Agent Runtime、Feature、权限、持久化和更新架构。
 - [部署与发布](docs/DEPLOYMENT.md)：客户端开发运行、打包、版本号、GitHub Release
   上传和自动更新流程。
-- [分阶段课程](stages/README.md)：`s01–s30` 的逐课教程、运行方式、观察重点和练习。
+- [分阶段课程](stages/README.md)：`s01–s40` 的逐课教程、运行方式、观察重点和练习。
 
 ## 源码结构
 
@@ -45,6 +45,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 │   ├── main.ts               # Deno Desktop 后端入口
 │   └── renderer/             # 原生 HTML/CSS/JS 桌面界面
 ├── docs/
+├── stages/                  # 每课一个目录：README.md + code.ts
 ├── scripts/
 ├── deno.json
 └── dist/
@@ -55,7 +56,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 
 内部 Agent 引擎按职责拆分为：
 
-- `runtime.ts`：统一 Agent loop、重试、Hooks、权限与上下文压缩
+- `runtime.ts`：统一 Agent loop、运行预算、重试、Hooks、权限与上下文压缩
 - `registry.ts` / `prompt.ts`：工具和系统提示注册
 - `features/`：文件工具、生产力、编排、后台任务、Worktree、MCP、定时任务
 - `scheduler.ts`：跨平台持久化的周期 AI 对话调度服务
@@ -70,27 +71,24 @@ deno task check
 deno task desktop:hmr
 ```
 
-`deno task s01` 到 `deno task s30` 用于理解和对照内部演进机制。`s21–s30` 继续覆盖生产级 Agent
-所需的可靠性、追踪、评估、RAG、规划、MCP 协商、多 Agent 交接、恢复和认知监控。运行桌面应用：
+`deno task s01` 到 `deno task s40` 用于理解和对照内部演进机制。`s21–s40` 继续覆盖生产级 Agent
+所需的运行预算、可靠性、追踪、评估、RAG、规划、MCP 协商、多 Agent
+交接、恢复、部署和生产验收。运行桌面应用：
 
 ```sh
 deno task desktop
 ```
 
-高级教学阶段：
+高级教学阶段分为两段：
 
-| 阶段  | 主题           | 最小能力                       |
-| ----- | -------------- | ------------------------------ |
-| `s21` | 有界运行时     | 工具调用与执行时间预算         |
-| `s22` | 结构化追踪     | Run ID 与有序工具/Hook 记录    |
-| `s23` | 评估与反馈     | 确定性文本 Grader              |
-| `s24` | 检索增强记忆   | 分块、来源和词法检索基线       |
-| `s25` | 规划—执行—验证 | 依赖校验、环检测与就绪任务     |
-| `s26` | MCP 能力协商   | 协议版本与能力检查             |
-| `s27` | Handoff 护栏   | 交接目标、证据、工具和预算约束 |
-| `s28` | 检查点恢复     | 原子保存与读取循环状态         |
-| `s29` | 认知监控       | 置信度、知识缺口与停滞门控     |
-| `s30` | 生产就绪       | 关键生产控制项审计             |
+| 阶段      | 主题               | 最小能力                                           |
+| --------- | ------------------ | -------------------------------------------------- |
+| `s21–s25` | Runtime 与任务执行 | 预算、Trace、工具策略、Checkpoint、Worker Lease    |
+| `s26–s30` | 协议、知识与评估   | MCP Session、A2A、Memory、Grounding、Evaluation CI |
+| `s31–s35` | 安全、认知与发布   | Identity/DLP、认知路由、部署拓扑、Canary、验收矩阵 |
+| `s36–s40` | 路由、运营与总验收 | Provider、红队、AIOps、证据流、六层 Capstone       |
+
+完整课程地图和每章练习见 [stages/README.md](stages/README.md)。
 
 ## 模型配置
 

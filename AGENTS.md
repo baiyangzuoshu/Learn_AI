@@ -16,7 +16,7 @@ Electron, Node.js runtime, or a Rust application layer.
 - `src/providers/` owns model-provider clients and telemetry.
 - `desktop/main.ts` is the Deno Desktop backend and HTTP API entry point.
 - `desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
-- `stages/s01_*.ts` through `stages/s30_*.ts` are teaching examples only.
+- `stages/s01_*/code.ts` through `stages/s40_*/code.ts` are teaching examples only.
 
 ## Critical Boundary
 
@@ -146,6 +146,13 @@ Build output must embed `desktop/` and `src/`, never `stages/`.
 Cross-compilation verifies compilation and packaging, not native runtime behavior. Before release,
 test credential storage, directory selection, shell execution, Git, WebView behavior, and
 application shutdown on each target operating system.
+
+For every production or desktop change, always run the macOS ARM64 package as a required
+verification step:
+
+```sh
+deno task desktop:build:mac-arm64
+```
 
 ## Change Discipline
 
