@@ -73,3 +73,10 @@ Capstone 不是发布平台；最终仍要通过格式、类型、架构扫描�
 ## 下一章
 
 完成课程后，从一个小型能力开始设计 HarnessFeature，并用完整生产检查验证迁移。
+
+## 课程图
+
+![s40_cognitive_workspace 执行链](images/overview.svg)
+
+图中把本章新增机制放在统一 Agent Loop
+的边界上；阅读代码时，沿箭头核对输入、执行、限制和证据是否一致。

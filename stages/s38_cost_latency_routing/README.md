@@ -73,3 +73,10 @@ JSON”和“生产系统具备持久化、并发、安全、取消与运营证�
 ## 下一章
 
 进入 [s39 →](../s39_loop_control_replay/README.md)，继续补齐生产 Agent 的下一层约束。
+
+## 课程图
+
+![s38_cost_latency_routing 执行链](images/overview.svg)
+
+图中把本章新增机制放在统一 Agent Loop
+的边界上；阅读代码时，沿箭头核对输入、执行、限制和证据是否一致。

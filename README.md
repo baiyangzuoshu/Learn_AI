@@ -45,7 +45,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 │   ├── main.ts               # Deno Desktop 后端入口
 │   └── renderer/             # 原生 HTML/CSS/JS 桌面界面
 ├── docs/
-├── stages/                  # 每课一个目录：README.md + code.ts
+├── stages/                  # 每课一个目录：README.md + code.ts + images/overview.svg
 ├── scripts/
 ├── deno.json
 └── dist/

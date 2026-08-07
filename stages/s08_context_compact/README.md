@@ -73,3 +73,10 @@ Registry、Runtime 和 Feature 契约重新实现。
 ## 下一章
 
 进入 [s09 →](../s09_memory/README.md)，在同一个 Loop 上继续增加下一项能力。
+
+## 课程图
+
+![s08_context_compact 执行链](images/overview.svg)
+
+图中把本章新增机制放在统一 Agent Loop
+的边界上；阅读代码时，沿箭头核对输入、执行、限制和证据是否一致。

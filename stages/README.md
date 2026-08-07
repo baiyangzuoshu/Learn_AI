@@ -16,7 +16,8 @@ stages/
 ├── README.md
 ├── s01_agent_loop/
 │   ├── README.md     # 问题、方案、机制、观察、练习和生产差距
-│   └── code.ts       # 本章可运行实现
+│   ├── code.ts       # 本章可运行实现
+│   └── images/       # 本章执行链或状态图（SVG）
 ├── s02_tool_use/
 │   ├── README.md
 │   └── code.ts
@@ -24,6 +25,9 @@ stages/
 ```
 
 不再维护独立的 `tutorials/`：教程和源码放在同一课程目录，避免链接、编号和内容演进不同步。
+
+每章 README 都嵌入 `images/overview.svg`。图示是代码阅读的入口：先看箭头上的输入、边界和证据，再回到
+`code.ts` 找对应的类型、Handler 或状态转移。
 
 ## 学习路线
 
