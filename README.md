@@ -11,7 +11,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 
 - 多工作区、多会话、本地对话持久化和工作区文件树
 - 面向代码任务的 Agent 对话、文件读写、编辑、Shell 执行和权限控制
-- 多模型供应商配置、Keychain 密钥管理、Token/缓存命中遥测
+- 多模型供应商配置、Keychain 密钥管理、Token/缓存命中与费用遥测
 - Todo、Memory、任务图、Skill、MCP、后台任务和周期任务
 - Subagent、Agent Teams、Git Worktree 和有边界自治循环
 - 可收起导航、工作区概览、Git 改动信息和开发者事件面板
@@ -68,8 +68,18 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 ```sh
 deno --version
 deno task check
+deno task test
 deno task desktop:hmr
 ```
+
+桌面端也可打开“设置 → 通用 → 1–21
+课程测试用例”，先查看每课验收项，再单独测试或一键运行全部；该流程使用 Fake
+Provider，不调用真实模型。
+
+每次桌面对话结束后，回答下方和底部状态栏会显示本次预算的迭代、工具调用、输出字符和成本单位用量；
+底部第一行同时显示最近一次模型费用和累计费用。DeepSeek 会根据响应中的 token/cache usage
+按已配置的人民币模型价格估算，网关若直接返回 `usage.cost` 则优先采用；未知价格的自定义供应商显示
+`—`，避免伪造费用。DeepSeek 供应商还会用当前 API Key 查询余额并显示在状态栏。
 
 `deno task s01` 到 `deno task s40` 用于理解和对照内部演进机制。`s21–s40` 继续覆盖生产级 Agent
 所需的运行预算、可靠性、追踪、评估、RAG、规划、MCP 协商、多 Agent

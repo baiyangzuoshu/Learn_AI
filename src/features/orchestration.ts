@@ -37,6 +37,12 @@ export const orchestration: HarnessFeature = {
             workspace: context.workspace,
             permissionMode: "ask",
             signal: context.signal,
+            budget: context.budget.child({
+              iterations: 12,
+              toolCalls: 24,
+              outputChars: 80_000,
+              cost: 12,
+            }),
           }));
       },
     );
@@ -103,6 +109,12 @@ export const orchestration: HarnessFeature = {
                       workspace: context.workspace,
                       permissionMode: "ask",
                       signal: context.signal,
+                      budget: context.budget.child({
+                        iterations: 8,
+                        toolCalls: 16,
+                        outputChars: 40_000,
+                        cost: 8,
+                      }),
                     }),
                 )
               ),
@@ -151,6 +163,12 @@ export const orchestration: HarnessFeature = {
               workspace: context.workspace,
               permissionMode: "ask",
               signal: context.signal,
+              budget: context.budget.child({
+                iterations: 8,
+                toolCalls: 16,
+                outputChars: 40_000,
+                cost: 8,
+              }),
             });
             results.push(output);
             if (output.includes("[AUTONOMY_COMPLETE]")) {

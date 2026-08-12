@@ -5,7 +5,7 @@ const messages = $("#messages"),
   eventsContent = $("#events-content"),
   form = $("#composer");
 const input = $("#prompt"), send = $("#send"), status = $("#status");
-const modelSelect = $("#model-select"), settingsDialog = $("#settings-dialog");
+const modelSelect = $("#model-select"), settingsDialog = $("#settings-dialog"), testsDialog = $("#tests-dialog");
 const permissionMode = $("#permission-mode"), permissionHint = $("#permission-hint");
 const navToggle = $("#nav-toggle"), workspacePanelToggle = $("#toggle-workspace-panel");
 const workspacePanelRoot = $("#workspace-panel-root"),
@@ -18,19 +18,55 @@ const settingsForm = $("#settings-form"),
   providerSelect = $("#provider-select"),
   providerNameInput = $("#provider-name"),
   modelsInput = $("#models"),
-  defaultModel = $("#default-model");
+  defaultModel = $("#default-model"),
+  openLessonTestsButton = $("#open-lesson-tests"),
+  showLessonTestsButton = $("#show-lesson-tests"),
+  runAllLessonTestsButton = $("#run-all-lesson-tests"),
+  lessonTestList = $("#lesson-test-list"),
+  lessonTestSummary = $("#lesson-test-summary"),
+  runtimeTestOutput = $("#runtime-test-output");
 let settings = {}, sessions = [], activeSessionId = null;
 let providerApiKeys = {}, activeProviderId = null;
 let generationController = null;
 let cronSchedules = [];
 let runStep = 0, runToolCount = 0;
+let lastBudgetUsage = null;
 let startupUpdateCheckDone = false;
 let lastUpdateCheck = null;
+let lastBalanceAt = 0;
+let lastBalanceProviderId = "";
 const AUTO_SCROLL_MARGIN = 96;
 const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
 const CONTEXT_COMPACT_AT = 0.8;
 let activeWorkspaceTab = localStorage.getItem("deno-agent:workspace-tab") || "overview";
+
+function formatBudgetNumber(value) {
+  const number = Number(value || 0);
+  return number >= 1000 ? `${(number / 1000).toFixed(1)}k` : String(number);
+}
+function formatBudgetUsage(usage, compact = false) {
+  const used = usage?.used || {}, limit = usage?.limit || {};
+  if (compact) {
+    return `${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)}轮 · ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}工具 · ${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)}字 · ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}成本`;
+  }
+  return `迭代 ${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)} · 工具 ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}\n输出 ${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)} 字符 · 成本 ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)} 单位`;
+}
+function renderBudgetUsage(usage) {
+  lastBudgetUsage = usage;
+  const used = usage?.used || {}, limit = usage?.limit || {};
+  $("#runtime-budget-iterations").textContent = `${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)}`;
+  $("#runtime-budget-tools").textContent = `${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}`;
+  $("#runtime-budget-output").textContent = `${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)}`;
+  $("#runtime-budget-cost").textContent = `${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}`;
+}
+function appendBudgetResult(container = messages) {
+  if (!lastBudgetUsage) return;
+  const card = document.createElement("div");
+  card.className = "budget-result";
+  card.innerHTML = `<b>本次对话预算</b><span>${formatBudgetUsage(lastBudgetUsage)}</span><small>剩余 ${formatBudgetNumber(lastBudgetUsage.remaining?.iterations)} 轮 / ${formatBudgetNumber(lastBudgetUsage.remaining?.toolCalls)} 次工具调用</small>`;
+  container.append(card);
+}
 
 function escapeHtml(value) {
   const node = document.createElement("div");
@@ -377,7 +413,7 @@ function renderToolEvent(event) {
     }</b><span class="mcp-target">${
       escapeHtml(
         data.stage ||
-          (data.ok === true ? "全部检查通过" : data.ok === false ? "检查未通过" : "s20"),
+          (data.ok === true ? "全部检查通过" : data.ok === false ? "检查未通过" : "s21"),
       )
     }</span><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></div>`;
   }
@@ -521,6 +557,22 @@ function scrollMessagesToBottom() {
 function formatNumber(value) {
   return Number.isFinite(value) ? Math.round(value).toLocaleString() : "—";
 }
+function formatCost(value, currency = "USD") {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  const prefix = currency === "CNY" ? "¥" : currency === "USD" ? "$" : `${currency} `;
+  if (amount === 0) return `${prefix}0`;
+  return `${prefix}${Math.abs(amount) < 0.01 ? amount.toFixed(4) : amount.toFixed(3)}`;
+}
+function formatBalance(data) {
+  const balances = Array.isArray(data?.balanceInfos) ? data.balanceInfos : [];
+  const balance = balances.find((item) => item.currency === "CNY") || balances[0];
+  if (!balance) return "—";
+  const amount = Number(balance.totalBalance);
+  if (!Number.isFinite(amount)) return "—";
+  const prefix = balance.currency === "CNY" ? "¥" : "US$";
+  return `${prefix}${amount.toFixed(2)}`;
+}
 function formatDuration(ms) {
   const seconds = Math.max(0, Math.round(ms / 1_000));
   if (seconds < 60) return `${seconds}秒`;
@@ -653,6 +705,8 @@ async function updateRuntimeStatus() {
     const data = await (await fetch(`${API}/telemetry`)).json();
     $("#runtime-session-tokens").textContent = data.totalTokens?.toLocaleString() || "—";
     $("#runtime-last-tokens").textContent = data.lastTotalTokens?.toLocaleString() || "—";
+    $("#runtime-last-cost").textContent = formatCost(data.lastCost, data.costCurrency);
+    $("#runtime-session-cost").textContent = formatCost(data.totalCost, data.costCurrency);
     const lastTotal = data.lastTotalTokens || 0;
     $("#runtime-hit").textContent = lastTotal
       ? `${Math.round((data.lastCacheHitTokens || 0) / lastTotal * 100)}%`
@@ -663,6 +717,22 @@ async function updateRuntimeStatus() {
       : "—";
     if (document.body.classList.contains("workspace-panel-open")) renderWorkspaceOverview(data);
   } catch { /* keep the last telemetry values */ }
+  void updateRuntimeBalance();
+}
+async function updateRuntimeBalance(force = false) {
+  const providerId = selectedModel(modelSelect).providerId || "";
+  const now = Date.now();
+  if (!force && providerId === lastBalanceProviderId && now - lastBalanceAt < 60_000) return;
+  lastBalanceProviderId = providerId;
+  lastBalanceAt = now;
+  try {
+    const response = await fetch(`${API}/balance?providerId=${encodeURIComponent(providerId)}`);
+    if (!response.ok) throw new Error("balance unavailable");
+    const data = await response.json();
+    $("#runtime-balance").textContent = data.supported ? formatBalance(data) : "—";
+  } catch {
+    $("#runtime-balance").textContent = "—";
+  }
 }
 async function saveSessions() {
   localStorage.setItem(storageKey(), JSON.stringify(sessions));
@@ -1025,7 +1095,7 @@ async function loadSettings() {
 async function connect(retries = 30) {
   try {
     if (!(await fetch(`${API}/health`)).ok) throw new Error();
-    status.textContent = "Deno Runtime 已连接 · s20 Complete Harness";
+    status.textContent = "Deno Runtime 已连接 · s21 Bounded Runtime";
     await loadSettings();
   } catch {
     if (retries) setTimeout(() => connect(retries - 1), 300);
@@ -1049,6 +1119,11 @@ form.addEventListener("submit", async (event) => {
   send.title = "停止生成";
   status.textContent = "Agent 正在思考和行动…";
   runToolCount = 0;
+  lastBudgetUsage = null;
+  $("#runtime-budget-iterations").textContent = "运行中…";
+  $("#runtime-budget-tools").textContent = "—";
+  $("#runtime-budget-output").textContent = "—";
+  $("#runtime-budget-cost").textContent = "—";
   setRunStep(1);
   try {
     const thinking = document.createElement("div");
@@ -1085,6 +1160,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "status") {
           thinking.textContent = data.message;
           status.textContent = data.message;
+        }
+        if (data.type === "budget") {
+          renderBudgetUsage(data.usage);
+          thinking.textContent = `本次预算：${formatBudgetUsage(data.usage, true)}`;
         }
         if (data.type === "tool") {
           runToolCount++;
@@ -1125,11 +1204,12 @@ form.addEventListener("submit", async (event) => {
     }
     item.classList.remove("stream-cursor");
     item.innerHTML = renderMarkdown(answer);
+    appendBudgetResult();
     session.messages.push({ role: "assistant", content: answer });
     await saveSessions();
     await loadComposerGitSummary();
     if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
-    status.textContent = "Deno Runtime 已连接 · s20 Complete Harness";
+    status.textContent = "Deno Runtime 已连接 · s21 Bounded Runtime";
   } catch (error) {
     setRunStep(4);
     const stopped = error.name === "AbortError";
@@ -1142,6 +1222,7 @@ form.addEventListener("submit", async (event) => {
     await saveSessions();
     await loadComposerGitSummary();
     addMessage("agent", text);
+    appendBudgetResult();
     status.textContent = stopped ? "生成已停止" : "请求失败 · 可重试";
   } finally {
     generationController = null;
@@ -1596,6 +1677,113 @@ settingsForm.addEventListener("submit", async (event) => {
     $("#key-status").textContent = `错误：${error.message}`;
   } finally {
     button.disabled = false;
+  }
+});
+let lessonTests = [];
+function renderLessonTests(cases) {
+  lessonTests = cases;
+  lessonTestList.innerHTML = cases.map((test) =>
+    `<div class="lesson-test-row" data-lesson="${test.lesson}"><div><b>${String(test.lesson).padStart(2, "0")} · ${escapeHtml(test.title)}</b><small>${escapeHtml(test.description)}</small><span data-test-state>未测试</span></div><button type="button" data-run-lesson="${test.lesson}">测试</button></div>`
+  ).join("");
+}
+function renderLessonReport(report) {
+  lessonTestSummary.classList.toggle("passed", report.ok);
+  lessonTestSummary.classList.toggle("failed", !report.ok);
+  lessonTestSummary.textContent = `${report.ok ? "✓ 验收通过" : "✗ 验收失败"} · ${report.passed}/${report.passed + report.failed} 通过`;
+  for (const result of report.results) {
+    const row = lessonTestList.querySelector(`[data-lesson="${result.lesson}"]`),
+      state = row?.querySelector("[data-test-state]");
+    if (!row || !state) continue;
+    row.classList.toggle("passed", result.status === "passed");
+    row.classList.toggle("failed", result.status === "failed");
+    state.textContent = `${result.status === "passed" ? "✓ 通过" : "✗ 失败"} · ${result.durationMs}ms${result.detail ? ` · ${result.detail}` : ""}`;
+  }
+  runtimeTestOutput.textContent = [
+    `${report.ok ? "✓" : "✗"} ${report.suite}: ${report.passed} passed / ${report.failed} failed`,
+    ...report.results.map((result) =>
+      `${result.status === "passed" ? "✓" : "✗"} ${result.id} · ${result.title} (${result.durationMs}ms)` +
+      (result.detail ? "\n  " + result.detail : "")
+    ),
+  ].join("\n");
+}
+async function runLessonTest(lesson) {
+  const row = lessonTestList.querySelector(`[data-lesson="${lesson}"]`),
+    state = row?.querySelector("[data-test-state]");
+  if (row && state) {
+    row.classList.remove("passed", "failed");
+    state.textContent = "⟳ 测试中…";
+  }
+  lessonTestSummary.classList.remove("passed", "failed");
+  lessonTestSummary.textContent = `正在测试第 ${lesson} 课…`;
+  runtimeTestOutput.textContent = `正在运行 21test-${String(lesson).padStart(2, "0")}…`;
+  const response = await fetch(`${API}/tests/lessons`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ lesson }),
+  });
+  const report = await response.json();
+  if (!response.ok) throw new Error(report.error || "验收请求失败");
+  renderLessonReport(report);
+}
+openLessonTestsButton.addEventListener("click", () => {
+  testsDialog.showModal();
+  if (!lessonTests.length) showLessonTestsButton.click();
+});
+$("#close-tests").addEventListener("click", () => testsDialog.close());
+showLessonTestsButton.addEventListener("click", async () => {
+  showLessonTestsButton.disabled = true;
+  runtimeTestOutput.textContent = "正在加载 1–21 测试用例…";
+  try {
+    const response = await fetch(`${API}/tests/lessons`), data = await response.json();
+    if (!response.ok) throw new Error(data.error || "测试用例加载失败");
+    renderLessonTests(data.cases || []);
+    runAllLessonTestsButton.disabled = lessonTests.length !== 21;
+    lessonTestSummary.classList.remove("passed", "failed");
+    lessonTestSummary.textContent = `已加载 ${lessonTests.length} 个用例；现在可以单独测试或一键测试全部。`;
+    runtimeTestOutput.textContent = `已加载 ${lessonTests.length} 个测试用例；点击每行“测试”运行单课验收。`;
+  } catch (error) {
+    lessonTestSummary.classList.add("failed");
+    lessonTestSummary.textContent = "✗ 测试用例加载失败";
+    runtimeTestOutput.textContent = `✗ 测试用例加载失败：${error.message || String(error)}`;
+  } finally {
+    showLessonTestsButton.disabled = false;
+  }
+});
+lessonTestList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-run-lesson]");
+  if (!button) return;
+  button.disabled = true;
+  const lesson = Number(button.dataset.runLesson);
+  try {
+    await runLessonTest(lesson);
+  } catch (error) {
+    lessonTestSummary.classList.add("failed");
+    lessonTestSummary.textContent = `✗ 第 ${lesson} 课测试失败`;
+    runtimeTestOutput.textContent = `✗ 第 ${lesson} 课测试失败：${error.message || String(error)}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+runAllLessonTestsButton.addEventListener("click", async () => {
+  runAllLessonTestsButton.disabled = true;
+  lessonTestSummary.classList.remove("passed", "failed");
+  lessonTestSummary.textContent = "⟳ 正在运行 1–21 全部测试…";
+  runtimeTestOutput.textContent = "正在运行 1–21 全部测试…";
+  try {
+    const response = await fetch(`${API}/tests/lessons`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.error || "验收请求失败");
+    renderLessonReport(report);
+  } catch (error) {
+    lessonTestSummary.classList.add("failed");
+    lessonTestSummary.textContent = "✗ 全部测试失败";
+    runtimeTestOutput.textContent = `✗ 全部测试失败：${error.message || String(error)}`;
+  } finally {
+    runAllLessonTestsButton.disabled = false;
   }
 });
 setNavCollapsed(localStorage.getItem("deno-agent:nav-collapsed") === "true");

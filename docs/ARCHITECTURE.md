@@ -86,7 +86,8 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
   - `/api/conversations`
   - `/api/workspace/tree`
   - `/api/workspace/git`
-  - `/api/telemetry`
+  - `/api/telemetry`（Token、缓存命中和费用遥测）
+  - `/api/balance`（使用现有 Provider API Key 查询余额）
   - `/api/update/check`
   - `/api/update/install`
 - 调用 `src/mod.ts` 暴露的 `agentLoop()`。
@@ -101,6 +102,7 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 ```ts
 export const harness = new AgentRuntime([
   diagnostics,
+  runtimeLimits,
   coreTools,
   productivity,
   orchestration,
@@ -136,6 +138,8 @@ RunOptions
 
 - 模型调用和指数退避重试。
 - `AbortSignal` 取消传播。
+- 每次运行的迭代、工具调用、输出量和成本预算。
+- 嵌套 Agent 的子预算，以及预算耗尽时的开发者 Hook 事件。
 - 工具执行和工具结果回填。
 - 用户可见工具事件与开发者 Hook 事件。
 - 权限检查和危险操作拒绝。
@@ -158,16 +162,20 @@ interface HarnessFeature {
 
 当前生产 Feature：
 
-| Feature         | 职责                                           |
-| --------------- | ---------------------------------------------- |
-| `diagnostics`   | Agent 引擎自检和能力状态                       |
-| `core_tools`    | Shell、读文件、写文件、编辑文件                |
-| `productivity`  | Todo、Memory、任务图、Skill 加载               |
-| `orchestration` | Subagent、Team、Autonomous bounded loop        |
-| `integrations`  | 后台任务、Git Worktree、MCP 工具发现与调用     |
-| `scheduling`    | 周期性 AI 对话任务的 list、write、run-now 工具 |
+| Feature          | 职责                                           |
+| ---------------- | ---------------------------------------------- |
+| `diagnostics`    | Agent 引擎自检和能力状态                       |
+| `runtime_limits` | 统一运行预算、取消边界和嵌套执行子预算         |
+| `core_tools`     | Shell、读文件、写文件、编辑文件                |
+| `productivity`   | Todo、Memory、任务图、Skill 加载               |
+| `orchestration`  | Subagent、Team、Autonomous bounded loop        |
+| `integrations`   | 后台任务、Git Worktree、MCP 工具发现与调用     |
+| `scheduling`     | 周期性 AI 对话任务的 list、write、run-now 工具 |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
+
+桌面端的“设置 → 通用 → 1–21 课程测试用例”会调用 `/api/tests/lessons`，展示并执行 1–21 课程的生产能力
+Smoke Test；第 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider 预算验收。
 
 ## 权限与安全边界
 
@@ -194,6 +202,12 @@ interface HarnessFeature {
 | macOS   | `~/Library/Application Support/DenoAgent`                |
 | Windows | `%APPDATA%/DenoAgent`                                    |
 | Linux   | `$XDG_DATA_HOME/DenoAgent` 或 `~/.local/share/DenoAgent` |
+
+Provider 遥测除了调用次数、Token 和缓存命中数，也记录最近一次费用与累计费用。DeepSeek
+根据模型和响应中的 cache hit/miss、输入、输出 token 做本地费用估算；如果 OpenAI-compatible 网关返回
+`usage.cost`，则优先使用网关值；内置 DeepSeek
+费用按人民币价格记录。没有已知价格的自定义供应商保持未知， 不显示误导性的零费用。DeepSeek
+余额通过后端携带现有 API Key 调用 `/user/balance`，只返回余额字段， 不向前端暴露 Key。
 
 持久化内容：
 

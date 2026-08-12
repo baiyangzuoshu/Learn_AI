@@ -30,6 +30,7 @@ export const diagnostics: HarnessFeature = {
           "teams",
           "protocol",
           "autonomy",
+          "bounded-runtime",
           "worktree",
           "mcp",
           "desktop",

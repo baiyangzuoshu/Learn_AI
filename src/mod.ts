@@ -5,11 +5,13 @@ import { orchestration } from "./features/orchestration.ts";
 import { integrations } from "./features/integrations.ts";
 import { diagnostics } from "./features/diagnostics.ts";
 import { scheduling } from "./features/scheduling.ts";
+import { runtimeLimits } from "./features/runtime_limits.ts";
 import type { Message } from "./core/types.ts";
-import type { HarnessEvent, PermissionMode } from "./contracts.ts";
+import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
 export const harness = new AgentRuntime([
   diagnostics,
+  runtimeLimits,
   coreTools,
   productivity,
   orchestration,
@@ -33,6 +35,7 @@ export async function agentLoop(
   signal?: AbortSignal,
   onHook: (event: HarnessEvent) => void = () => {},
   providerId?: string,
+  budget?: RunOptions["budget"],
 ): Promise<string> {
   return await harness.run({
     query,
@@ -41,6 +44,7 @@ export async function agentLoop(
     history,
     permissionMode,
     signal,
+    budget,
     onEvent(event) {
       if (event.type === "tool") {
         onEvent({
@@ -53,5 +57,17 @@ export async function agentLoop(
     },
   });
 }
-export type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
+export type {
+  HarnessEvent,
+  PermissionMode,
+  RunBudget,
+  RunBudgetSnapshot,
+  RunOptions,
+} from "./contracts.ts";
+export {
+  BudgetExceededError,
+  DEFAULT_RUN_BUDGET,
+  resolveRunBudget,
+  RuntimeBudget,
+} from "./contracts.ts";
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";

@@ -21,6 +21,7 @@ deno --version
 ```sh
 cd /Users/youjunmao/WORK/Learn_AI
 deno task check
+deno task test
 deno task desktop
 ```
 
@@ -34,7 +35,7 @@ deno task desktop:hmr
 
 ```sh
 deno task s01
-deno task s20
+deno task s21
 ```
 
 `stages/` 只用于理解内部机制和对照实现，不能被生产代码引用。

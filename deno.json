@@ -40,6 +40,7 @@
     "s38": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s38_cost_latency_routing/code.ts",
     "s39": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s39_loop_control_replay/code.ts",
     "s40": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s40_cognitive_workspace/code.ts",
+    "test": "deno test tests/21test_runtime_budget.ts tests/cost_telemetry_test.ts",
     "desktop": "deno desktop --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:hmr": "deno desktop --hmr --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
     "desktop:build": "deno desktop --output dist/DenoAgent.app --icon desktop/assets/app-icon.icns --include desktop/renderer --include desktop/assets/app-icon.png --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write desktop/main.ts",

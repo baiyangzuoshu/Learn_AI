@@ -13,18 +13,28 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 27px;
+  height: 48px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   border-top: 1px solid #252d37;
   background: #101318;
   color: #747b86;
   font: 10px ui-monospace,SFMono-Regular,Menlo,monospace;
   white-space: nowrap;
+  overflow: hidden;
+}
+.runtime-status-main {
+  flex: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 27px;
   overflow-x: auto;
   overflow-y: hidden;
+  white-space: nowrap;
 }
-.runtime-status > span {
+.runtime-status-main > span {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -49,14 +59,41 @@
 .runtime-status .runtime-money {
   color: #42db94;
 }
+.runtime-status .runtime-budget-status {
+  flex: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 21px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid #252d37;
+  background: #0d1117;
+  white-space: nowrap;
+}
+.runtime-status .runtime-budget-status > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: max-content;
+  padding: 0 11px;
+  border-right: 1px solid #2a3038;
+}
+.runtime-status .runtime-budget-status > span:first-child {
+  color: #747b86;
+}
+.runtime-status .runtime-budget-status b {
+  color: #8c949f;
+  white-space: nowrap;
+}
 #composer {
-  bottom: 35px!important;
+  bottom: 56px!important;
 }
 body > aside {
-  height: calc(100vh - 27px)!important;
+  height: calc(100vh - 48px)!important;
 }
 body > main {
-  height: calc(100vh - 27px)!important;
+  height: calc(100vh - 48px)!important;
 }
 .composer-meta {
   position: absolute;

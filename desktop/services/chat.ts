@@ -1,4 +1,9 @@
-import { type AgentEvent, agentLoop, type PermissionMode } from "../../src/mod.ts";
+import {
+  type AgentEvent,
+  agentLoop,
+  type PermissionMode,
+  type RunBudgetSnapshot,
+} from "../../src/mod.ts";
 
 export type ChatRequest = {
   message?: string;
@@ -12,9 +17,11 @@ export type ChatRequest = {
 export async function runChat(body: ChatRequest): Promise<{
   answer: string;
   events: AgentEvent[];
+  budget?: RunBudgetSnapshot;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
   const events: AgentEvent[] = [];
+  let budget: RunBudgetSnapshot | undefined;
   const answer = await agentLoop(
     body.message,
     (event) => events.push(event),
@@ -22,10 +29,16 @@ export async function runChat(body: ChatRequest): Promise<{
     body.history ?? [],
     body.permissionMode ?? "ask",
     undefined,
-    undefined,
+    (event) => {
+      if (event.name === "RunUsage") {
+        try {
+          budget = JSON.parse(event.detail ?? "") as RunBudgetSnapshot;
+        } catch { /* ignore malformed developer detail */ }
+      }
+    },
     body.providerId,
   );
-  return { answer, events };
+  return { answer, events, budget };
 }
 
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
@@ -59,7 +72,12 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
         body.permissionMode ?? "ask",
         abortController.signal,
         (event) => {
-          if (body.developerMode) emit({ type: "hook", event });
+          if (event.name === "RunUsage") {
+            try {
+              emit({ type: "budget", usage: JSON.parse(event.detail ?? "") });
+            } catch { /* ignore malformed usage details */ }
+          }
+          if (body.developerMode && event.name !== "RunUsage") emit({ type: "hook", event });
         },
         body.providerId,
       ).then((answer) => {

@@ -33,5 +33,8 @@ export interface ChatResponse {
     total_tokens?: number;
     prompt_cache_hit_tokens?: number;
     prompt_cache_miss_tokens?: number;
+    /** Some OpenAI-compatible gateways return their own computed charge. */
+    cost?: number;
+    currency?: string;
   };
 }

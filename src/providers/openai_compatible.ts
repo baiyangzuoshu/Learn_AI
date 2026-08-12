@@ -13,9 +13,88 @@ const telemetry = {
   lastProviderId: "",
   lastProviderName: "",
   lastModel: "",
+  lastCost: null as number | null,
+  totalCost: 0,
+  costCurrency: "CNY",
+  costEstimated: false,
 };
 export function providerTelemetry() {
   return { ...telemetry };
+}
+
+export interface ProviderPricing {
+  currency: string;
+  inputCacheHitPerMillion: number;
+  inputCacheMissPerMillion: number;
+  outputPerMillion: number;
+}
+
+const DEEPSEEK_PRICING: Record<string, ProviderPricing> = {
+  "deepseek-v4-flash": {
+    currency: "CNY",
+    inputCacheHitPerMillion: 0.02,
+    inputCacheMissPerMillion: 1,
+    outputPerMillion: 2,
+  },
+  "deepseek-v4-pro": {
+    currency: "CNY",
+    inputCacheHitPerMillion: 0.025,
+    inputCacheMissPerMillion: 3,
+    outputPerMillion: 6,
+  },
+  "deepseek-chat": {
+    currency: "CNY",
+    inputCacheHitPerMillion: 0.02,
+    inputCacheMissPerMillion: 1,
+    outputPerMillion: 2,
+  },
+  "deepseek-reasoner": {
+    currency: "CNY",
+    inputCacheHitPerMillion: 0.025,
+    inputCacheMissPerMillion: 3,
+    outputPerMillion: 6,
+  },
+};
+
+function providerPricing(config: ProviderConfig): ProviderPricing | undefined {
+  const identity = `${config.id} ${config.name} ${config.baseUrl}`.toLowerCase();
+  if (!identity.includes("deepseek")) return undefined;
+  const model = config.model.toLowerCase();
+  const match = Object.keys(DEEPSEEK_PRICING).find((key) => model.includes(key));
+  return match ? DEEPSEEK_PRICING[match] : undefined;
+}
+
+/** Estimate a provider charge from the usage returned by an OpenAI-compatible API. */
+export function estimateProviderCost(
+  config: ProviderConfig,
+  usage: NonNullable<ChatResponse["usage"]>,
+): { amount: number; currency: string; estimated: boolean } | undefined {
+  if (Number.isFinite(usage.cost)) {
+    return {
+      amount: Math.max(0, Number(usage.cost)),
+      currency: usage.currency?.trim() || "USD",
+      estimated: false,
+    };
+  }
+  const pricing = providerPricing(config);
+  if (!pricing) return undefined;
+  const promptTokens = Math.max(0, usage.prompt_tokens ?? 0);
+  const cacheHitTokens = Math.max(0, usage.prompt_cache_hit_tokens ?? 0);
+  const cacheMissTokens = Math.max(
+    0,
+    usage.prompt_cache_miss_tokens ?? Math.max(0, promptTokens - cacheHitTokens),
+  );
+  const completionTokens = Math.max(0, usage.completion_tokens ?? 0);
+  if (!promptTokens && !cacheHitTokens && !cacheMissTokens && !completionTokens) return undefined;
+  return {
+    amount: (
+      cacheHitTokens * pricing.inputCacheHitPerMillion +
+      cacheMissTokens * pricing.inputCacheMissPerMillion +
+      completionTokens * pricing.outputPerMillion
+    ) / 1_000_000,
+    currency: pricing.currency,
+    estimated: true,
+  };
 }
 
 export class ProviderError extends Error {
@@ -68,6 +147,13 @@ export async function createOpenAICompatibleCompletion(
     telemetry.lastProviderId = config.id;
     telemetry.lastProviderName = config.name;
     telemetry.lastModel = config.model;
+    const charge = estimateProviderCost(config, payload.usage);
+    telemetry.lastCost = charge?.amount ?? null;
+    if (charge) {
+      telemetry.totalCost += charge.amount;
+      telemetry.costCurrency = charge.currency;
+      telemetry.costEstimated = charge.estimated;
+    }
   }
   return payload;
 }

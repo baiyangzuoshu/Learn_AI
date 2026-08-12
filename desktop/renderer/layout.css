@@ -932,7 +932,7 @@ body.nav-collapsed.workspace-panel-open .workspace-panel {
 
 .runtime-status {
   left: 0!important;
-  height: 24px!important;
+  height: 48px!important;
   padding: 0 9px!important;
   font-size: 8px!important;
   background: #0d1117!important;

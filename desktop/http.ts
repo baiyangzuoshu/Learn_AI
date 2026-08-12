@@ -16,6 +16,9 @@ import { type ChatRequest, createChatStream, runChat } from "./services/chat.ts"
 import { readWorkspaceGit } from "./services/git.ts";
 import { APP_VERSION, checkForUpdate, installUpdateAndRestart } from "./services/updater.ts";
 import { openWorkspaceFile, readWorkspaceTree } from "./services/workspace.ts";
+import { runRuntimeBudgetAcceptance } from "./services/acceptance.ts";
+import { readProviderBalance } from "./services/balance.ts";
+import { listLessonTests, runLessonAcceptance } from "./services/lesson_tests.ts";
 
 type StaticAssets = ReadonlyMap<string, { body: BodyInit; contentType: string }>;
 
@@ -29,9 +32,36 @@ function errorResponse(error: unknown, status = 400): Response {
 
 async function routeApi(request: Request, url: URL): Promise<Response | undefined> {
   if (url.pathname === "/api/health") {
-    return json({ ok: true, stage: "s20", version: APP_VERSION, capabilities: 20 });
+    return json({ ok: true, stage: "s21", version: APP_VERSION, capabilities: 21 });
+  }
+  if (url.pathname === "/api/tests/21" && request.method === "POST") {
+    return json(await runRuntimeBudgetAcceptance());
+  }
+  if (url.pathname === "/api/tests/lessons" && request.method === "GET") {
+    return json({ suite: "21test-lessons", cases: listLessonTests() });
+  }
+  if (url.pathname === "/api/tests/lessons" && request.method === "POST") {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const lesson = body && typeof body === "object" && "lesson" in body
+        ? Number((body as { lesson?: unknown }).lesson)
+        : undefined;
+      if (lesson !== undefined && (!Number.isInteger(lesson) || lesson < 1 || lesson > 21)) {
+        return errorResponse("lesson must be an integer from 1 to 21", 400);
+      }
+      return json(await runLessonAcceptance(lesson));
+    } catch (error) {
+      return errorResponse(error);
+    }
   }
   if (url.pathname === "/api/telemetry") return json(providerTelemetry());
+  if (url.pathname === "/api/balance" && request.method === "GET") {
+    try {
+      return json(await readProviderBalance(url.searchParams.get("providerId") || undefined));
+    } catch (error) {
+      return errorResponse(error);
+    }
+  }
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
   }

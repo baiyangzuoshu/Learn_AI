@@ -35,7 +35,7 @@ async function git(cwd: string, args: string[]) {
   return text.trim();
 }
 //
-async function mcpRpc(url: string, method: string, params: unknown) {
+async function mcpRpc(url: string, method: string, params: unknown, signal?: AbortSignal) {
   const parsed = new URL(url), local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
 
   if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) {
@@ -46,6 +46,7 @@ async function mcpRpc(url: string, method: string, params: unknown) {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
     body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
+    signal,
   });
 
   if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
@@ -169,6 +170,12 @@ export const integrations: HarnessFeature = {
           workspace: item.path,
           permissionMode: "ask",
           signal: context.signal,
+          budget: context.budget.child({
+            iterations: 16,
+            toolCalls: 32,
+            outputChars: 100_000,
+            cost: 16,
+          }),
         });
       },
     );
@@ -203,7 +210,7 @@ export const integrations: HarnessFeature = {
           item.name === input.server && item.enabled !== false
         );
         if (!server) throw new Error("MCP server not found");
-        return JSON.stringify(await mcpRpc(server.url, "tools/list", {}));
+        return JSON.stringify(await mcpRpc(server.url, "tools/list", {}, context.signal));
       },
     );
     //mcp_call
@@ -219,7 +226,12 @@ export const integrations: HarnessFeature = {
         );
         if (!server) throw new Error("MCP server not found");
         return JSON.stringify(
-          await mcpRpc(server.url, "tools/call", { name: input.tool, arguments: input.arguments }),
+          await mcpRpc(
+            server.url,
+            "tools/call",
+            { name: input.tool, arguments: input.arguments },
+            context.signal,
+          ),
         );
       },
     );

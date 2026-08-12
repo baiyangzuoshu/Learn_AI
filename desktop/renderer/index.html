@@ -20,7 +20,7 @@
       <button id="new-chat" class="new-chat">＋ 新对话</button>
       <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
       <div
-        class="stage"><span>Harness</span><strong>s20</strong><div><i style="width:100%"></i></div><small>Complete Harness · 20 / 20</small></div>
+        class="stage"><span>Harness</span><strong>s21</strong><div><i style="width:100%"></i></div><small>Bounded Runtime · 21 / 21</small></div>
       <div
         class="sidebar-actions"><button id="cron-button" class="settings-button">◷ 定时任务</button><button id="settings-button" class="settings-button">⚙ 设置</button></div>
     </aside>
@@ -120,7 +120,7 @@
       </div>
     </section>
     <footer id="runtime-status"
-      class="runtime-status"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b>—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b class="runtime-money">—</b></span><span>余额 <b class="runtime-money">—</b></span></footer>
+      class="runtime-status"><div class="runtime-status-main"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b id="runtime-last-cost" class="runtime-money">—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b id="runtime-session-cost" class="runtime-money">—</b></span><span>余额 <b id="runtime-balance" class="runtime-money">—</b></span></div><div class="runtime-budget-status"><span>本次预算</span><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span></div></footer>
     <dialog id="settings-dialog">
       <form id="settings-form" method="dialog">
         <div class="settings-shell">
@@ -152,6 +152,7 @@
             <section class="settings-panel" data-settings-panel="general">
               <label
                 class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示Hook生命周期事件</small></span></label>
+              <div class="settings-card acceptance-card"><b>1–21 课程测试用例</b><p>打开独立测试面板，查看每课验收项，再单独测试某课或一键运行全部。</p><div class="update-actions"><button id="open-lesson-tests" type="button">打开 1–21 测试面板</button></div></div>
               <div
                 class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
               <div
@@ -184,6 +185,15 @@
           </div>
         </div>
       </form>
+    </dialog>
+    <dialog id="tests-dialog">
+      <div class="tests-dialog-panel">
+        <div class="dialog-title"><div><h2>1–21 课程测试用例</h2><p>Fake Provider Smoke Test · 不调用真实模型</p></div><button id="close-tests" class="close" type="button">×</button></div>
+        <div class="update-actions"><button id="show-lesson-tests" type="button">加载 1–21 用例</button><button id="run-all-lesson-tests" type="button" disabled>一键测试全部</button></div>
+        <div id="lesson-test-summary" class="lesson-test-summary">尚未运行测试</div>
+        <div id="lesson-test-list" class="lesson-test-list"></div>
+        <pre id="runtime-test-output">点击“加载 1–21 用例”开始。</pre>
+      </div>
     </dialog>
     <dialog id="cron-dialog">
       <div class="cron-panel">
