@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deno Agent</title>
+    <title>AI Agent</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="settings.css" />
     <link rel="stylesheet" href="stream.css" />
@@ -16,7 +16,7 @@
   <body>
     <aside>
       <div
-        class="brand"><img class="logo" src="/app-icon.png" alt="白羊左树" /><div><b>Deno Agent</b><small>PERSONAL HARNESS</small></div></div>
+        class="brand"><img class="logo" src="/app-icon.png" alt="白羊左树" /><div><b>AI Agent</b><small>PERSONAL HARNESS</small></div></div>
       <button id="new-chat" class="new-chat">＋ 新对话</button>
       <nav><span class="label">工作区</span><button id="new-workspace" class="new-workspace">＋ 新目录</button><div id="workspace-tree"></div></nav>
       <div
@@ -38,7 +38,7 @@
       <header>
         <div>
           <h1 id="conversation-title">新的任务</h1>
-          <p id="status">正在连接 Deno Runtime…</p>
+          <p id="status">正在连接 Agent Runtime…</p>
         </div>
       </header>
       <section id="messages" class="messages">
@@ -59,7 +59,7 @@
         <div id="composer-summary"
           class="composer-summary"><span id="composer-step">第0/4步</span><b id="composer-change-summary">工作区状态读取中…</b></div>
         <textarea id="prompt" rows="1"
-          placeholder="交给 Deno Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea>
+          placeholder="交给 AI Agent 一个任务…（Enter 发送，Shift+Enter 换行）"></textarea>
         <select id="model-select" class="model-side" title="选择模型"></select>
         <button id="send" type="submit">↑</button>
         <div
@@ -125,7 +125,7 @@
       <form id="settings-form" method="dialog">
         <div class="settings-shell">
           <aside
-            class="settings-nav"><div><h2>设置</h2><p>Deno Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button><button type="button" data-settings-tab="update">更新</button></aside>
+            class="settings-nav"><div><h2>设置</h2><p>AI Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button><button type="button" data-settings-tab="update">更新</button></aside>
           <div class="settings-content">
             <div
               class="settings-top"><div><h2 id="settings-title">模型</h2><p id="settings-subtitle">密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
@@ -145,7 +145,7 @@
               <div
                 class="settings-card"><b>工作区MCP插件</b><p>配置会随项目隔离，Agent仅在需要时发现工具。</p><code id="mcp-workspace">尚未选择工作区</code></div>
               <div
-                class="settings-card"><b>配置文件</b><code>.deno-agent/mcp.json</code><code>mcp.json</code></div>
+                class="settings-card"><b>配置文件</b><code>.ai-agent/mcp.json</code><code>mcp.json</code></div>
               <div
                 class="settings-card"><b>连接安全</b><p>允许HTTPS远程服务，以及localhost、127.0.0.1、::1本地HTTP服务。实际调用仍受权限模式控制。</p></div>
             </section>
@@ -156,7 +156,7 @@
               <div
                 class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
               <div
-                class="settings-card"><b>运行时</b><p>Deno Desktop · 系统WebView · 无Electron</p></div>
+                class="settings-card"><b>运行时</b><p>Electron · Node.js · Chromium</p></div>
             </section>
             <section class="settings-panel" data-settings-panel="update">
               <div class="settings-card update-settings-card">
@@ -198,7 +198,7 @@
     <dialog id="cron-dialog">
       <div class="cron-panel">
         <div
-          class="dialog-title"><div><h2>定时任务</h2><p>仅在 Deno Agent 运行期间触发 · 当前工作区独立保存</p></div><button id="close-cron" class="close">×</button></div>
+          class="dialog-title"><div><h2>定时任务</h2><p>仅在 AI Agent 运行期间触发 · 当前工作区独立保存</p></div><button id="close-cron" class="close">×</button></div>
         <div id="cron-list" class="cron-list"></div>
         <form id="cron-form">
           <h3>新建定时任务</h3>

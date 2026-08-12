@@ -1,4 +1,6 @@
 import { getWorkspace } from "../../src/config/settings.ts";
+import { isWindows, runCommand } from "../../src/platform.ts";
+import { readdir, realpath } from "node:fs/promises";
 
 export type WorkspaceTreeNode = {
   name: string;
@@ -12,7 +14,6 @@ const TREE_MAX_DEPTH = 6;
 const TREE_MAX_ENTRIES = 900;
 const TREE_IGNORED_NAMES = new Set([
   ".git",
-  ".deno",
   ".DS_Store",
   "node_modules",
   "dist",
@@ -37,7 +38,7 @@ export async function readWorkspaceTree(): Promise<{
   truncated: boolean;
   limit: number;
 }> {
-  const workspace = await Deno.realPath(await getWorkspace());
+  const workspace = await realpath(await getWorkspace());
   const counter = { count: 0, truncated: false };
   const readDirectory = async (
     absolutePath: string,
@@ -48,16 +49,16 @@ export async function readWorkspaceTree(): Promise<{
       counter.truncated = true;
       return [];
     }
-    let entries: Deno.DirEntry[] = [];
+    let entries: import("node:fs").Dirent[] = [];
     try {
-      for await (const entry of Deno.readDir(absolutePath)) {
-        if (!TREE_IGNORED_NAMES.has(entry.name)) entries.push(entry);
-      }
+      entries = (await readdir(absolutePath, { withFileTypes: true })).filter((entry) =>
+        !TREE_IGNORED_NAMES.has(entry.name)
+      );
     } catch {
       return [];
     }
     entries.sort((a, b) => {
-      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
       return a.name.localeCompare(b.name, "zh-Hans-CN");
     });
     const nodes: WorkspaceTreeNode[] = [];
@@ -71,9 +72,9 @@ export async function readWorkspaceTree(): Promise<{
       const node: WorkspaceTreeNode = {
         name: entry.name,
         path,
-        type: entry.isDirectory ? "directory" : entry.isSymlink ? "symlink" : "file",
+        type: entry.isDirectory() ? "directory" : entry.isSymbolicLink() ? "symlink" : "file",
       };
-      if (entry.isDirectory) {
+      if (entry.isDirectory()) {
         node.children = await readDirectory(
           joinWorkspacePath(absolutePath, entry.name),
           path,
@@ -96,13 +97,16 @@ export async function readWorkspaceTree(): Promise<{
 
 export async function openWorkspaceFile(path: string): Promise<void> {
   const workspace = await getWorkspace();
-  const root = await Deno.realPath(workspace);
-  const target = await Deno.realPath(path.startsWith("/") ? path : joinWorkspacePath(root, path));
-  if (target !== root && !target.startsWith(`${root}/`)) {
+  const root = await realpath(workspace);
+  const target = await realpath(
+    path.startsWith("/") || (isWindows && /^[A-Za-z]:[\\/]/.test(path))
+      ? path
+      : joinWorkspacePath(root, path),
+  );
+  if (target !== root && !target.startsWith(`${root}/`) && !target.startsWith(`${root}\\`)) {
     throw new Error("文件不在当前工作目录中");
   }
-  if (Deno.build.os !== "darwin") {
-    throw new Error("当前文件打开功能仅支持 macOS");
-  }
-  await new Deno.Command("/usr/bin/open", { args: [target] }).output();
+  const command = process.platform === "darwin" ? "open" : isWindows ? "explorer.exe" : "xdg-open";
+  const result = await runCommand(command, [target]);
+  if (!result.success) throw new Error(result.stderr || "无法打开文件");
 }

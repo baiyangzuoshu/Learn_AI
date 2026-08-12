@@ -1,5 +1,8 @@
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../core/types.ts";
+import { isNotFound, isWindows, runCommand, spawnCommand } from "../platform.ts";
+import { mkdir, readFile } from "node:fs/promises";
+import type { ChildProcess } from "node:child_process";
 
 const def = (
   name: string,
@@ -17,20 +20,15 @@ interface Job {
   command: string;
   status: string;
   output: string;
-  process: Deno.ChildProcess;
+  process: ChildProcess;
 }
 //
 const jobs = new Map<string, Job>(),
   worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
 //
 async function git(cwd: string, args: string[]) {
-  const result = await new Deno.Command(Deno.build.os === "windows" ? "git.exe" : "git", {
-    args,
-    cwd,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  const text = new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr);
+  const result = await runCommand(isWindows ? "git.exe" : "git", args, { cwd });
+  const text = result.stdout + result.stderr;
   if (!result.success) throw new Error(text);
   return text.trim();
 }
@@ -63,11 +61,11 @@ async function mcpRpc(url: string, method: string, params: unknown, signal?: Abo
 }
 //
 async function mcpServers(workspace: string) {
-  for (const path of [`${workspace}/.deno-agent/mcp.json`, `${workspace}/mcp.json`]) {
+  for (const path of [`${workspace}/.ai-agent/mcp.json`, `${workspace}/mcp.json`]) {
     try {
-      return (JSON.parse(await Deno.readTextFile(path)).servers ?? []) as any[];
+      return (JSON.parse(await readFile(path, "utf8")).servers ?? []) as any[];
     } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (!isNotFound(error)) throw error;
     }
   }
   return [];
@@ -88,13 +86,10 @@ export const integrations: HarnessFeature = {
         }
 
         const command = String(input.command),
-          shell = Deno.build.os === "windows" ? "cmd.exe" : "/bin/sh",
-          process = new Deno.Command(shell, {
-            args: Deno.build.os === "windows" ? ["/d", "/s", "/c", command] : ["-c", command],
+          shell = isWindows ? "cmd.exe" : "/bin/sh",
+          process = spawnCommand(shell, isWindows ? ["/d", "/s", "/c", command] : ["-c", command], {
             cwd: context.workspace,
-            stdout: "piped",
-            stderr: "piped",
-          }).spawn(),
+          }),
           job = {
             id: `bg-${crypto.randomUUID().slice(0, 8)}`,
             workspace: context.workspace,
@@ -104,11 +99,12 @@ export const integrations: HarnessFeature = {
             process,
           };
         jobs.set(job.id, job);
-        process.output().then((result) => {
-          job.output =
-            (new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr))
-              .slice(0, 50_000);
-          job.status = result.success ? "completed" : "failed";
+        const output: Buffer[] = [], errors: Buffer[] = [];
+        process.stdout?.on("data", (chunk: Buffer) => output.push(chunk));
+        process.stderr?.on("data", (chunk: Buffer) => errors.push(chunk));
+        process.once("close", (code) => {
+          job.output = Buffer.concat([...output, ...errors]).toString("utf8").slice(0, 50_000);
+          job.status = code === 0 ? "completed" : "failed";
         });
         return JSON.stringify({ id: job.id, status: job.status, command });
       },
@@ -142,9 +138,9 @@ export const integrations: HarnessFeature = {
       async (input, context) => {
         const id = String(input.id),
           root = await git(context.workspace, ["rev-parse", "--show-toplevel"]),
-          path = `${root}/.deno-agent-worktrees/${id}`,
-          branch = `deno-agent/${id}`;
-        await Deno.mkdir(`${root}/.deno-agent-worktrees`, { recursive: true });
+          path = `${root}/.ai-agent-worktrees/${id}`,
+          branch = `ai-agent/${id}`;
+        await mkdir(`${root}/.ai-agent-worktrees`, { recursive: true });
         await git(root, ["worktree", "add", "-b", branch, path, "HEAD"]);
         const record = { id, root, path, branch };
         worktrees.set(id, record);

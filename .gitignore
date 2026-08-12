@@ -4,4 +4,7 @@
 .env
 .env.local
 dist/
+node_modules/
+electron/dist/
+electron/.electron-builder-cache/
 graphify-out/

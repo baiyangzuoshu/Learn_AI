@@ -76,7 +76,7 @@ export const lessonTestCases: readonly LessonTestCase[] = [
     assert(denied, "dangerous command was not denied");
   }),
   lesson(4, "Hooks", "验证 Hook 所需的稳定系统提示区段已组装。", () => {
-    const prompt = harness.prompts.build(Deno.cwd());
+    const prompt = harness.prompts.build(process.cwd());
     const ids = prompt.sections.map((section) => section.id);
     assertEquals(new Set(ids).size, ids.length, "prompt section ids must be unique");
     assert(ids.includes("contract"), "contract prompt section missing");
@@ -99,8 +99,8 @@ export const lessonTestCases: readonly LessonTestCase[] = [
     assertTools("memory_read", "memory_append", "memory_replace");
   }),
   lesson(10, "System Prompt", "验证系统提示可由 Feature 动态组装。", () => {
-    const prompt = harness.prompts.build(Deno.cwd());
-    assert(prompt.prompt.includes("Deno Agent"), "identity prompt missing");
+    const prompt = harness.prompts.build(process.cwd());
+    assert(prompt.prompt.includes("AI Agent"), "identity prompt missing");
     assert(prompt.sections.length >= 5, "too few prompt sections");
   }),
   lesson(11, "Error Recovery", "验证 Provider 错误包含可重试分类。", () => {

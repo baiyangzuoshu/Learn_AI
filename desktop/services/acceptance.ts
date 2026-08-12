@@ -129,7 +129,7 @@ function createRuntime(factory: (call: number) => ChatResponse): {
 function runOptions(budget: Partial<RuntimeBudget["limit"]>) {
   return {
     query: "test bounded runtime",
-    workspace: Deno.cwd(),
+    workspace: process.cwd(),
     permissionMode: "full" as const,
     budget,
   };

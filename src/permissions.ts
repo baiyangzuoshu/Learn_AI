@@ -1,4 +1,5 @@
 import type { PermissionMode, ToolRequest } from "./contracts.ts";
+import { confirmPermission } from "./platform.ts";
 
 const hardDenied = [
   /rm\s+-[^\n]*r[^\n]*f[^\n]*\s+\/(?:\s|$)/i,
@@ -71,8 +72,8 @@ export async function authorize(request: ToolRequest, mode: PermissionMode): Pro
     "mcp_call",
   ].includes(request.name);
   if (mode !== "ask" || !mutating) return;
-  const allowed = confirm(
-    `Deno Agent 请求权限\n\n${request.name}\n${summarizePermissionInput(request)}\n\n是否允许？`,
+  const allowed = confirmPermission(
+    `AI Agent 请求权限\n\n${request.name}\n${summarizePermissionInput(request)}\n\n是否允许？`,
   );
   if (!allowed) throw new Error("Permission denied by user");
 }

@@ -1,11 +1,14 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../core/types.ts";
+import { isWindows, runCommand } from "../platform.ts";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 //根据模型提供相对路径，防止工具越权读取工作区外的文件
 function safePath(workspace: string, requested: string) {
   const root = resolve(workspace), path = resolve(root, requested), rel = relative(root, path);
   if (
-    rel === ".." || rel.startsWith(`..${Deno.build.os === "windows" ? "\\" : "/"}`) ||
+    rel === ".." || rel.startsWith(`..${isWindows ? "\\" : "/"}`) ||
     isAbsolute(rel)
   ) throw new Error(`Path escapes workspace: ${requested}`);
   return path;
@@ -30,15 +33,13 @@ export const coreTools: HarnessFeature = {
       ]),
       async (input, context) => {
         const command = String(input.command ?? ""),
-          shell = Deno.build.os === "windows" ? "cmd.exe" : "/bin/sh";
-        const result = await new Deno.Command(shell, {
-          args: Deno.build.os === "windows" ? ["/d", "/s", "/c", command] : ["-c", command],
-          cwd: context.workspace,
-          stdout: "piped",
-          stderr: "piped",
-        }).output();
-        return (new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr) ||
-          `(exit ${result.code})`).slice(0, 50_000);
+          shell = isWindows ? "cmd.exe" : "/bin/sh";
+        const result = await runCommand(
+          shell,
+          isWindows ? ["/d", "/s", "/c", command] : ["-c", command],
+          { cwd: context.workspace },
+        );
+        return (result.stdout + result.stderr || `(exit ${result.code})`).slice(0, 50_000);
       },
     );
     //读取工具
@@ -48,7 +49,7 @@ export const coreTools: HarnessFeature = {
         limit: { type: "number" },
       }, ["path"]),
       async (input, context) => {
-        const text = await Deno.readTextFile(safePath(context.workspace, String(input.path ?? "")));
+        const text = await readFile(safePath(context.workspace, String(input.path ?? "")), "utf8");
         return (typeof input.limit === "number"
           ? text.split("\n").slice(0, input.limit).join("\n")
           : text).slice(0, 50_000);
@@ -62,8 +63,8 @@ export const coreTools: HarnessFeature = {
       }, ["path", "content"]),
       async (input, context) => {
         const path = safePath(context.workspace, String(input.path ?? ""));
-        await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-        await Deno.writeTextFile(path, String(input.content ?? ""));
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, String(input.content ?? ""), "utf8");
         return `Wrote ${String(input.content ?? "").length} characters to ${input.path}`;
       },
     );
@@ -76,14 +77,14 @@ export const coreTools: HarnessFeature = {
       }, ["path", "old_text", "new_text"]),
       async (input, context) => {
         const path = safePath(context.workspace, String(input.path ?? "")),
-          text = await Deno.readTextFile(path),
+          text = await readFile(path, "utf8"),
           oldText = String(input.old_text ?? "");
         if (!oldText || text.split(oldText).length !== 2) {
           throw new Error(
             "old_text must match exactly once",
           );
         }
-        await Deno.writeTextFile(path, text.replace(oldText, String(input.new_text ?? "")));
+        await writeFile(path, text.replace(oldText, String(input.new_text ?? "")), "utf8");
         return `Edited ${input.path}`;
       },
     );

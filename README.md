@@ -1,11 +1,12 @@
-# Deno Agent
+# AI Agent
 
-Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工作区、文件编辑、Shell、MCP
+AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工作区、文件编辑、Shell、MCP
 工具、技能、定时任务、软件更新和模型用量遥测整合到一个桌面应用里。
 
-项目基于 Deno 2.9 Desktop 和系统 WebView 构建，不依赖 Electron、Node.js 运行时或 Rust 应用层。
-`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent 引擎， `desktop/`
-是客户端产品壳层。
+桌面端基于 Electron 构建，Windows、macOS、Linux 均使用 Electron Builder 打包，运行时使用 Node.js。
+`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent
+引擎，`electron/` 是桌面主进程和打包入口，`desktop/` 保留共享 API 服务、业务服务和 renderer UI
+资源。
 
 ## 客户端能力
 
@@ -41,9 +42,14 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 │   ├── config/               # 设置、路径、聊天持久化
 │   ├── core/                 # 核心类型
 │   └── providers/            # 运行时 Provider 路由、适配器与 usage 遥测
+├── electron/
+│   ├── main.ts               # Electron 主进程入口
+│   ├── preload.ts             # contextBridge preload
+│   └── package.json           # Electron Builder 配置
 ├── desktop/
-│   ├── main.ts               # Deno Desktop 后端入口
-│   └── renderer/             # 原生 HTML/CSS/JS 桌面界面
+│   ├── http.ts                # 本地 loopback API
+│   ├── services/              # 桌面业务服务
+│   └── renderer/              # 原生 HTML/CSS/JS 界面源文件
 ├── docs/
 ├── stages/                  # 每课一个目录：README.md + code.ts + images/overview.svg
 ├── scripts/
@@ -51,7 +57,7 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 └── dist/
 ```
 
-`desktop/main.ts` 是唯一产品入口，并调用 `src/mod.ts` 中的 Agent 引擎。`stages/`
+`electron/main.ts` 是唯一桌面产品入口，并调用 `src/mod.ts` 中的 Agent 引擎。`stages/`
 保留为内部演进和对照示例，不进入正式桌面运行时依赖图。
 
 内部 Agent 引擎按职责拆分为：
@@ -63,13 +69,13 @@ Deno Agent 是一个面向开发者的本地 Agent 客户端。它把对话、�
 
 ## 开发运行
 
-要求 Deno 2.9 或更新版本：
+底层课程和测试要求 Deno 2.9 或更新版本：
 
 ```sh
 deno --version
 deno task check
 deno task test
-deno task desktop:hmr
+deno task check
 ```
 
 桌面端也可打开“设置 → 通用 → 1–21
@@ -86,7 +92,9 @@ Provider，不调用真实模型。
 交接、恢复、部署和生产验收。运行桌面应用：
 
 ```sh
-deno task desktop
+cd electron
+npm install
+npm run dev
 ```
 
 高级教学阶段分为两段：
@@ -157,37 +165,24 @@ GitHub Releases 必须能被匿名访问；如果仓库是 private，GitHub API 
 内的更新检查和自动下载都会失败。若源码仓库需要保持 private，建议额外创建一个只放发布包的 public
 release 仓库，并把更新源改到那个仓库。
 
-发布新版本有两种方式。
-
-方式一：本机 token 发布，不依赖 GitHub Actions：
-
-```sh
-export GITHUB_TOKEN=ghp_xxx
-deno task release:github v1.0.1
-```
-
-脚本会自动检查版本、构建 macOS arm64 App、压缩 zip、创建或更新 GitHub Release，并上传
-`DenoAgent-v1.0.1-macos-arm64.zip`。
-
-方式二：推送 tag，让仓库根目录的 GitHub Actions workflow 自动创建 Release 并上传 zip：
+构建发布包后，可推送 tag 并在 GitHub Release 上传 Electron Builder 产物：
 
 ```sh
 git tag v1.0.1
 git push origin v1.0.1
 ```
 
-也可以在 GitHub Actions 页面手动运行 `Release Deno Agent` workflow，输入 `v1.0.1` 这类版本号。
-标签名建议使用 `v1.1.0` 或 `deno-agent-v1.1.0`。
+标签名建议使用 `v1.1.0` 或 `ai-agent-v1.1.0`。
 
-应用会从 `tag_name` 中提取语义版本号进行比较，并优先选择名字包含 `DenoAgent`、`macos`、`arm64` 的
-`.zip` asset 作为自动安装包。zip 根目录需要包含 `DenoAgent.app`。
+应用会从 `tag_name` 中提取语义版本号进行比较，并优先选择名字包含 `AIAgent`、`macos`、`arm64` 的
+`.zip` asset 作为自动安装包。zip 根目录需要包含 `AI Agent.app`。
 
 当前测试更新版本为 `1.0.1`，可用 GitHub Release tag `v1.0.1` 验证更新检测链路。
 
 也可以在设置页或环境变量中覆盖更新源：
 
 ```sh
-DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
+AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest
 ```
 
 除 GitHub latest release API 返回的 `tag_name`、`html_url`、`body` 字段外，也支持简单 manifest：
@@ -195,8 +190,8 @@ DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releas
 ```json
 {
   "version": "1.1.0",
-  "url": "https://example.com/deno-agent/releases/1.1.0",
-  "downloadUrl": "https://example.com/deno-agent/releases/DenoAgent-v1.1.0-macos-arm64.zip",
+  "url": "https://example.com/ai-agent/releases/1.1.0",
+  "downloadUrl": "https://example.com/ai-agent/releases/AIAgent-v1.1.0-macos-arm64.zip",
   "notes": "Release notes"
 }
 ```
@@ -205,15 +200,15 @@ DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releas
 
 | 平台    | 数据目录                                                 |
 | ------- | -------------------------------------------------------- |
-| macOS   | `~/Library/Application Support/DenoAgent`                |
-| Windows | `%APPDATA%/DenoAgent`                                    |
-| Linux   | `$XDG_DATA_HOME/DenoAgent` 或 `~/.local/share/DenoAgent` |
+| macOS   | `~/Library/Application Support/AIAgent`                |
+| Windows | `%APPDATA%/AIAgent`                                    |
+| Linux   | `$XDG_DATA_HOME/AIAgent` 或 `~/.local/share/AIAgent` |
 
 聊天、Memory、任务图和定时任务按工作区隔离。项目路径经 SHA-256 生成本地文件标识。
 
 ## MCP
 
-在项目中创建 `.deno-agent/mcp.json`：
+在项目中创建 `.ai-agent/mcp.json`：
 
 ```json
 {
@@ -229,48 +224,43 @@ DENO_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releas
 
 仅允许 HTTPS 远程服务或 localhost HTTP 服务。MCP 工具按需发现，实际调用受权限模式控制。
 
-## 构建与发布
+## Electron 构建与发布
 
-Deno Desktop 支持在一台机器上交叉构建全部目标：
+桌面构建由 Electron Builder 负责打包：
 
 ```sh
-deno task desktop:build:all
+npm --prefix electron run dist:win
+npm --prefix electron run dist:mac
+npm --prefix electron run dist:linux
 ```
 
 也可以分别构建：
 
 ```sh
-deno task desktop:build:mac-arm64
-deno task desktop:build:mac-x64
-deno task desktop:build:windows
-deno task desktop:build:linux-x64
-deno task desktop:build:linux-arm64
+npm --prefix electron run typecheck
+npm --prefix electron run build
 ```
 
 产物目录：
 
 ```text
-dist/releases/
-├── macos-arm64/DenoAgent.app
-├── macos-x64/DenoAgent.app
-├── windows-x64/DenoAgent.msi
-├── linux-x64/DenoAgent.AppImage
-└── linux-arm64/DenoAgent.AppImage
+dist/releases/app/
+├── AI Agent Setup.exe
+├── mac-arm64/AI Agent.app
+└── linux/...
 ```
 
 目标平台：
 
-| 平台                | Deno target                 | 格式        |
-| ------------------- | --------------------------- | ----------- |
-| macOS Apple Silicon | `aarch64-apple-darwin`      | `.app`      |
-| macOS Intel         | `x86_64-apple-darwin`       | `.app`      |
-| Windows x64         | `x86_64-pc-windows-msvc`    | `.msi`      |
-| Linux x64           | `x86_64-unknown-linux-gnu`  | `.AppImage` |
-| Linux ARM64         | `aarch64-unknown-linux-gnu` | `.AppImage` |
+| 平台                | Electron Builder target | 格式        |
+| ------------------- | ----------------------- | ----------- |
+| macOS Apple Silicon | `mac`                   | `.app`      |
+| macOS Intel         | `mac`                   | `.app`      |
+| Windows x64/arm64   | `win`                   | `.exe`      |
+| Linux x64/arm64     | `linux`                 | `.AppImage` |
 
-首次交叉构建会下载对应平台的 Deno Runtime 和 WebView
-后端，后续构建使用本地缓存。正式分发前仍应在目标系统进行启动、文件选择器、凭据存储、Shell、Git
-和系统 WebView 验收，并配置平台代码签名。
+正式分发前仍应在目标系统进行启动、文件选择器、凭据存储、Shell、Git 和窗口生命周期验收，并配置
+平台代码签名。
 
 macOS App 图标使用 `desktop/assets/app-icon.icns`，界面品牌图使用
 `desktop/assets/app-icon.png`。如果替换图标，需要同步更新这两个文件。
@@ -278,7 +268,7 @@ macOS App 图标使用 `desktop/assets/app-icon.icns`，界面品牌图使用
 ## 验证
 
 ```sh
-deno fmt --check src desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop README.md AGENTS.md
 deno task check
 rg 'stages/' desktop src
 ```

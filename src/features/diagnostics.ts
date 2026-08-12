@@ -1,4 +1,5 @@
 import type { HarnessFeature } from "../contracts.ts";
+import { platformVersion } from "../platform.ts";
 export const diagnostics: HarnessFeature = {
   id: "diagnostics",
   register({ tools, prompts }) {
@@ -13,7 +14,7 @@ export const diagnostics: HarnessFeature = {
       JSON.stringify({
         version: "1.0.0",
         workspace: context.workspace,
-        runtime: Deno.version.deno,
+        runtime: platformVersion(),
         capabilities: [
           "tools",
           "permissions",

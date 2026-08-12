@@ -1,8 +1,17 @@
 import type { ProviderConfig } from "../providers/contracts.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appDataDir } from "./paths.ts";
+import {
+  chooseFolder,
+  environment,
+  isNotFound,
+  readSecret,
+  readUtf8,
+  writeJsonAtomic,
+  writeSecret,
+} from "../platform.ts";
 
-const SERVICE = "com.youjunmao.deno-agent";
+const SERVICE = "com.youjunmao.ai-agent";
 const LEGACY_ACCOUNT = "deepseek-api-key";
 const DEFAULT_PROVIDER_ID = "deepseek";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
@@ -86,7 +95,7 @@ export function settingsFilePath(): string {
 
 function env(name: string): string | undefined {
   try {
-    return Deno.env.get(name);
+    return environment(name);
   } catch {
     return undefined;
   }
@@ -95,7 +104,7 @@ function env(name: string): string | undefined {
 function defaultUpdateSettings(): UpdateSettings {
   return {
     checkOnStartup: true,
-    updateUrl: env("DENO_AGENT_UPDATE_URL")?.trim() || DEFAULT_UPDATE_URL,
+    updateUrl: env("AI_AGENT_UPDATE_URL")?.trim() || DEFAULT_UPDATE_URL,
   };
 }
 
@@ -234,7 +243,7 @@ async function readStored(): Promise<StoredSettings> {
     update: defaultUpdateSettings(),
   };
   try {
-    const parsed = JSON.parse(await Deno.readTextFile(settingsPath())) as Partial<StoredSettings>;
+    const parsed = JSON.parse(await readUtf8(settingsPath())) as Partial<StoredSettings>;
     const providers = providersFromStored(parsed);
     const workspaces = parsed.workspaces ?? (parsed.workspace ? [parsed.workspace] : []);
     const workspace = parsed.workspace && workspaces.includes(parsed.workspace)
@@ -251,26 +260,14 @@ async function readStored(): Promise<StoredSettings> {
       update: normalizeUpdateSettings(parsed.update),
     };
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return fallback;
+    if (isNotFound(error)) return fallback;
     throw error;
   }
 }
 
 async function writeStored(settings: StoredSettings): Promise<void> {
   const target = settingsPath();
-  await Deno.mkdir(target.slice(0, target.lastIndexOf("/")), { recursive: true });
-  const temporary = `${target}.${crypto.randomUUID()}.tmp`;
-  await Deno.writeTextFile(temporary, `${JSON.stringify(settings, null, 2)}\n`);
-  await Deno.rename(temporary, target);
-}
-
-async function keychain(args: string[]): Promise<{ ok: boolean; output: string }> {
-  const result = await new Deno.Command("/usr/bin/security", {
-    args,
-    stdout: "piped",
-    stderr: "null",
-  }).output();
-  return { ok: result.success, output: new TextDecoder().decode(result.stdout).trim() };
+  await writeJsonAtomic(target, settings);
 }
 
 function keychainAccount(providerId: string): string {
@@ -285,29 +282,11 @@ async function readProviderKey(provider: StoredProviderSettings): Promise<string
   const envName = providerEnvName(provider);
   const envKey = envName ? env(envName) : undefined;
   if (envKey) return envKey;
-  const result = await keychain([
-    "find-generic-password",
-    "-s",
-    SERVICE,
-    "-a",
-    keychainAccount(provider.id),
-    "-w",
-  ]);
-  return result.ok && result.output ? result.output : undefined;
+  return await readSecret(SERVICE, keychainAccount(provider.id));
 }
 
 async function saveProviderKey(providerId: string, apiKey: string): Promise<void> {
-  const result = await keychain([
-    "add-generic-password",
-    "-U",
-    "-s",
-    SERVICE,
-    "-a",
-    keychainAccount(providerId),
-    "-w",
-    apiKey.trim(),
-  ]);
-  if (!result.ok) throw new Error("无法写入 macOS Keychain");
+  await writeSecret(SERVICE, keychainAccount(providerId), apiKey.trim());
 }
 
 function modelValue(providerId: string, model: string): string {
@@ -455,26 +434,20 @@ export async function getWorkspace(): Promise<string> {
   if (scoped) return scoped;
   const workspace = (await readStored()).workspace;
   if (!workspace) throw new Error("请先点击左侧“新目录”选择工作目录");
-  const stat = await Deno.stat(workspace);
-  if (!stat.isDirectory) throw new Error("保存的工作目录已失效");
+  const { stat } = await import("node:fs/promises");
+  if (!(await stat(workspace)).isDirectory()) throw new Error("保存的工作目录已失效");
   return workspace;
 }
 
 export async function withWorkspace<T>(workspace: string, action: () => Promise<T>): Promise<T> {
-  const stat = await Deno.stat(workspace);
-  if (!stat.isDirectory) throw new Error("绑定的项目目录已失效");
+  const { stat } = await import("node:fs/promises");
+  if (!(await stat(workspace)).isDirectory()) throw new Error("绑定的项目目录已失效");
   return await workspaceContext.run(workspace, action);
 }
 
 export async function chooseWorkspace(): Promise<PublicSettings> {
-  const script = 'POSIX path of (choose folder with prompt "选择 Deno Agent 工作目录")';
-  const result = await new Deno.Command("/usr/bin/osascript", {
-    args: ["-e", script],
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  if (!result.success) throw new Error("已取消选择目录");
-  const workspace = new TextDecoder().decode(result.stdout).trim().replace(/\/$/, "");
+  const workspace = await chooseFolder();
+  if (!workspace) throw new Error("已取消选择目录");
   const current = await readStored();
   const workspaces = [...new Set([...(current.workspaces ?? []), workspace])];
   await writeStored({ ...current, workspace, workspaces });

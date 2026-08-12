@@ -1,7 +1,7 @@
-# Deno Agent 客户端架构说明
+# AI Agent 客户端架构说明
 
-Deno Agent 是一个本地优先的开发者 Agent 客户端。它使用 Deno Desktop 和系统 WebView 承载界面，不引入
-Electron、Node.js 运行时或 Rust 应用层。
+AI Agent 是一个本地优先的开发者 Agent 客户端。桌面端使用 Electron 主进程承载本地服务、
+原生能力和窗口，renderer 使用框架无关的 HTML/CSS/JavaScript。
 
 从产品角度看，它是一个桌面客户端：负责工作区、会话、模型配置、工具权限、MCP/Skill 扩展、Git
 信息、用量遥测和软件更新。从技术角度看，`src/` 根目录的 Runtime 和 Feature 模块组成客户端 内部的
@@ -19,7 +19,7 @@ Agent 引擎。
 
 ## 客户端边界
 
-Deno Agent 客户端由四层组成：
+AI Agent 客户端由四层组成：
 
 1. 桌面壳层：窗口、导航、输入框、工作区面板、设置、更新。
 2. 本地后端：HTTP API、静态资源服务、工作区文件/Git/设置/会话 API。
@@ -35,8 +35,7 @@ Deno Agent 客户端由四层组成：
   ↓
 desktop/renderer/           原生桌面 UI
   ↓ HTTP / NDJSON stream
-desktop/main.ts             Deno Desktop 组装入口
-  ├── desktop/backend.ts    窗口、静态资源和后端初始化
+electron/main.ts            Electron 组装入口
   ├── desktop/http.ts       HTTP API 路由
   └── desktop/services/     工作区、Git、更新和 Chat 服务
   ↓
@@ -52,9 +51,14 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 
 ```text
 .
+├── electron/
+│   ├── main.ts              # 产品进程入口：窗口、原生能力和 HTTP 服务
+│   ├── preload.ts           # contextBridge 安全桥接
+│   └── package.json          # Electron Builder 配置
 ├── desktop/
-│   ├── main.ts              # 产品进程入口：窗口、HTTP API、静态资源、更新接口
-│   └── renderer/            # 无框架桌面 UI
+│   ├── http.ts               # HTTP API 路由
+│   ├── services/             # 工作区、Git、更新和 Chat 服务
+│   └── renderer/             # 无框架桌面 UI 源文件
 ├── src/
 │   ├── core/                # Message、ToolDefinition 等核心类型
 │   ├── config/              # 设置、Keychain、工作区、会话持久化、跨平台路径
@@ -70,16 +74,16 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 ├── stages/                  # 每课一个 README.md + code.ts，不进入生产依赖图
 ├── scripts/                 # 本地发布脚本
 ├── docs/                    # 开源文档
-├── deno.json                # 任务、构建 target、Deno Desktop 配置
+├── deno.json                # 课程和底层测试任务
 └── dist/                    # 构建产物
 ```
 
 ## 产品入口
 
-`desktop/main.ts` 是唯一产品入口。它负责：
+`electron/main.ts` 是唯一产品入口。它负责：
 
-- 创建 `Deno.BrowserWindow` 桌面窗口。
-- 读取并内嵌 `desktop/renderer/` 静态资源。
+- 创建 Electron `BrowserWindow` 桌面窗口。
+- 启动 loopback HTTP 服务并加载 `desktop/renderer/` 静态资源。
 - 提供 HTTP API，例如：
   - `/api/chat`、`/api/chat/stream`
   - `/api/settings`
@@ -93,7 +97,7 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 - 调用 `src/mod.ts` 暴露的 `agentLoop()`。
 - 管理软件更新检查、下载、退出替换和重启。
 
-桌面关闭时进程会主动退出，避免 `Deno.serve()` 继续保持后台进程。
+桌面关闭时进程会主动退出，避免本地 HTTP 服务继续保持后台进程。
 
 ## Agent 引擎组合入口
 
@@ -199,9 +203,9 @@ Smoke Test；第 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake
 
 | 平台    | 数据目录                                                 |
 | ------- | -------------------------------------------------------- |
-| macOS   | `~/Library/Application Support/DenoAgent`                |
-| Windows | `%APPDATA%/DenoAgent`                                    |
-| Linux   | `$XDG_DATA_HOME/DenoAgent` 或 `~/.local/share/DenoAgent` |
+| macOS   | `~/Library/Application Support/AIAgent`                |
+| Windows | `%APPDATA%/AIAgent`                                    |
+| Linux   | `$XDG_DATA_HOME/AIAgent` 或 `~/.local/share/AIAgent` |
 
 Provider 遥测除了调用次数、Token 和缓存命中数，也记录最近一次费用与累计费用。DeepSeek
 根据模型和响应中的 cache hit/miss、输入、输出 token 做本地费用估算；如果 OpenAI-compatible 网关返回
@@ -270,10 +274,10 @@ GitHub Release 必须公开可访问。私有仓库的未授权 latest release A
 架构相关修改完成后至少运行：
 
 ```sh
-deno fmt --check src desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop README.md AGENTS.md
 deno task check
 rg 'stages/' src desktop
-deno task desktop:build:mac-arm64
+npm --prefix electron run dist:win
 ```
 
 `rg 'stages/' src desktop` 应无输出。

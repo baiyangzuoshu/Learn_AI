@@ -2,6 +2,8 @@ import { appendConversation } from "./config/conversations.ts";
 import { appDataDir } from "./config/paths.ts";
 import { getWorkspace } from "./config/settings.ts";
 import type { PermissionMode, RunOptions } from "./contracts.ts";
+import { isNotFound, readUtf8, writeJsonAtomic } from "./platform.ts";
+import { stat } from "node:fs/promises";
 
 export interface CronSchedule {
   id: string;
@@ -110,19 +112,16 @@ function validate(value: unknown): CronSchedule[] {
 
 async function read(): Promise<CronSchedule[]> {
   try {
-    return validate(JSON.parse(await Deno.readTextFile(path())));
+    return validate(JSON.parse(await readUtf8(path())));
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return [];
+    if (isNotFound(error)) return [];
     throw error;
   }
 }
 
 async function persist(schedules: CronSchedule[]): Promise<void> {
   const target = path();
-  await Deno.mkdir(target.slice(0, target.lastIndexOf("/")), { recursive: true });
-  const temporary = `${target}.${crypto.randomUUID()}.tmp`;
-  await Deno.writeTextFile(temporary, `${JSON.stringify(schedules, null, 2)}\n`);
-  await Deno.rename(temporary, target);
+  await writeJsonAtomic(target, schedules);
 }
 
 function calendar(year: number, month: number, day: number, hour: number, minute: number): Date {
@@ -263,7 +262,7 @@ export async function listCronSchedules(): Promise<CronSchedule[]> {
 export async function saveCronSchedules(value: unknown): Promise<CronSchedule[]> {
   const schedules = validate(value);
   for (const item of schedules) {
-    if (item.workspace && !(await Deno.stat(item.workspace)).isDirectory) {
+    if (item.workspace && !(await stat(item.workspace)).isDirectory()) {
       throw new Error(`绑定项目已失效：${item.workspace}`);
     }
   }

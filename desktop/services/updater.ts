@@ -1,4 +1,9 @@
 import { getPublicSettings, saveUpdateSettings } from "../../src/config/settings.ts";
+import { isMacOS, writeBufferAtomic, writeTextAtomic } from "../../src/platform.ts";
+import { mkdtemp, realpath, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 
 export const APP_VERSION = "1.0.1";
 const UPDATE_CHECK_TIMEOUT_MS = 8_000;
@@ -45,7 +50,7 @@ function selectUpdateDownloadUrl(manifest: UpdateManifest): string | undefined {
     .map((asset) => {
       const name = (asset.name ?? "").toLowerCase();
       let score = 0;
-      if (name.includes("denoagent") || name.includes("deno-agent")) score += 4;
+      if (name.includes("aiagent") || name.includes("ai-agent")) score += 4;
       if (name.includes("macos") || name.includes("darwin")) score += 3;
       if (name.includes("arm64") || name.includes("aarch64")) score += 3;
       if (name.includes("x64") || name.includes("x86_64")) score -= 1;
@@ -66,9 +71,9 @@ function validateUpdateDownloadUrl(downloadUrl: string): void {
 }
 
 async function currentAppBundlePath(): Promise<string | undefined> {
-  let path = await Deno.realPath(Deno.execPath());
+  let path = await realpath(process.execPath);
   while (path && path !== "/") {
-    if (path.endsWith(".app") && (await Deno.stat(path)).isDirectory) return path;
+    if (path.endsWith(".app") && (await stat(path)).isDirectory()) return path;
     const trimmed = path.replace(/\/+$/, "");
     const slash = trimmed.lastIndexOf("/");
     path = slash <= 0 ? "/" : trimmed.slice(0, slash);
@@ -90,7 +95,7 @@ async function downloadUpdateArchive(downloadUrl: string, archivePath: string): 
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`更新包下载失败：HTTP ${response.status}`);
-    await Deno.writeFile(archivePath, new Uint8Array(await response.arrayBuffer()));
+    await writeBufferAtomic(archivePath, Buffer.from(await response.arrayBuffer()));
   } finally {
     clearTimeout(timeout);
   }
@@ -154,7 +159,7 @@ export async function installUpdateAndRestart(): Promise<{
   version: string;
   message: string;
 }> {
-  if (Deno.build.os !== "darwin") throw new Error("当前自动安装更新仅支持 macOS");
+  if (!isMacOS) throw new Error("当前自动安装更新仅支持 macOS");
   const update = await checkForUpdate();
   if (!update.updateAvailable || !update.latestVersion) {
     throw new Error("当前已是最新版本，无需更新");
@@ -164,11 +169,11 @@ export async function installUpdateAndRestart(): Promise<{
   }
   const appPath = await currentAppBundlePath();
   if (!appPath) {
-    throw new Error("开发模式不支持自动替换应用；请用打包后的 DenoAgent.app 测试");
+    throw new Error("开发模式不支持自动替换应用；请用打包后的 AI Agent.app 测试");
   }
   const appParent = appPath.slice(0, appPath.lastIndexOf("/"));
-  const tempDir = await Deno.makeTempDir({ prefix: "deno-agent-update-" });
-  const archivePath = `${tempDir}/DenoAgent-${update.latestVersion}.zip`;
+  const tempDir = await mkdtemp(join(tmpdir(), "ai-agent-update-"));
+  const archivePath = `${tempDir}/AIAgent-${update.latestVersion}.zip`;
   const scriptPath = `${tempDir}/install-update.sh`;
   const backupPath = `${appPath}.bak-${Date.now()}`;
   await downloadUpdateArchive(update.downloadUrl, archivePath);
@@ -179,7 +184,7 @@ APP_PARENT=${shellQuote(appParent)}
 ARCHIVE_PATH=${shellQuote(archivePath)}
 BACKUP_PATH=${shellQuote(backupPath)}
 TEMP_DIR=${shellQuote(tempDir)}
-APP_PID=${Deno.pid}
+APP_PID=${process.pid}
 while kill -0 "$APP_PID" 2>/dev/null; do sleep 0.2; done
 rm -rf "$BACKUP_PATH"
 if [ -d "$APP_PATH" ]; then mv "$APP_PATH" "$BACKUP_PATH"; fi
@@ -192,14 +197,9 @@ rm -rf "$BACKUP_PATH"
 /usr/bin/open "$APP_PATH"
 rm -rf "$TEMP_DIR"
 `;
-  await Deno.writeTextFile(scriptPath, script);
-  new Deno.Command("/bin/sh", {
-    args: [scriptPath],
-    stdin: "null",
-    stdout: "null",
-    stderr: "null",
-  }).spawn();
-  setTimeout(() => Deno.exit(0), 300);
+  await writeTextAtomic(scriptPath, script);
+  spawn("/bin/sh", [scriptPath], { detached: true, stdio: "ignore" }).unref();
+  setTimeout(() => process.exit(0), 300);
   return {
     ok: true,
     version: update.latestVersion,

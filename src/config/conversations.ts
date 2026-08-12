@@ -1,5 +1,6 @@
 import { getWorkspace } from "./settings.ts";
 import { appDataDir } from "./paths.ts";
+import { isNotFound, readUtf8, writeJsonAtomic } from "../platform.ts";
 //会话信息
 export interface ConversationMessage {
   role: "user" | "assistant";
@@ -59,9 +60,9 @@ export async function readConversations(
 ): Promise<ConversationSession[]> {
   const path = await conversationsPath(workspace ?? await getWorkspace());
   try {
-    return validateSessions(JSON.parse(await Deno.readTextFile(path)));
+    return validateSessions(JSON.parse(await readUtf8(path)));
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return [];
+    if (isNotFound(error)) return [];
     throw error;
   }
 }
@@ -72,10 +73,7 @@ export async function saveConversations(
 ): Promise<ConversationSession[]> {
   const sessions = validateSessions(value);
   const path = await conversationsPath(workspace ?? await getWorkspace());
-  await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-  const temporary = `${path}.${crypto.randomUUID()}.tmp`;
-  await Deno.writeTextFile(temporary, `${JSON.stringify(sessions, null, 2)}\n`);
-  await Deno.rename(temporary, path);
+  await writeJsonAtomic(path, sessions);
   return sessions;
 }
 //拼接会话

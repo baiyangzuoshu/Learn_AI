@@ -1,6 +1,8 @@
 import type { HarnessFeature } from "../contracts.ts";
 import type { ToolDefinition } from "../core/types.ts";
 import { appDataDir } from "../config/paths.ts";
+import { isNotFound, readUtf8, writeTextAtomic } from "../platform.ts";
+import { readdir, readFile, stat } from "node:fs/promises";
 
 const def = (
   name: string,
@@ -21,18 +23,15 @@ async function key(workspace: string) {
 //
 async function readOptional(path: string) {
   try {
-    return await Deno.readTextFile(path);
+    return await readUtf8(path);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return "";
+    if (isNotFound(error)) return "";
     throw error;
   }
 }
 //
 async function writeData(path: string, content: string) {
-  await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-  const temp = `${path}.${crypto.randomUUID()}.tmp`;
-  await Deno.writeTextFile(temp, content);
-  await Deno.rename(temp, path);
+  await writeTextAtomic(path, content);
 }
 //
 export const productivity: HarnessFeature = {
@@ -133,17 +132,19 @@ export const productivity: HarnessFeature = {
         const names: string[] = [];
         for (const root of ["skills", ".agents/skills", ".codex/skills"]) {
           try {
-            for await (const entry of Deno.readDir(`${context.workspace}/${root}`)) {
-              if (entry.isDirectory) {
+            for (
+              const entry of await readdir(`${context.workspace}/${root}`, { withFileTypes: true })
+            ) {
+              if (entry.isDirectory()) {
                 try {
                   if (
-                    (await Deno.stat(`${context.workspace}/${root}/${entry.name}/SKILL.md`)).isFile
+                    (await stat(`${context.workspace}/${root}/${entry.name}/SKILL.md`)).isFile()
                   ) names.push(entry.name);
                 } catch { /* missing */ }
               }
             }
           } catch (error) {
-            if (!(error instanceof Deno.errors.NotFound)) throw error;
+            if (!isNotFound(error)) throw error;
           }
         }
         return [...new Set(names)].sort().join("\n") || "(no workspace skills found)";
@@ -157,12 +158,12 @@ export const productivity: HarnessFeature = {
         if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error("invalid skill name");
         for (const root of ["skills", ".agents/skills", ".codex/skills"]) {
           try {
-            return (await Deno.readTextFile(`${context.workspace}/${root}/${name}/SKILL.md`)).slice(
+            return (await readFile(`${context.workspace}/${root}/${name}/SKILL.md`, "utf8")).slice(
               0,
               50_000,
             );
           } catch (error) {
-            if (!(error instanceof Deno.errors.NotFound)) throw error;
+            if (!isNotFound(error)) throw error;
           }
         }
         throw new Error(`skill not found: ${name}`);

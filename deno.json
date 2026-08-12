@@ -41,29 +41,7 @@
     "s39": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s39_loop_control_replay/code.ts",
     "s40": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s40_cognitive_workspace/code.ts",
     "test": "deno test tests/21test_runtime_budget.ts tests/cost_telemetry_test.ts",
-    "desktop": "deno desktop --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
-    "desktop:hmr": "deno desktop --hmr --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write --env-file=.env.local desktop/main.ts",
-    "desktop:build": "deno desktop --output dist/DenoAgent.app --icon desktop/assets/app-icon.icns --include desktop/renderer --include desktop/assets/app-icon.png --allow-env=HOME,DEEPSEEK_API_KEY,DEEPSEEK_BASE_URL,DEEPSEEK_MODEL,DENO_AGENT_UPDATE_URL --allow-net --allow-run=/usr/bin/security,/usr/bin/git,/bin/sh,/usr/bin/osascript,/usr/bin/open --allow-read --allow-write desktop/main.ts",
-    "desktop:build:mac-arm64": "deno desktop --target aarch64-apple-darwin --output dist/releases/macos-arm64/DenoAgent.app --icon desktop/assets/app-icon.icns --include desktop/renderer --include desktop/assets/app-icon.png --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
-    "desktop:build:mac-x64": "deno desktop --target x86_64-apple-darwin --output dist/releases/macos-x64/DenoAgent.app --icon desktop/assets/app-icon.icns --include desktop/renderer --include desktop/assets/app-icon.png --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
-    "desktop:build:windows": "deno desktop --target x86_64-pc-windows-msvc --output dist/releases/windows-x64/DenoAgent.msi --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
-    "desktop:build:linux-x64": "deno desktop --target x86_64-unknown-linux-gnu --output dist/releases/linux-x64/DenoAgent.AppImage --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
-    "desktop:build:linux-arm64": "deno desktop --target aarch64-unknown-linux-gnu --output dist/releases/linux-arm64/DenoAgent.AppImage --include desktop/renderer --allow-env --allow-net --allow-run --allow-read --allow-write desktop/main.ts",
-    "desktop:build:all": "deno task desktop:build:mac-arm64 && deno task desktop:build:mac-x64 && deno task desktop:build:windows && deno task desktop:build:linux-x64 && deno task desktop:build:linux-arm64",
-    "release:github": "deno run --allow-env=GITHUB_TOKEN,GH_TOKEN,GITHUB_REPOSITORY --allow-net=api.github.com,uploads.github.com --allow-run=deno,/usr/bin/ditto,/usr/bin/git,/usr/bin/grep --allow-read scripts/release_github.ts",
-    "check": "deno check desktop/main.ts stages/*/code.ts src/**/*.ts"
-  },
-  "desktop": {
-    "app": {
-      "name": "Deno Agent",
-      "identifier": "com.youjunmao.deno-agent"
-    },
-    "backend": "webview",
-    "output": {
-      "macos": "./dist/DenoAgent.app",
-      "windows": "./dist/DenoAgent",
-      "linux": "./dist/deno-agent"
-    }
+    "check": "deno check stages/*/code.ts src/**/*.ts"
   },
   "fmt": {
     "lineWidth": 100,

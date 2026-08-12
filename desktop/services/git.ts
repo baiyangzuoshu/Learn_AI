@@ -1,5 +1,7 @@
 import { getWorkspace } from "../../src/config/settings.ts";
 import { joinWorkspacePath } from "./workspace.ts";
+import { isWindows, runCommand } from "../../src/platform.ts";
+import { readFile, realpath, stat } from "node:fs/promises";
 
 type GitStatusItem = {
   code: string;
@@ -32,26 +34,20 @@ async function runGit(
   workspace: string,
   args: string[],
 ): Promise<{ success: boolean; stdout: string; stderr: string }> {
-  const command = Deno.build.os === "windows" ? "git" : "/usr/bin/git";
-  const result = await new Deno.Command(command, {
-    args,
-    cwd: workspace,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  const decoder = new TextDecoder();
+  const command = isWindows ? "git" : "/usr/bin/git";
+  const result = await runCommand(command, args, { cwd: workspace });
   return {
     success: result.success,
-    stdout: decoder.decode(result.stdout).trim(),
-    stderr: decoder.decode(result.stderr).trim(),
+    stdout: result.stdout.trim(),
+    stderr: result.stderr.trim(),
   };
 }
 
 async function countSmallTextFileLines(path: string): Promise<number> {
   try {
-    const stat = await Deno.stat(path);
-    if (!stat.isFile || stat.size > 300_000) return 0;
-    const content = await Deno.readTextFile(path);
+    const info = await stat(path);
+    if (!info.isFile() || info.size > 300_000) return 0;
+    const content = await readFile(path, "utf8");
     if (!content || content.includes("\u0000")) return 0;
     return content.endsWith("\n") ? content.split("\n").length - 1 : content.split("\n").length;
   } catch {
@@ -83,7 +79,7 @@ export async function readWorkspaceGit(): Promise<{
   changes: GitStatusItem[];
   commits: GitCommit[];
 }> {
-  const workspace = await Deno.realPath(await getWorkspace());
+  const workspace = await realpath(await getWorkspace());
   const root = await runGit(workspace, ["rev-parse", "--show-toplevel"]);
   if (!root.success) {
     return {

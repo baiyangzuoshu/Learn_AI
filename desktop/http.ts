@@ -19,6 +19,8 @@ import { openWorkspaceFile, readWorkspaceTree } from "./services/workspace.ts";
 import { runRuntimeBudgetAcceptance } from "./services/acceptance.ts";
 import { readProviderBalance } from "./services/balance.ts";
 import { listLessonTests, runLessonAcceptance } from "./services/lesson_tests.ts";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 
 type StaticAssets = ReadonlyMap<string, { body: BodyInit; contentType: string }>;
 
@@ -229,8 +231,60 @@ function serveAsset(url: URL, assets: StaticAssets): Response | undefined {
   });
 }
 
-export function startHttpServer(assets: StaticAssets): Deno.HttpServer {
-  return Deno.serve((request) => handleRequest(request, assets));
+async function requestBody(request: IncomingMessage): Promise<Uint8Array | undefined> {
+  if (request.method === "GET" || request.method === "HEAD") return undefined;
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function headers(request: IncomingMessage): Headers {
+  const result = new Headers();
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (value) result.set(key, Array.isArray(value) ? value.join(", ") : value);
+  }
+  return result;
+}
+
+async function handleNodeRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  assets: StaticAssets,
+): Promise<void> {
+  try {
+    const body = await requestBody(request);
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+    const webRequest = new Request(url, {
+      method: request.method ?? "GET",
+      headers: headers(request),
+      body: body ? Buffer.from(body) : undefined,
+    });
+    const webResponse = await handleRequest(webRequest, assets);
+    response.statusCode = webResponse.status;
+    webResponse.headers.forEach((value, key) => response.setHeader(key, value));
+    if (!webResponse.body) {
+      response.end();
+      return;
+    }
+    Readable.fromWeb(webResponse.body as import("node:stream/web").ReadableStream).pipe(response);
+  } catch (error) {
+    response.statusCode = 500;
+    response.setHeader("content-type", "application/json; charset=utf-8");
+    response.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+  }
+}
+
+export function startHttpServer(
+  assets: StaticAssets,
+  options: { port?: number; host?: string } = {},
+): Server {
+  const server = createServer((request, response) => {
+    void handleNodeRequest(request, response, assets);
+  });
+  server.listen(options.port ?? 0, options.host ?? "127.0.0.1");
+  return server;
 }
 
 export async function handleRequest(request: Request, assets: StaticAssets): Promise<Response> {

@@ -1,7 +1,7 @@
-# Deno Agent — AI Development Instructions
+# AI Agent — Development Instructions
 
-This repository is a Deno 2.9 Desktop application that implements a local AI coding agent without
-Electron, Node.js runtime, or a Rust application layer.
+This repository contains an Agent engine, an Electron desktop application, and an independent set of
+teaching stages. The production desktop runtime and packaging use Node.js and Electron.
 
 ## Product Architecture
 
@@ -14,7 +14,9 @@ Electron, Node.js runtime, or a Rust application layer.
 - `src/config/` owns settings, secrets integration, application paths, workspaces, and conversation
   persistence.
 - `src/providers/` owns model-provider clients and telemetry.
-- `desktop/main.ts` is the Deno Desktop backend and HTTP API entry point.
+- `electron/main.ts` is the Electron desktop entry point.
+- `electron/preload.ts` is the context-isolated renderer bridge.
+- `desktop/http.ts` and `desktop/services/` provide the shared local API and desktop services.
 - `desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
 - `stages/s01_*/code.ts` through `stages/s40_*/code.ts` are teaching examples only.
 
@@ -86,14 +88,14 @@ path in production modules.
 
 Expected data roots:
 
-- macOS: `~/Library/Application Support/DenoAgent`
-- Windows: `%APPDATA%/DenoAgent`
-- Linux: `$XDG_DATA_HOME/DenoAgent` or `~/.local/share/DenoAgent`
+- macOS: `~/Library/Application Support/AIAgent`
+- Windows: `%APPDATA%/AIAgent`
+- Linux: `$XDG_DATA_HOME/AIAgent` or `~/.local/share/AIAgent`
 
 Write persisted JSON atomically through a temporary file followed by rename. Validate all data
 loaded from disk or received through HTTP APIs.
 
-OS-specific commands must be guarded by `Deno.build.os` and have a supported fallback or a clear
+OS-specific commands must be guarded by `process.platform` and have a supported fallback or a clear
 platform-specific error.
 
 ## Desktop UI Rules
@@ -118,10 +120,10 @@ platform-specific error.
 Run the smallest relevant checks while developing, then run the production checks before completion:
 
 ```sh
-deno fmt --check src desktop/main.ts README.md AGENTS.md
+deno fmt --check src desktop README.md AGENTS.md
 deno task check
 rg 'stages/' src desktop
-deno task desktop:build:mac-arm64
+npm --prefix electron run dist:win
 ```
 
 The repository contains intentionally compact legacy UI CSS and teaching files, so avoid formatting
@@ -130,16 +132,14 @@ unrelated files merely to satisfy a whole-repository format check.
 For release or cross-platform changes, also run:
 
 ```sh
-deno task desktop:build:all
+npm --prefix electron run dist:win
+npm --prefix electron run dist:mac
+npm --prefix electron run dist:linux
 ```
 
 Expected artifacts:
 
-- `dist/releases/macos-arm64/DenoAgent.app`
-- `dist/releases/macos-x64/DenoAgent.app`
-- `dist/releases/windows-x64/DenoAgent.msi`
-- `dist/releases/linux-x64/DenoAgent.AppImage`
-- `dist/releases/linux-arm64/DenoAgent.AppImage`
+- Electron Builder artifacts under `dist/releases/electron/`
 
 Build output must embed `desktop/` and `src/`, never `stages/`.
 
@@ -147,18 +147,18 @@ Cross-compilation verifies compilation and packaging, not native runtime behavio
 test credential storage, directory selection, shell execution, Git, WebView behavior, and
 application shutdown on each target operating system.
 
-For every production or desktop change, always run the macOS ARM64 package as a required
+For every production or desktop change, always run the Electron Windows package as a required
 verification step:
 
 ```sh
-deno task desktop:build:mac-arm64
+npm --prefix electron run dist:win
 ```
 
 ## Change Discipline
 
 - Preserve unrelated user changes and generated release artifacts unless the task explicitly covers
   them.
-- Prefer small cohesive modules over adding more responsibilities to `desktop/main.ts`.
+- Prefer small cohesive modules over adding more responsibilities to `electron/main.ts`.
 - Keep public contracts typed and avoid `any` when a narrow runtime-validated type is practical.
 - Update `README.md` whenever architecture, setup, persistence, models, permissions, or release
   commands change.

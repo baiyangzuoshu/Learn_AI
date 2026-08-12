@@ -12,7 +12,7 @@ export class PromptRegistry implements PromptRegistryContract {
       title: "Identity and workspace",
       priority: 0,
       content:
-        `You are Deno Agent, a local coding harness working in ${workspace}. Continue until the user's scoped task is complete. Verify outcomes and respect permission boundaries.`,
+        `You are AI Agent, a local coding harness working in ${workspace}. Continue until the user's scoped task is complete. Verify outcomes and respect permission boundaries.`,
     };
     const sections = [core, ...this.#sections.values()].sort((a, b) =>
       a.priority - b.priority || a.id.localeCompare(b.id)

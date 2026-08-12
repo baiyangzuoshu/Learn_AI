@@ -1,6 +1,6 @@
-# Deno Agent 产品策划
+# AI Agent 产品策划
 
-Deno Agent 的产品定位是：本地优先的开发者 Agent 客户端。
+AI Agent 的产品定位是：本地优先的开发者 Agent 客户端。
 
 它不是单纯的 Harness 教学项目，也不是云端
 IDE。它的核心价值是把模型对话、代码工作区、工具调用、权限控制、MCP/Skill
@@ -8,7 +8,7 @@ IDE。它的核心价值是把模型对话、代码工作区、工具调用、�
 
 ## 产品定位
 
-Deno Agent 面向需要在本地项目中使用 AI Agent
+AI Agent 面向需要在本地项目中使用 AI Agent
 的开发者。用户可以选择一个工作区，围绕这个工作区进行对话、读取文件、修改代码、运行命令、查看 Git
 改动、调用 MCP 工具，并在权限可控的前提下让 Agent 完成多步骤任务。
 
@@ -27,7 +27,7 @@ Deno Agent 面向需要在本地项目中使用 AI Agent
 
 ## 产品边界
 
-Deno Agent 做：
+AI Agent 做：
 
 - 本地桌面客户端。
 - 多工作区和多会话管理。
@@ -36,7 +36,7 @@ Deno Agent 做：
 - 模型 Provider 配置和用量遥测。
 - GitHub Release 自动更新。
 
-Deno Agent 暂不做：
+AI Agent 暂不做：
 
 - 云端多租户服务。
 - 浏览器托管 IDE。
@@ -98,7 +98,7 @@ zip、退出当前 App、替换 `.app` 并重新打开。
 
 | 模块       | 当前状态                                         |
 | ---------- | ------------------------------------------------ |
-| 桌面客户端 | Deno Desktop + 系统 WebView                      |
+| 桌面客户端 | Electron + Chromium renderer                     |
 | 模型       | DeepSeek Provider，可配置模型列表                |
 | 工作区     | 多工作区、多会话、文件树、Git 概览               |
 | 工具       | 文件、Shell、Todo、Memory、任务图、后台任务      |

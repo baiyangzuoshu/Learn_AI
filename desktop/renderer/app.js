@@ -39,7 +39,7 @@ const AUTO_SCROLL_MARGIN = 96;
 const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
 const CONTEXT_COMPACT_AT = 0.8;
-let activeWorkspaceTab = localStorage.getItem("deno-agent:workspace-tab") || "overview";
+let activeWorkspaceTab = localStorage.getItem("ai-agent:workspace-tab") || "overview";
 
 function formatBudgetNumber(value) {
   const number = Number(value || 0);
@@ -543,7 +543,7 @@ function collectProvidersForSave() {
   }));
 }
 function storageKey() {
-  return `deno-agent:sessions:${settings.workspace || "none"}`;
+  return `ai-agent:sessions:${settings.workspace || "none"}`;
 }
 function activeSession() {
   return sessions.find((session) => session.id === activeSessionId);
@@ -631,7 +631,7 @@ function cacheRate(data) {
 }
 function setWorkspaceTab(tab, { refresh = true } = {}) {
   activeWorkspaceTab = ["overview", "files", "changes"].includes(tab) ? tab : "overview";
-  localStorage.setItem("deno-agent:workspace-tab", activeWorkspaceTab);
+  localStorage.setItem("ai-agent:workspace-tab", activeWorkspaceTab);
   document.querySelectorAll("[data-workspace-tab]").forEach((button) =>
     button.classList.toggle("active", button.dataset.workspaceTab === activeWorkspaceTab)
   );
@@ -682,14 +682,14 @@ function setNavCollapsed(collapsed) {
   navToggle.textContent = "导航";
   navToggle.classList.toggle("active", !collapsed);
   navToggle.title = collapsed ? "展开左侧导航" : "收起左侧导航";
-  localStorage.setItem("deno-agent:nav-collapsed", String(collapsed));
+  localStorage.setItem("ai-agent:nav-collapsed", String(collapsed));
 }
 function setWorkspacePanelOpen(open, { load = true } = {}) {
   document.body.classList.toggle("workspace-panel-open", open);
   workspacePanelToggle.classList.toggle("active", open);
   workspacePanelToggle.textContent = "工作区";
   workspacePanelToggle.title = open ? "收起右侧工作区" : "展开右侧工作区";
-  localStorage.setItem("deno-agent:workspace-panel-open", String(open));
+  localStorage.setItem("ai-agent:workspace-panel-open", String(open));
   if (open && load) refreshWorkspacePanel();
 }
 async function updateRuntimeStatus() {
@@ -1086,7 +1086,7 @@ async function loadSettings() {
   activeProviderId = settings.defaultProviderId;
   fillModels(modelSelect, { providerId: settings.defaultProviderId, model: settings.defaultModel });
   renderProviderEditor();
-  $("#developer-mode").checked = localStorage.getItem("deno-agent:developer-mode") === "true";
+  $("#developer-mode").checked = localStorage.getItem("ai-agent:developer-mode") === "true";
   if (previousWorkspace !== settings.workspace) await loadSessions();
   else renderWorkspaceTree();
   maybeCheckUpdateOnStartup();
@@ -1095,11 +1095,11 @@ async function loadSettings() {
 async function connect(retries = 30) {
   try {
     if (!(await fetch(`${API}/health`)).ok) throw new Error();
-    status.textContent = "Deno Runtime 已连接 · s21 Bounded Runtime";
+    status.textContent = "Agent Runtime 已连接 · Bounded Runtime";
     await loadSettings();
   } catch {
     if (retries) setTimeout(() => connect(retries - 1), 300);
-    else status.textContent = "Deno Runtime 连接失败";
+    else status.textContent = "Agent Runtime 连接失败";
   }
 }
 
@@ -1209,7 +1209,7 @@ form.addEventListener("submit", async (event) => {
     await saveSessions();
     await loadComposerGitSummary();
     if (document.body.classList.contains("workspace-panel-open")) await refreshWorkspacePanel();
-    status.textContent = "Deno Runtime 已连接 · s21 Bounded Runtime";
+    status.textContent = "Agent Runtime 已连接 · Bounded Runtime";
   } catch (error) {
     setRunStep(4);
     const stopped = error.name === "AbortError";
@@ -1252,9 +1252,9 @@ function updatePermissionMode() {
   };
   permissionHint.textContent = hints[permissionMode.value];
   document.body.classList.toggle("permission-full", permissionMode.value === "full");
-  localStorage.setItem("deno-agent:permission-mode", permissionMode.value);
+  localStorage.setItem("ai-agent:permission-mode", permissionMode.value);
 }
-permissionMode.value = localStorage.getItem("deno-agent:permission-mode") || "ask";
+permissionMode.value = localStorage.getItem("ai-agent:permission-mode") || "ask";
 permissionMode.addEventListener("change", updatePermissionMode);
 updatePermissionMode();
 
@@ -1660,7 +1660,7 @@ settingsForm.addEventListener("submit", async (event) => {
       await saveUpdateSettingsFromForm();
       return;
     }
-    localStorage.setItem("deno-agent:developer-mode", String($("#developer-mode").checked));
+    localStorage.setItem("ai-agent:developer-mode", String($("#developer-mode").checked));
     const response = await fetch(`${API}/settings`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1786,9 +1786,9 @@ runAllLessonTestsButton.addEventListener("click", async () => {
     runAllLessonTestsButton.disabled = false;
   }
 });
-setNavCollapsed(localStorage.getItem("deno-agent:nav-collapsed") === "true");
+setNavCollapsed(localStorage.getItem("ai-agent:nav-collapsed") === "true");
 setWorkspaceTab(activeWorkspaceTab, { refresh: false });
-setWorkspacePanelOpen(localStorage.getItem("deno-agent:workspace-panel-open") === "true", {
+setWorkspacePanelOpen(localStorage.getItem("ai-agent:workspace-panel-open") === "true", {
   load: false,
 });
 connect();
