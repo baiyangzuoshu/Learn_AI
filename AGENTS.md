@@ -139,7 +139,70 @@ npm --prefix electron run dist:linux
 
 Expected artifacts:
 
-- Electron Builder artifacts under `dist/releases/electron/`
+- Electron Builder artifacts under `dist/releases/app/`
+
+### Windows Offline Packaging
+
+Keep the following Electron Builder archives under `tools/` so Windows packaging can run when GitHub
+release downloads are unavailable:
+
+- `7zip-win-x64.tar.gz`
+- `nsis-3.0.4.1.7z`
+- `nsis-resources-3.4.1.7z`
+- `winCodeSign-2.6.0.7z`
+
+The extracted/cache directories under `tools/` are generated files and must remain ignored by Git.
+From the repository root, prepare the local tool directories with PowerShell:
+
+```powershell
+$repoRoot = (Get-Location).Path
+$toolRoot = Join-Path $repoRoot "tools"
+$sevenRoot = Join-Path $toolRoot "7zip-extracted"
+$nsisRoot = Join-Path $toolRoot "nsis-extracted"
+$resourcesRoot = Join-Path $toolRoot "nsis-resources-extracted"
+$codeSignRoot = Join-Path $toolRoot "winCodeSign-extracted"
+
+New-Item -ItemType Directory -Force -Path $sevenRoot, $nsisRoot, $resourcesRoot, $codeSignRoot |
+  Out-Null
+tar.exe -xzf (Join-Path $toolRoot "7zip-win-x64.tar.gz") -C $sevenRoot --strip-components=1
+
+$sevenZip = Join-Path $sevenRoot "bin\7za.exe"
+& $sevenZip x (Join-Path $toolRoot "nsis-3.0.4.1.7z") ("-o" + $nsisRoot) -y
+& $sevenZip x (Join-Path $toolRoot "nsis-resources-3.4.1.7z") ("-o" + $resourcesRoot) -y
+& $sevenZip e (Join-Path $toolRoot "winCodeSign-2.6.0.7z") `
+  "rcedit-ia32.exe" "rcedit-x64.exe" ("-o" + $codeSignRoot) -y
+Copy-Item (Join-Path $codeSignRoot "rcedit-ia32.exe") `
+  (Join-Path $codeSignRoot "rcedit-x86.exe") -Force
+```
+
+Then build the Windows x64 NSIS installer with the local tools and the installed Electron runtime:
+
+```powershell
+$repoRoot = (Get-Location).Path
+$toolRoot = Join-Path $repoRoot "tools"
+$env:ELECTRON_BUILDER_CACHE = $toolRoot
+$env:ELECTRON_BUILDER_7ZIP_PATH = Join-Path $toolRoot "7zip-extracted\bin\7za.exe"
+$env:ELECTRON_BUILDER_RCEDIT_PATH = Join-Path $toolRoot "winCodeSign-extracted"
+$env:ELECTRON_BUILDER_NSIS_DIR = Join-Path $toolRoot "nsis-extracted"
+$env:ELECTRON_BUILDER_NSIS_RESOURCES_DIR = Join-Path $toolRoot "nsis-resources-extracted"
+$env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+$electronDist = Join-Path $repoRoot "electron\node_modules\electron\dist"
+
+Push-Location (Join-Path $repoRoot "electron")
+npm.cmd run build
+npx.cmd electron-builder --win nsis --x64 `
+  --config.win.target=nsis `
+  --config.electronDist=$electronDist
+Pop-Location
+```
+
+Use `npm.cmd` and `npx.cmd` on Windows because PowerShell execution policy may block the `.ps1`
+launchers. The explicit `--config.win.target=nsis` override is required for an x64-only build:
+`electron/package.json` currently declares both x64 and arm64 under `build.win.target`, and `--x64`
+alone does not override that architecture list.
+
+The expected installer is `dist/releases/app/AI Agent Setup <version>.exe`, accompanied by its
+`.blockmap`. The unpacked executable is under `dist/releases/app/win-unpacked/`.
 
 Build output must embed `desktop/` and `src/`, never `stages/`.
 

@@ -6,12 +6,14 @@ import { integrations } from "./features/integrations.ts";
 import { diagnostics } from "./features/diagnostics.ts";
 import { scheduling } from "./features/scheduling.ts";
 import { runtimeLimits } from "./features/runtime_limits.ts";
+import { pdfReader } from "./features/pdf_reader.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
 export const harness = new AgentRuntime([
   diagnostics,
   runtimeLimits,
+  pdfReader,
   coreTools,
   productivity,
   orchestration,

@@ -8,3 +8,6 @@ node_modules/
 electron/dist/
 electron/.electron-builder-cache/
 graphify-out/
+
+# Keep offline Electron Builder archives, ignore extracted/cache directories.
+tools/*/
