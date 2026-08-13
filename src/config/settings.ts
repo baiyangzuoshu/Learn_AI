@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../providers/contracts.ts";
+import type { ImageGenerationConfig, ProviderConfig } from "../providers/contracts.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appDataDir } from "./paths.ts";
 import {
@@ -16,6 +16,9 @@ const LEGACY_ACCOUNT = "deepseek-api-key";
 const DEFAULT_PROVIDER_ID = "deepseek";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
 const DEFAULT_UPDATE_URL = "https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest";
+const IMAGE_GENERATION_ACCOUNT = "image-generation:volcengine-ark:api-key";
+const DEFAULT_IMAGE_MODEL = "doubao-seedream-4-5-251128";
+const DEFAULT_IMAGE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
 const workspaceContext = new AsyncLocalStorage<string>();
 
 export interface PublicProviderSettings {
@@ -49,6 +52,14 @@ export interface PublicSettings {
   workspaces: string[];
   settingsPath: string;
   update: UpdateSettings;
+  imageGeneration: PublicImageGenerationSettings;
+}
+
+export interface PublicImageGenerationSettings {
+  provider: "volcengine-ark";
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
 }
 
 interface StoredProviderSettings {
@@ -71,6 +82,13 @@ interface StoredSettings {
   workspace?: string;
   workspaces?: string[];
   update?: Partial<UpdateSettings>;
+  imageGeneration?: Partial<StoredImageGenerationSettings>;
+}
+
+interface StoredImageGenerationSettings {
+  provider: "volcengine-ark";
+  baseUrl: string;
+  model: string;
 }
 
 export interface UpdateSettings {
@@ -105,6 +123,16 @@ function defaultUpdateSettings(): UpdateSettings {
   return {
     checkOnStartup: true,
     updateUrl: env("AI_AGENT_UPDATE_URL")?.trim() || DEFAULT_UPDATE_URL,
+  };
+}
+
+function normalizeImageGenerationSettings(
+  input?: Partial<StoredImageGenerationSettings>,
+): StoredImageGenerationSettings {
+  return {
+    provider: "volcengine-ark",
+    baseUrl: DEFAULT_IMAGE_BASE_URL,
+    model: String(input?.model ?? DEFAULT_IMAGE_MODEL).trim() || DEFAULT_IMAGE_MODEL,
   };
 }
 
@@ -241,6 +269,7 @@ async function readStored(): Promise<StoredSettings> {
     workspace: undefined,
     workspaces: [],
     update: defaultUpdateSettings(),
+    imageGeneration: normalizeImageGenerationSettings(),
   };
   try {
     const parsed = JSON.parse(await readUtf8(settingsPath())) as Partial<StoredSettings>;
@@ -258,6 +287,7 @@ async function readStored(): Promise<StoredSettings> {
       workspace,
       workspaces,
       update: normalizeUpdateSettings(parsed.update),
+      imageGeneration: normalizeImageGenerationSettings(parsed.imageGeneration),
     };
   } catch (error) {
     if (isNotFound(error)) return fallback;
@@ -289,6 +319,14 @@ async function saveProviderKey(providerId: string, apiKey: string): Promise<void
   await writeSecret(SERVICE, keychainAccount(providerId), apiKey.trim());
 }
 
+async function readImageGenerationKey(): Promise<string | undefined> {
+  return env("ARK_API_KEY") || await readSecret(SERVICE, IMAGE_GENERATION_ACCOUNT);
+}
+
+async function saveImageGenerationKey(apiKey: string): Promise<void> {
+  await writeSecret(SERVICE, IMAGE_GENERATION_ACCOUNT, apiKey.trim());
+}
+
 function modelValue(providerId: string, model: string): string {
   return `${encodeURIComponent(providerId)}:${encodeURIComponent(model)}`;
 }
@@ -303,21 +341,6 @@ function modelOptions(providers: PublicProviderSettings[]): PublicModelOption[] 
       label: `${provider.name} · ${model}`,
     }))
   );
-}
-
-export async function revealApiKey(): Promise<string> {
-  const stored = await readStored();
-  const provider = stored.providers?.find((item) => item.id === stored.defaultProviderId) ??
-    stored.providers?.[0];
-  return provider ? await readProviderKey(provider) ?? "" : "";
-}
-
-export async function revealApiKeys(): Promise<Record<string, string>> {
-  const stored = await readStored();
-  const entries = await Promise.all((stored.providers ?? []).map(async (provider) => {
-    return [provider.id, await readProviderKey(provider) ?? ""] as const;
-  }));
-  return Object.fromEntries(entries);
 }
 
 export async function getPublicSettings(): Promise<PublicSettings> {
@@ -346,6 +369,10 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     workspaces: stored.workspaces ?? [],
     update: normalizeUpdateSettings(stored.update),
     settingsPath: settingsPath(),
+    imageGeneration: {
+      ...normalizeImageGenerationSettings(stored.imageGeneration),
+      hasApiKey: Boolean(await readImageGenerationKey()),
+    },
   };
 }
 
@@ -374,6 +401,7 @@ export async function saveSettings(
     defaultModel?: string;
     defaultProviderId?: string;
     providers?: SaveProviderInput[];
+    imageGeneration?: { apiKey?: string; model?: string };
   },
 ): Promise<PublicSettings> {
   const current = await readStored();
@@ -401,6 +429,13 @@ export async function saveSettings(
     if (apiKey) await saveProviderKey(providers[index].id, apiKey);
   }
 
+  const imageGeneration = normalizeImageGenerationSettings({
+    ...current.imageGeneration,
+    model: input.imageGeneration?.model ?? current.imageGeneration?.model,
+  });
+  const imageApiKey = input.imageGeneration?.apiKey?.trim();
+  if (imageApiKey) await saveImageGenerationKey(imageApiKey);
+
   const defaultProviderId = providers.some((item) => item.id === input.defaultProviderId)
     ? input.defaultProviderId
     : providers[0].id;
@@ -410,6 +445,7 @@ export async function saveSettings(
     workspace: current.workspace,
     workspaces: current.workspaces ?? [],
     update: normalizeUpdateSettings(current.update),
+    imageGeneration,
   });
   return await getPublicSettings();
 }
@@ -494,6 +530,14 @@ export async function resolveProviderConfig(
     baseUrl: provider.baseUrl.replace(/\/$/, ""),
     model: selected,
   };
+}
+
+export async function resolveImageGenerationConfig(): Promise<ImageGenerationConfig> {
+  const stored = await readStored();
+  const imageGeneration = normalizeImageGenerationSettings(stored.imageGeneration);
+  const apiKey = await readImageGenerationKey();
+  if (!apiKey) throw new Error("请先在设置 → 图片生成中配置火山方舟 API Key");
+  return { ...imageGeneration, apiKey };
 }
 
 export async function resolveDeepSeekConfig(model?: string): Promise<ProviderConfig> {

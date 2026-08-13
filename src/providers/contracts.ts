@@ -9,6 +9,13 @@ export interface ProviderConfig {
   model: string;
 }
 
+export interface ImageGenerationConfig {
+  provider: "volcengine-ark";
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface ModelProvider {
   id: string;
   createChatCompletion(

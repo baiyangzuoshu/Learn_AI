@@ -5,7 +5,9 @@ const messages = $("#messages"),
   eventsContent = $("#events-content"),
   form = $("#composer");
 const input = $("#prompt"), send = $("#send"), status = $("#status");
-const modelSelect = $("#model-select"), settingsDialog = $("#settings-dialog"), testsDialog = $("#tests-dialog");
+const modelSelect = $("#model-select"),
+  settingsDialog = $("#settings-dialog"),
+  testsDialog = $("#tests-dialog");
 const permissionMode = $("#permission-mode"), permissionHint = $("#permission-hint");
 const navToggle = $("#nav-toggle"), workspacePanelToggle = $("#toggle-workspace-panel");
 const workspacePanelRoot = $("#workspace-panel-root"),
@@ -48,23 +50,45 @@ function formatBudgetNumber(value) {
 function formatBudgetUsage(usage, compact = false) {
   const used = usage?.used || {}, limit = usage?.limit || {};
   if (compact) {
-    return `${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)}轮 · ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}工具 · ${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)}字 · ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}成本`;
+    return `${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)}轮 · ${
+      formatBudgetNumber(used.toolCalls)
+    }/${formatBudgetNumber(limit.toolCalls)}工具 · ${formatBudgetNumber(used.outputChars)}/${
+      formatBudgetNumber(limit.outputChars)
+    }字 · ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}成本`;
   }
-  return `迭代 ${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)} · 工具 ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}\n输出 ${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)} 字符 · 成本 ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)} 单位`;
+  return `迭代 ${formatBudgetNumber(used.iterations)}/${
+    formatBudgetNumber(limit.iterations)
+  } · 工具 ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}\n输出 ${
+    formatBudgetNumber(used.outputChars)
+  }/${formatBudgetNumber(limit.outputChars)} 字符 · 成本 ${formatBudgetNumber(used.cost)}/${
+    formatBudgetNumber(limit.cost)
+  } 单位`;
 }
 function renderBudgetUsage(usage) {
   lastBudgetUsage = usage;
   const used = usage?.used || {}, limit = usage?.limit || {};
-  $("#runtime-budget-iterations").textContent = `${formatBudgetNumber(used.iterations)}/${formatBudgetNumber(limit.iterations)}`;
-  $("#runtime-budget-tools").textContent = `${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}`;
-  $("#runtime-budget-output").textContent = `${formatBudgetNumber(used.outputChars)}/${formatBudgetNumber(limit.outputChars)}`;
-  $("#runtime-budget-cost").textContent = `${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}`;
+  $("#runtime-budget-iterations").textContent = `${formatBudgetNumber(used.iterations)}/${
+    formatBudgetNumber(limit.iterations)
+  }`;
+  $("#runtime-budget-tools").textContent = `${formatBudgetNumber(used.toolCalls)}/${
+    formatBudgetNumber(limit.toolCalls)
+  }`;
+  $("#runtime-budget-output").textContent = `${formatBudgetNumber(used.outputChars)}/${
+    formatBudgetNumber(limit.outputChars)
+  }`;
+  $("#runtime-budget-cost").textContent = `${formatBudgetNumber(used.cost)}/${
+    formatBudgetNumber(limit.cost)
+  }`;
 }
 function appendBudgetResult(container = messages) {
   if (!lastBudgetUsage) return;
   const card = document.createElement("div");
   card.className = "budget-result";
-  card.innerHTML = `<b>本次对话预算</b><span>${formatBudgetUsage(lastBudgetUsage)}</span><small>剩余 ${formatBudgetNumber(lastBudgetUsage.remaining?.iterations)} 轮 / ${formatBudgetNumber(lastBudgetUsage.remaining?.toolCalls)} 次工具调用</small>`;
+  card.innerHTML = `<b>本次对话预算</b><span>${
+    formatBudgetUsage(lastBudgetUsage)
+  }</span><small>剩余 ${formatBudgetNumber(lastBudgetUsage.remaining?.iterations)} 轮 / ${
+    formatBudgetNumber(lastBudgetUsage.remaining?.toolCalls)
+  } 次工具调用</small>`;
   container.append(card);
 }
 
@@ -76,7 +100,16 @@ function escapeHtml(value) {
 
 function renderInlineMarkdown(value) {
   const codeSpans = [];
-  let html = escapeHtml(value).replace(/`([^`\n]+)`/g, (_, code) => {
+  const images = [];
+  let html = escapeHtml(value).replace(
+    /!\[([^\]\n]*)\]\((\/api\/workspace\/image\?path=(?:%[0-9A-Fa-f]{2}|[A-Za-z0-9._~-])+)\)/g,
+    (_, alt, src) => {
+      const index = images.push(
+        `<img class="generated-image" src="${src}" alt="${alt}" loading="lazy" />`,
+      ) - 1;
+      return `\u0000IMAGE${index}\u0000`;
+    },
+  ).replace(/`([^`\n]+)`/g, (_, code) => {
     const index = codeSpans.push(`<code>${code}</code>`) - 1;
     return `\u0000CODE${index}\u0000`;
   });
@@ -91,7 +124,8 @@ function renderInlineMarkdown(value) {
     .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
     .replace(/(^|[^\*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
     .replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
-  return html.replace(/\u0000CODE(\d+)\u0000/g, (_, index) => codeSpans[Number(index)] || "");
+  return html.replace(/\u0000CODE(\d+)\u0000/g, (_, index) => codeSpans[Number(index)] || "")
+    .replace(/\u0000IMAGE(\d+)\u0000/g, (_, index) => images[Number(index)] || "");
 }
 
 function splitMarkdownTableRow(line) {
@@ -1551,16 +1585,25 @@ $("#settings-button").addEventListener("click", async () => {
   await loadSettings();
   await loadUpdateSettings();
   $("#mcp-workspace").textContent = settings.workspace || "尚未选择工作区";
-  const data = await (await fetch(`${API}/settings/key`)).json(),
-    toggle = $("#toggle-key");
-  providerApiKeys = data.apiKeys || {};
+  const toggle = $("#toggle-key");
+  providerApiKeys = {};
   renderProviderEditor();
-  $("#api-key").type = "text";
-  toggle.textContent = "隐藏";
+  $("#api-key").type = "password";
+  toggle.textContent = "显示";
+  $("#image-api-key").value = "";
+  $("#image-api-key").type = "password";
+  $("#toggle-image-key").textContent = "显示";
+  $("#image-model").value = settings.imageGeneration?.model || "doubao-seedream-4-5-251128";
+  $("#image-base-url").value = settings.imageGeneration?.baseUrl ||
+    "https://ark.cn-beijing.volces.com/api/v3";
+  $("#image-key-status").textContent = settings.imageGeneration?.hasApiKey
+    ? "✓ 文生图 API Key 已配置"
+    : "尚未配置文生图 API Key";
   settingsDialog.showModal();
 });
 const settingsTabText = {
   model: ["模型", "密钥安全保存在 macOS Keychain"],
+  image: ["图片生成", "配置火山方舟 Seedream 文生图能力"],
   mcp: ["MCP与工具", "管理工作区插件与工具连接"],
   general: ["通用", "运行时、开发者模式与本地数据"],
   update: ["更新", "检查软件更新并查看版本信息"],
@@ -1608,6 +1651,11 @@ $("#toggle-key").addEventListener("click", () => {
   const key = $("#api-key"), hidden = key.type === "password";
   key.type = hidden ? "text" : "password";
   $("#toggle-key").textContent = hidden ? "隐藏" : "显示";
+});
+$("#toggle-image-key").addEventListener("click", () => {
+  const key = $("#image-api-key"), hidden = key.type === "password";
+  key.type = hidden ? "text" : "password";
+  $("#toggle-image-key").textContent = hidden ? "隐藏" : "显示";
 });
 providerSelect.addEventListener("change", () => {
   syncActiveProviderDraft();
@@ -1667,6 +1715,10 @@ settingsForm.addEventListener("submit", async (event) => {
         body: JSON.stringify({
           defaultProviderId: activeProviderId,
           providers: collectProvidersForSave(),
+          imageGeneration: {
+            apiKey: $("#image-api-key").value.trim(),
+            model: $("#image-model").value.trim(),
+          },
         }),
       }),
       data = await response.json();
@@ -1683,25 +1735,35 @@ let lessonTests = [];
 function renderLessonTests(cases) {
   lessonTests = cases;
   lessonTestList.innerHTML = cases.map((test) =>
-    `<div class="lesson-test-row" data-lesson="${test.lesson}"><div><b>${String(test.lesson).padStart(2, "0")} · ${escapeHtml(test.title)}</b><small>${escapeHtml(test.description)}</small><span data-test-state>未测试</span></div><button type="button" data-run-lesson="${test.lesson}">测试</button></div>`
+    `<div class="lesson-test-row" data-lesson="${test.lesson}"><div><b>${
+      String(test.lesson).padStart(2, "0")
+    } · ${escapeHtml(test.title)}</b><small>${
+      escapeHtml(test.description)
+    }</small><span data-test-state>未测试</span></div><button type="button" data-run-lesson="${test.lesson}">测试</button></div>`
   ).join("");
 }
 function renderLessonReport(report) {
   lessonTestSummary.classList.toggle("passed", report.ok);
   lessonTestSummary.classList.toggle("failed", !report.ok);
-  lessonTestSummary.textContent = `${report.ok ? "✓ 验收通过" : "✗ 验收失败"} · ${report.passed}/${report.passed + report.failed} 通过`;
+  lessonTestSummary.textContent = `${report.ok ? "✓ 验收通过" : "✗ 验收失败"} · ${report.passed}/${
+    report.passed + report.failed
+  } 通过`;
   for (const result of report.results) {
     const row = lessonTestList.querySelector(`[data-lesson="${result.lesson}"]`),
       state = row?.querySelector("[data-test-state]");
     if (!row || !state) continue;
     row.classList.toggle("passed", result.status === "passed");
     row.classList.toggle("failed", result.status === "failed");
-    state.textContent = `${result.status === "passed" ? "✓ 通过" : "✗ 失败"} · ${result.durationMs}ms${result.detail ? ` · ${result.detail}` : ""}`;
+    state.textContent = `${
+      result.status === "passed" ? "✓ 通过" : "✗ 失败"
+    } · ${result.durationMs}ms${result.detail ? ` · ${result.detail}` : ""}`;
   }
   runtimeTestOutput.textContent = [
     `${report.ok ? "✓" : "✗"} ${report.suite}: ${report.passed} passed / ${report.failed} failed`,
     ...report.results.map((result) =>
-      `${result.status === "passed" ? "✓" : "✗"} ${result.id} · ${result.title} (${result.durationMs}ms)` +
+      `${
+        result.status === "passed" ? "✓" : "✗"
+      } ${result.id} · ${result.title} (${result.durationMs}ms)` +
       (result.detail ? "\n  " + result.detail : "")
     ),
   ].join("\n");
@@ -1739,8 +1801,10 @@ showLessonTestsButton.addEventListener("click", async () => {
     renderLessonTests(data.cases || []);
     runAllLessonTestsButton.disabled = lessonTests.length !== 21;
     lessonTestSummary.classList.remove("passed", "failed");
-    lessonTestSummary.textContent = `已加载 ${lessonTests.length} 个用例；现在可以单独测试或一键测试全部。`;
-    runtimeTestOutput.textContent = `已加载 ${lessonTests.length} 个测试用例；点击每行“测试”运行单课验收。`;
+    lessonTestSummary.textContent =
+      `已加载 ${lessonTests.length} 个用例；现在可以单独测试或一键测试全部。`;
+    runtimeTestOutput.textContent =
+      `已加载 ${lessonTests.length} 个测试用例；点击每行“测试”运行单课验收。`;
   } catch (error) {
     lessonTestSummary.classList.add("failed");
     lessonTestSummary.textContent = "✗ 测试用例加载失败";

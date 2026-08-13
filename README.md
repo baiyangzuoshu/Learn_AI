@@ -4,15 +4,15 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 工具、技能、定时任务、软件更新和模型用量遥测整合到一个桌面应用里。
 
 桌面端基于 Electron 构建，Windows、macOS、Linux 均使用 Electron Builder 打包，运行时使用 Node.js。
-`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent
-引擎，`electron/` 是桌面主进程和打包入口，`desktop/` 保留共享 API 服务、业务服务和 renderer UI
-资源。
+`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent 引擎，`electron/`
+是桌面主进程和打包入口，`desktop/` 保留共享 API 服务、业务服务和 renderer UI 资源。
 
 ## 客户端能力
 
 - 多工作区、多会话、本地对话持久化和工作区文件树
 - 面向代码任务的 Agent 对话、文件读写、编辑、Shell 执行和权限控制
 - 多模型供应商配置、Keychain 密钥管理、Token/缓存命中与费用遥测
+- 火山方舟 Seedream 文生图、工作区安全落盘和会话内图片预览
 - Todo、Memory、任务图、Skill、MCP、后台任务和周期任务
 - Subagent、Agent Teams、Git Worktree 和有边界自治循环
 - 可收起导航、工作区概览、Git 改动信息和开发者事件面板
@@ -150,6 +150,24 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 发布构建不会读取或嵌入 `.env.local`。
 
+## 图片生成
+
+在“设置 → 图片生成”中填写火山方舟 API Key 和 Seedream 模型 ID。默认模型为
+`doubao-seedream-4-5-251128`，也可以替换为火山方舟控制台当前提供的兼容模型 ID。Key 通过 Electron
+`safeStorage` 加密保存，普通设置接口只返回“是否已配置”，不会把明文 Key 发送到 renderer 或写入
+`settings.json`。也可通过 `ARK_API_KEY` 环境变量提供凭据。
+
+用户要求生成图片时，Agent 调用 `generate_image` 工具。该操作属于外部调用和工作区写入，在 `ask`
+权限模式下会请求确认；生成结果原子写入当前工作区：
+
+```text
+.ai-agent/generated-images/
+```
+
+桌面端通过受限的 loopback 图片接口显示预览，仅允许当前工作区内不超过 20 MB 的 JPEG、PNG 或 WebP
+文件。Seedream 调用固定关闭组图，一次只生成一张，以限制意外费用；1K、2K、4K 每次调用均
+计入运行预算的外部成本单位。仓库默认忽略生成图片目录，避免误把大量二进制产物提交到 Git。
+
 ## 软件更新
 
 “设置 → 更新”提供版本查看、启动时检测开关、手动检查更新和“下载并重启更新”。自动安装流程会下载 GitHub
@@ -198,10 +216,10 @@ AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases
 
 ## 本地数据
 
-| 平台    | 数据目录                                                 |
-| ------- | -------------------------------------------------------- |
-| macOS   | `~/Library/Application Support/AIAgent`                |
-| Windows | `%APPDATA%/AIAgent`                                    |
+| 平台    | 数据目录                                             |
+| ------- | ---------------------------------------------------- |
+| macOS   | `~/Library/Application Support/AIAgent`              |
+| Windows | `%APPDATA%/AIAgent`                                  |
 | Linux   | `$XDG_DATA_HOME/AIAgent` 或 `~/.local/share/AIAgent` |
 
 聊天、Memory、任务图和定时任务按工作区隔离。项目路径经 SHA-256 生成本地文件标识。

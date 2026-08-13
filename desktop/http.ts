@@ -5,8 +5,6 @@ import {
   chooseWorkspace,
   getPublicSettings,
   removeWorkspace,
-  revealApiKey,
-  revealApiKeys,
   saveSettings,
   saveUpdateSettings,
   selectWorkspace,
@@ -15,7 +13,7 @@ import {
 import { type ChatRequest, createChatStream, runChat } from "./services/chat.ts";
 import { readWorkspaceGit } from "./services/git.ts";
 import { APP_VERSION, checkForUpdate, installUpdateAndRestart } from "./services/updater.ts";
-import { openWorkspaceFile, readWorkspaceTree } from "./services/workspace.ts";
+import { openWorkspaceFile, readWorkspaceImage, readWorkspaceTree } from "./services/workspace.ts";
 import { runRuntimeBudgetAcceptance } from "./services/acceptance.ts";
 import { readProviderBalance } from "./services/balance.ts";
 import { listLessonTests, runLessonAcceptance } from "./services/lesson_tests.ts";
@@ -66,9 +64,6 @@ async function routeApi(request: Request, url: URL): Promise<Response | undefine
   }
   if (url.pathname === "/api/settings" && request.method === "GET") {
     return json(await getPublicSettings());
-  }
-  if (url.pathname === "/api/settings/key" && request.method === "GET") {
-    return json({ apiKey: await revealApiKey(), apiKeys: await revealApiKeys() });
   }
   if (url.pathname === "/api/update/settings" && request.method === "GET") {
     const settings = await getPublicSettings();
@@ -172,6 +167,20 @@ async function routeApi(request: Request, url: URL): Promise<Response | undefine
       return errorResponse(error);
     }
   }
+  if (url.pathname === "/api/workspace/image" && request.method === "GET") {
+    try {
+      const image = await readWorkspaceImage(url.searchParams.get("path") ?? "");
+      return new Response(Buffer.from(image.body), {
+        headers: {
+          "content-type": image.contentType,
+          "cache-control": "private, max-age=3600",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    } catch (error) {
+      return errorResponse(error, 404);
+    }
+  }
   if (url.pathname === "/api/workspace/git" && request.method === "GET") {
     try {
       return json(await readWorkspaceGit());
@@ -226,7 +235,7 @@ function serveAsset(url: URL, assets: StaticAssets): Response | undefined {
     headers: {
       "content-type": asset.contentType,
       "content-security-policy":
-        "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://api.deepseek.com",
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.deepseek.com",
     },
   });
 }

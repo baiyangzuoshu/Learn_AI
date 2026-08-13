@@ -339,6 +339,17 @@ dialog::backdrop {
   color: #5ed8bf;
 }
 
+.generated-image {
+  display: block;
+  width: min(100%, 720px);
+  height: auto;
+  margin: 12px 0;
+  border: 1px solid #2d3947;
+  border-radius: 12px;
+  background: #0b1016;
+  box-shadow: 0 12px 30px #0005;
+}
+
 .update-settings-card .developer-option {
   margin: 14px 0;
 }

@@ -70,6 +70,7 @@ export async function authorize(request: ToolRequest, mode: PermissionMode): Pro
     "worktree_create",
     "worktree_remove",
     "mcp_call",
+    "generate_image",
   ].includes(request.name);
   if (mode !== "ask" || !mutating) return;
   const allowed = confirmPermission(

@@ -120,12 +120,17 @@
       </div>
     </section>
     <footer id="runtime-status"
-      class="runtime-status"><div class="runtime-status-main"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b id="runtime-last-cost" class="runtime-money">—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b id="runtime-session-cost" class="runtime-money">—</b></span><span>余额 <b id="runtime-balance" class="runtime-money">—</b></span></div><div class="runtime-budget-status"><span>本次预算</span><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span></div></footer>
+      class="runtime-status">
+      <div
+        class="runtime-status-main"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b id="runtime-last-cost" class="runtime-money">—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b id="runtime-session-cost" class="runtime-money">—</b></span><span>余额 <b id="runtime-balance" class="runtime-money">—</b></span></div>
+      <div
+        class="runtime-budget-status"><span>本次预算</span><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span></div>
+    </footer>
     <dialog id="settings-dialog">
       <form id="settings-form" method="dialog">
         <div class="settings-shell">
           <aside
-            class="settings-nav"><div><h2>设置</h2><p>AI Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button><button type="button" data-settings-tab="update">更新</button></aside>
+            class="settings-nav"><div><h2>设置</h2><p>AI Agent</p></div><button type="button" class="active" data-settings-tab="model">模型</button><button type="button" data-settings-tab="image">图片生成</button><button type="button" data-settings-tab="mcp">MCP与工具</button><button type="button" data-settings-tab="general">通用</button><button type="button" data-settings-tab="update">更新</button></aside>
           <div class="settings-content">
             <div
               class="settings-top"><div><h2 id="settings-title">模型</h2><p id="settings-subtitle">密钥安全保存在 macOS Keychain</p></div><button value="cancel" class="close">×</button></div>
@@ -135,11 +140,19 @@
                 <div><button id="add-provider" type="button" class="secondary">+ 添加供应商</button><button id="remove-provider" type="button" class="secondary">移除</button></div>
               </div>
               <label>供应商名称<input id="provider-name" type="text" required placeholder="例如：DeepSeek 官方 / Mini" /></label>
-              <label>API Key<div class="key-input"><input id="api-key" type="text" autocomplete="off" placeholder="输入 API Key" /><button id="toggle-key" type="button" aria-label="隐藏 API Key">隐藏</button></div></label>
+              <label>API Key<div class="key-input"><input id="api-key" type="password" autocomplete="new-password" placeholder="留空则保留已保存的 Key" /><button id="toggle-key" type="button" aria-label="显示 API Key">显示</button></div></label>
               <label>Base URL<input id="base-url" type="url" required placeholder="https://api.example.com/v1" /></label>
               <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
               <label>默认模型<select id="default-model"></select></label>
               <p id="key-status" class="key-status"></p>
+            </section>
+            <section class="settings-panel" data-settings-panel="image">
+              <div
+                class="settings-card"><b>火山方舟 · Seedream</b><p>用于 Agent 的文生图工具。图片保存在当前工作区的 <code>.ai-agent/generated-images/</code>，API Key 加密存入系统凭据存储，不写入 settings.json。</p></div>
+              <label>文生图 API Key<div class="key-input"><input id="image-api-key" type="password" autocomplete="new-password" placeholder="留空则保留已保存的 Key" /><button id="toggle-image-key" type="button" aria-label="显示文生图 API Key">显示</button></div></label>
+              <label>Seedream 模型 ID<input id="image-model" type="text" required placeholder="doubao-seedream-4-5-251128" /></label>
+              <label>API 地址<input id="image-base-url" type="text" readonly /></label>
+              <p id="image-key-status" class="key-status"></p>
             </section>
             <section class="settings-panel" data-settings-panel="mcp">
               <div
@@ -152,7 +165,8 @@
             <section class="settings-panel" data-settings-panel="general">
               <label
                 class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示Hook生命周期事件</small></span></label>
-              <div class="settings-card acceptance-card"><b>1–21 课程测试用例</b><p>打开独立测试面板，查看每课验收项，再单独测试某课或一键运行全部。</p><div class="update-actions"><button id="open-lesson-tests" type="button">打开 1–21 测试面板</button></div></div>
+              <div
+                class="settings-card acceptance-card"><b>1–21 课程测试用例</b><p>打开独立测试面板，查看每课验收项，再单独测试某课或一键运行全部。</p><div class="update-actions"><button id="open-lesson-tests" type="button">打开 1–21 测试面板</button></div></div>
               <div
                 class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
               <div
@@ -188,8 +202,10 @@
     </dialog>
     <dialog id="tests-dialog">
       <div class="tests-dialog-panel">
-        <div class="dialog-title"><div><h2>1–21 课程测试用例</h2><p>Fake Provider Smoke Test · 不调用真实模型</p></div><button id="close-tests" class="close" type="button">×</button></div>
-        <div class="update-actions"><button id="show-lesson-tests" type="button">加载 1–21 用例</button><button id="run-all-lesson-tests" type="button" disabled>一键测试全部</button></div>
+        <div
+          class="dialog-title"><div><h2>1–21 课程测试用例</h2><p>Fake Provider Smoke Test · 不调用真实模型</p></div><button id="close-tests" class="close" type="button">×</button></div>
+        <div
+          class="update-actions"><button id="show-lesson-tests" type="button">加载 1–21 用例</button><button id="run-all-lesson-tests" type="button" disabled>一键测试全部</button></div>
         <div id="lesson-test-summary" class="lesson-test-summary">尚未运行测试</div>
         <div id="lesson-test-list" class="lesson-test-list"></div>
         <pre id="runtime-test-output">点击“加载 1–21 用例”开始。</pre>

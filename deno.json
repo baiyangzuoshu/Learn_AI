@@ -40,7 +40,7 @@
     "s38": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s38_cost_latency_routing/code.ts",
     "s39": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s39_loop_control_replay/code.ts",
     "s40": "deno run --allow-env --allow-net --allow-run --allow-read --allow-write --env-file=.env.local stages/s40_cognitive_workspace/code.ts",
-    "test": "deno test tests/21test_runtime_budget.ts tests/cost_telemetry_test.ts",
+    "test": "deno test tests/21test_runtime_budget.ts tests/cost_telemetry_test.ts tests/seedream_test.ts",
     "check": "deno check stages/*/code.ts src/**/*.ts"
   },
   "fmt": {

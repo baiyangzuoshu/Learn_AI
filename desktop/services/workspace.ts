@@ -1,6 +1,7 @@
 import { getWorkspace } from "../../src/config/settings.ts";
 import { isWindows, runCommand } from "../../src/platform.ts";
-import { readdir, realpath } from "node:fs/promises";
+import { readdir, readFile, realpath, stat } from "node:fs/promises";
+import { extname, isAbsolute, relative, resolve } from "node:path";
 
 export type WorkspaceTreeNode = {
   name: string;
@@ -109,4 +110,41 @@ export async function openWorkspaceFile(path: string): Promise<void> {
   const command = process.platform === "darwin" ? "open" : isWindows ? "explorer.exe" : "xdg-open";
   const result = await runCommand(command, [target]);
   if (!result.success) throw new Error(result.stderr || "无法打开文件");
+}
+
+const IMAGE_CONTENT_TYPES = new Map([
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"],
+]);
+
+export async function readWorkspaceImage(path: string): Promise<{
+  body: Uint8Array;
+  contentType: string;
+}> {
+  if (!path || isAbsolute(path)) throw new Error("图片路径必须是工作区相对路径");
+  const workspace = await realpath(await getWorkspace());
+  const target = resolve(workspace, path);
+  const rel = relative(workspace, target);
+  if (rel === ".." || rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)) {
+    throw new Error("图片不在当前工作目录中");
+  }
+  const generatedPrefix = `.ai-agent${process.platform === "win32" ? "\\" : "/"}generated-images`;
+  if (
+    rel !== generatedPrefix &&
+    !rel.startsWith(`${generatedPrefix}${process.platform === "win32" ? "\\" : "/"}`)
+  ) {
+    throw new Error("仅允许预览 Agent 生成的图片");
+  }
+  const actual = await realpath(target);
+  if (
+    actual !== workspace && !actual.startsWith(`${workspace}/`) &&
+    !actual.startsWith(`${workspace}\\`)
+  ) throw new Error("图片不在当前工作目录中");
+  const contentType = IMAGE_CONTENT_TYPES.get(extname(actual).toLowerCase());
+  if (!contentType) throw new Error("不支持的图片格式");
+  const info = await stat(actual);
+  if (!info.isFile() || info.size > 20 * 1024 * 1024) throw new Error("图片文件无效或超过 20 MB");
+  return { body: await readFile(actual), contentType };
 }
