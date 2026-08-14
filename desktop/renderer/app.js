@@ -638,7 +638,13 @@ function formatTraceDuration(ms) {
   return value < 1_000 ? `${Math.max(0, Math.round(value))}ms` : formatDuration(value);
 }
 function traceStatusLabel(status) {
-  return status === "ok" ? "完成" : status === "cancelled" ? "已取消" : status === "error" ? "失败" : "运行中";
+  return status === "ok"
+    ? "完成"
+    : status === "cancelled"
+    ? "已取消"
+    : status === "error"
+    ? "失败"
+    : "运行中";
 }
 function traceKindLabel(kind) {
   return kind === "provider" ? "Provider" : kind === "tool" ? "工具" : "运行";
@@ -667,8 +673,12 @@ function renderTraceDetails(summary) {
       const status = traceStatusLabel(span.status);
       const statusClass = span.status === "error"
         ? "trace-span-error"
-        : span.status === "cancelled" ? "trace-span-cancelled" : "trace-span-ok";
-      return `<div class="runtime-trace-span ${statusClass}" title="Span ${escapeHtml(String(span.spanId || ""))}">
+        : span.status === "cancelled"
+        ? "trace-span-cancelled"
+        : "trace-span-ok";
+      return `<div class="runtime-trace-span ${statusClass}" title="Span ${
+        escapeHtml(String(span.spanId || ""))
+      }">
         <span class="trace-span-index">${index + 1}</span>
         <span class="trace-span-kind">${escapeHtml(traceKindLabel(span.kind))}</span>
         <span class="trace-span-name">${escapeHtml(String(span.name || "未命名 Span"))}</span>
@@ -702,7 +712,9 @@ function renderTraceSummary(summary) {
   const shortId = traceId ? traceId.slice(-8) : "未知";
   const status = summary.status === "ok"
     ? "完成"
-    : summary.status === "cancelled" ? "已取消" : "失败";
+    : summary.status === "cancelled"
+    ? "已取消"
+    : "失败";
   target.textContent = `${shortId} · ${formatTraceDuration(summary.durationMs)} · ${
     formatBudgetNumber(summary.spanCount)
   } spans · ${formatBudgetNumber(summary.errorSpans)} 错误`;

@@ -1,4 +1,4 @@
-import type { PermissionMode, ToolRequest } from "./contracts.ts";
+import type { PermissionMode, ToolPolicy, ToolRequest } from "./contracts.ts";
 import { confirmPermission } from "./platform.ts";
 
 const hardDenied = [
@@ -56,13 +56,18 @@ function summarizePermissionInput(request: ToolRequest): string {
   return Object.entries(input).map(([key, value]) => `${key}: ${describeValue(value)}`).join("\n");
 }
 
-export async function authorize(request: ToolRequest, mode: PermissionMode): Promise<void> {
+export async function authorize(
+  request: ToolRequest,
+  mode: PermissionMode,
+  policy?: Pick<ToolPolicy, "mutation" | "risk">,
+): Promise<void> {
   const command = String(request.input.command ?? "");
   if (
     mode !== "full" && ["bash", "background_start"].includes(request.name) &&
     hardDenied.some((pattern) => pattern.test(command))
   ) throw new Error("Permission denied: system-level dangerous command");
-  const mutating = [
+  const mutating = policy ? policy.mutation || policy.risk !== "read-only" : [
+    "bash",
     "write_file",
     "edit_file",
     "background_start",

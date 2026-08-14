@@ -2,6 +2,22 @@ import type { Message, ToolDefinition } from "./core/types.ts";
 
 export type PermissionMode = "ask" | "auto" | "full";
 
+export type ToolRisk = "read-only" | "mutating" | "external" | "dangerous";
+
+export interface ToolPolicy {
+  name: string;
+  mutation: boolean;
+  risk: ToolRisk;
+  scopes: string[];
+  maxOutput: number;
+}
+
+export interface Principal {
+  id: string;
+  scopes: ReadonlySet<string>;
+  expiresAt: number;
+}
+
 export type RunBudget = {
   iterations: number;
   toolCalls: number;
@@ -109,6 +125,7 @@ export type ToolHandler = (input: Record<string, unknown>, context: ToolContext)
 export interface RegisteredTool {
   definition: ToolDefinition;
   handler: ToolHandler;
+  policy: ToolPolicy;
 }
 export interface PromptSection {
   id: string;
@@ -135,6 +152,7 @@ export interface RunOptions {
   history?: Message[];
   workspace?: string;
   permissionMode?: PermissionMode;
+  principal?: Principal;
   signal?: AbortSignal;
   budget?: Partial<RunBudget> | RuntimeBudget;
   onEvent?: (event: HarnessEvent) => void;
@@ -150,7 +168,7 @@ export interface HarnessFeature {
   ): void;
 }
 export interface ToolRegistryContract {
-  register(definition: ToolDefinition, handler: ToolHandler): void;
+  register(definition: ToolDefinition, handler: ToolHandler, policy?: Partial<ToolPolicy>): void;
 }
 export interface PromptRegistryContract {
   register(section: PromptSection): void;

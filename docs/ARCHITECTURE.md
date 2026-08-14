@@ -167,6 +167,17 @@ Key、工具参数、工具输出或文件内容。
 位于第二行， 后续指标继续使用独立的 `runtime-status-row` 向下扩展。完整工具事件仍在工具面板中，详细
 Hook 事件只在开发者 模式下显示。Trace 不持久化提示词、API Key、工具参数或文件内容。
 
+### Tool Policy
+
+第 23 课的 Tool Policy 已融合到生产工具执行面。`ToolRegistry` 为每个注册工具保存统一策略：风险分类
+（read-only、mutating、external、dangerous）、mutation 标记、所需 scope
+和最大输出长度。运行开始时创建短期 `Principal`；每次工具调用在权限审批前检查 Principal
+是否过期、是否拥有全部 scope，执行成功后再按工具策略截断 输出。策略拒绝、授权和输出截断会通过开发者
+Hook 与 Trace 关联，模型不能自行授予或延长权限。
+
+未显式传入策略的旧工具会由注册中心按工具名称生成安全默认值，以保持现有 Feature
+兼容；新增高风险工具应显式传入 `ToolPolicy`，并补充过期、scope、输出上限和失败路径的验收测试。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：

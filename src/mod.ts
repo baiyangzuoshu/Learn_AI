@@ -8,6 +8,7 @@ import { scheduling } from "./features/scheduling.ts";
 import { runtimeLimits } from "./features/runtime_limits.ts";
 import { pdfReader } from "./features/pdf_reader.ts";
 import { imageGeneration } from "./features/image_generation.ts";
+import { toolPolicy } from "./features/tool_policy.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -20,6 +21,7 @@ export const harness = new AgentRuntime([
   orchestration,
   integrations,
   imageGeneration,
+  toolPolicy,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -45,6 +47,7 @@ export async function agentLoop(
   onHook: (event: HarnessEvent) => void = () => {},
   providerId?: string,
   budget?: RunOptions["budget"],
+  principal?: RunOptions["principal"],
 ): Promise<string> {
   return await harness.run({
     query,
@@ -54,6 +57,7 @@ export async function agentLoop(
     permissionMode,
     signal,
     budget,
+    principal,
     onEvent(event) {
       if (event.type === "tool") {
         onEvent({
@@ -74,10 +78,12 @@ export async function agentLoop(
 export type {
   HarnessEvent,
   PermissionMode,
+  Principal,
   RunBudget,
   RunBudgetSnapshot,
   RunOptions,
 } from "./contracts.ts";
+export type { ToolPolicy, ToolRisk } from "./contracts.ts";
 export {
   BudgetExceededError,
   DEFAULT_RUN_BUDGET,
@@ -86,4 +92,13 @@ export {
 } from "./contracts.ts";
 export { TraceBook } from "./trace.ts";
 export type { TraceSpan, TraceStatus, TraceSummary } from "./trace.ts";
+export {
+  authorizeToolPolicy,
+  boundedToolOutput,
+  createPrincipal,
+  DEFAULT_TOOL_OUTPUT,
+  normalizeToolPolicy,
+  PRINCIPAL_TTL_MS,
+  ToolPolicyError,
+} from "./tool_policy.ts";
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";

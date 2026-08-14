@@ -17,6 +17,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 - Subagent、Agent Teams、Git Worktree 和有边界自治循环
 - 可收起导航、工作区概览、Git 改动信息和开发者事件面板
 - 结构化运行 Trace：底部第二行显示摘要，第三行可展开查看脱敏 Span 明细（类型、父子关系、耗时和状态）
+- 工具策略：每个工具具备风险分类、权限 scope、Principal 过期校验和独立输出上限
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
 ## 文档

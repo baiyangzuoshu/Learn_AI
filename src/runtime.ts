@@ -15,6 +15,12 @@ import { PromptRegistry } from "./prompt.ts";
 import { authorize } from "./permissions.ts";
 import { compactHistory } from "./context.ts";
 import { TraceBook, type TraceSpan, type TraceStatus } from "./trace.ts";
+import {
+  authorizeToolPolicy,
+  boundedToolOutput,
+  createPrincipal,
+  ToolPolicyError,
+} from "./tool_policy.ts";
 
 type TraceEvent = Omit<HarnessEvent, "type">;
 
@@ -88,6 +94,7 @@ export class AgentRuntime {
     };
     //
     const workspace = options.workspace ?? await getWorkspace();
+    const principal = createPrincipal(options.permissionMode ?? "ask", options.principal);
     //
     const config = await this.#resolveProviderConfig(options.providerId, options.model);
     //
@@ -155,19 +162,38 @@ export class AgentRuntime {
         for (const call of assistant.tool_calls) {
           budget.consume("toolCalls");
           const toolSpan = traces.start(`tool.${call.function.name}`, "tool", rootSpan);
+          const tool = this.tools.get(call.function.name);
           let output: string;
           try {
-            const tool = this.tools.get(call.function.name);
-            //
             if (!tool) throw new Error(`Unknown tool: ${call.function.name}`);
             //
             const input = JSON.parse(call.function.arguments) as Record<string, unknown>;
             //
+            authorizeToolPolicy(tool.policy, principal);
+            emitHook({
+              name: "ToolPolicyAuthorized",
+              detail: `${tool.policy.name} · ${tool.policy.risk} · scopes=${
+                tool.policy.scopes.join(",")
+              }`,
+            }, toolSpan);
             emitHook({ name: "PreToolUse", detail: call.function.name }, toolSpan);
             //
-            await authorize({ name: call.function.name, input }, options.permissionMode ?? "ask");
+            await authorize(
+              { name: call.function.name, input },
+              options.permissionMode ?? "ask",
+              tool.policy,
+            );
             //
             output = await tool.handler(input, { workspace, signal: options.signal, budget });
+
+            const bounded = boundedToolOutput(output, tool.policy);
+            if (bounded.length !== output.length) {
+              emitHook({
+                name: "ToolOutputTruncated",
+                detail: `${tool.policy.name} · ${output.length} → ${bounded.length} chars`,
+              }, toolSpan);
+            }
+            output = bounded;
 
             toolCount++;
             //
@@ -178,9 +204,16 @@ export class AgentRuntime {
             }, toolSpan);
           } catch (error) {
             traces.end(toolSpan, options.signal?.aborted ? "cancelled" : "error");
+            if (error instanceof ToolPolicyError) {
+              emitHook({
+                name: "ToolPolicyDenied",
+                detail: `${call.function.name} · ${error.reason} · ${error.message}`,
+              }, toolSpan);
+            }
             if (error instanceof BudgetExceededError) throw error;
             output = `Error: ${error instanceof Error ? error.message : String(error)}`;
           }
+          output = tool ? boundedToolOutput(output, tool.policy) : output;
           budget.consume("outputChars", output.length);
           emitTool({
             name: call.function.name,
