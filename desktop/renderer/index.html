@@ -127,6 +127,9 @@
         class="runtime-budget-status runtime-status-row"><span>本次预算</span><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span><span>追踪 <b id="runtime-trace">—</b></span><button id="runtime-trace-toggle" class="runtime-trace-toggle" type="button" hidden>查看明细</button></div>
       <div id="runtime-trace-details" class="runtime-trace-details runtime-status-row" hidden>
         <div
+          id="runtime-task-state" class="runtime-task-state"
+          hidden><span>任务 <b id="runtime-task-id">—</b></span><span>状态 <b id="runtime-task-status">—</b></span><span>修订 <b id="runtime-task-revision">0</b></span><span>证据 <b id="runtime-task-evidence">0</b></span><span class="runtime-task-goal">目标 <b id="runtime-task-goal">—</b></span></div>
+        <div
           class="runtime-trace-detail-header"><span>Trace ID <b id="runtime-trace-id">—</b></span><span>状态 <b id="runtime-trace-status">—</b></span><span>根 Span <b id="runtime-trace-root">—</b></span><span>Provider <b id="runtime-trace-provider">0</b></span><span>工具 <b id="runtime-trace-tools">0</b></span><span>错误 <b id="runtime-trace-errors">0</b></span></div>
         <div id="runtime-trace-spans" class="runtime-trace-spans" aria-live="polite"></div>
       </div>

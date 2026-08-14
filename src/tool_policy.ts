@@ -18,6 +18,9 @@ const mutatingTools = new Set([
   "worktree_remove",
   "mcp_call",
   "generate_image",
+  "task_create",
+  "task_checkpoint",
+  "task_verify",
 ]);
 const externalTools = new Set([
   "bash",

@@ -195,6 +195,10 @@ export class AgentRuntime {
             }
             output = bounded;
 
+            if (call.function.name.startsWith("task_") && output.startsWith('{"task":')) {
+              emitHook({ name: "TaskState", detail: output }, toolSpan);
+            }
+
             toolCount++;
             //
             traces.end(toolSpan, "ok");

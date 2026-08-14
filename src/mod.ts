@@ -9,6 +9,7 @@ import { runtimeLimits } from "./features/runtime_limits.ts";
 import { pdfReader } from "./features/pdf_reader.ts";
 import { imageGeneration } from "./features/image_generation.ts";
 import { toolPolicy } from "./features/tool_policy.ts";
+import { taskState } from "./features/task_state.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -22,6 +23,7 @@ export const harness = new AgentRuntime([
   integrations,
   imageGeneration,
   toolPolicy,
+  taskState,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -102,3 +104,5 @@ export {
   ToolPolicyError,
 } from "./tool_policy.ts";
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";
+export { checkpointTask, createTask, resumeTask, verifyTask } from "./task_ledger.ts";
+export type { TaskEvidence, TaskRecord, TaskState } from "./task_ledger.ts";

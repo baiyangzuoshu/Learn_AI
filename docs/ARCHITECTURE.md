@@ -178,6 +178,15 @@ Hook 与 Trace 关联，模型不能自行授予或延长权限。
 未显式传入策略的旧工具会由注册中心按工具名称生成安全默认值，以保持现有 Feature
 兼容；新增高风险工具应显式传入 `ToolPolicy`，并补充过期、scope、输出上限和失败路径的验收测试。
 
+### Task State & Replay
+
+第 24 课的任务账本已融合为独立 `task-state` Feature。`task_create`、`task_checkpoint`、`task_resume`
+和 `task_verify` 使用工作区哈希后的本地 JSON
+文件持久化任务状态；写入通过原子替换完成。任务只有在存在 evidence 时才能进入 `verified`，checkpoint
+和 verify 支持幂等键，重复提交不会重复推进副作用。每次任务工具 返回的状态会关联当前
+Trace，并推送到桌面底部第三行；该行显示任务 ID、状态、revision、证据数量和目标，Trace
+明细仍在同一观察区内展示。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：

@@ -7,6 +7,7 @@ const messages = $("#messages"),
   runtimeStatus = $("#runtime-status"),
   runtimeTraceDetails = $("#runtime-trace-details"),
   runtimeTraceSpans = $("#runtime-trace-spans"),
+  runtimeTaskState = $("#runtime-task-state"),
   runtimeTraceToggle = $("#runtime-trace-toggle");
 const input = $("#prompt"), send = $("#send"), status = $("#status");
 const modelSelect = $("#model-select"),
@@ -653,6 +654,49 @@ function shortTraceId(value) {
   const id = String(value || "");
   return id ? id.slice(-12) : "—";
 }
+function taskStateLabel(state) {
+  return state === "planned"
+    ? "计划中"
+    : state === "running"
+    ? "执行中"
+    : state === "verified"
+    ? "已验证"
+    : "已阻塞";
+}
+function renderTaskState(task) {
+  if (!runtimeTaskState) return;
+  if (!task || typeof task !== "object") {
+    runtimeTaskState.hidden = true;
+    runtimeTaskState.classList.remove(
+      "task-planned",
+      "task-running",
+      "task-verified",
+      "task-blocked",
+    );
+    return;
+  }
+  $("#runtime-task-id").textContent = shortTraceId(task.id);
+  $("#runtime-task-status").textContent = taskStateLabel(task.state);
+  $("#runtime-task-revision").textContent = formatBudgetNumber(task.revision);
+  $("#runtime-task-evidence").textContent = formatBudgetNumber(
+    Number.isFinite(Number(task.evidenceCount))
+      ? Number(task.evidenceCount)
+      : Array.isArray(task.evidence)
+      ? task.evidence.length
+      : 0,
+  );
+  $("#runtime-task-goal").textContent = String(task.goal || "—");
+  runtimeTaskState.hidden = false;
+  runtimeTaskState.classList.remove(
+    "task-planned",
+    "task-running",
+    "task-verified",
+    "task-blocked",
+  );
+  runtimeTaskState.classList.add(`task-${String(task.state || "planned")}`);
+  if (runtimeTraceToggle) runtimeTraceToggle.hidden = false;
+  setTraceDetailsOpen(true);
+}
 function renderTraceDetails(summary) {
   if (!runtimeTraceDetails || !runtimeTraceSpans) return;
   const spans = Array.isArray(summary?.spans) ? summary.spans : [];
@@ -705,6 +749,7 @@ function renderTraceSummary(summary) {
     target.classList.remove("trace-error", "trace-cancelled");
     if (runtimeTraceToggle) runtimeTraceToggle.hidden = true;
     if (runtimeTraceSpans) runtimeTraceSpans.replaceChildren();
+    renderTaskState(null);
     setTraceDetailsOpen(false);
     return;
   }
@@ -1319,6 +1364,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "trace") {
           renderTraceSummary(data.summary);
           thinking.textContent = `追踪完成：${$("#runtime-trace").textContent}`;
+        }
+        if (data.type === "task") {
+          renderTaskState(data.task);
+          thinking.textContent = `任务状态：${$("#runtime-task-status").textContent}`;
         }
         if (data.type === "tool") {
           runToolCount++;

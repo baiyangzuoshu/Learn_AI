@@ -3,6 +3,7 @@ import {
   agentLoop,
   type PermissionMode,
   type RunBudgetSnapshot,
+  type TaskRecord,
   type TraceSummary,
 } from "../../src/mod.ts";
 
@@ -20,11 +21,13 @@ export async function runChat(body: ChatRequest): Promise<{
   events: AgentEvent[];
   budget?: RunBudgetSnapshot;
   trace?: TraceSummary;
+  task?: TaskRecord;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
   const events: AgentEvent[] = [];
   let budget: RunBudgetSnapshot | undefined;
   let trace: TraceSummary | undefined;
+  let task: TaskRecord | undefined;
   const answer = await agentLoop(
     body.message,
     (event) => events.push(event),
@@ -43,10 +46,15 @@ export async function runChat(body: ChatRequest): Promise<{
           trace = JSON.parse(event.detail ?? "") as TraceSummary;
         } catch { /* ignore malformed trace details */ }
       }
+      if (event.name === "TaskState") {
+        try {
+          task = (JSON.parse(event.detail ?? "{}").task ?? undefined) as TaskRecord | undefined;
+        } catch { /* ignore malformed task state details */ }
+      }
     },
     body.providerId,
   );
-  return { answer, events, budget, trace };
+  return { answer, events, budget, trace, task };
 }
 
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
@@ -90,7 +98,17 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
               emit({ type: "trace", summary: JSON.parse(event.detail ?? "") });
             } catch { /* ignore malformed trace details */ }
           }
-          if (body.developerMode && event.name !== "RunUsage" && event.name !== "TraceSummary") {
+          if (event.name === "TaskState") {
+            try {
+              emit({ type: "task", task: JSON.parse(event.detail ?? "{}").task });
+            } catch { /* ignore malformed task state details */ }
+          }
+          if (
+            body.developerMode &&
+            event.name !== "RunUsage" &&
+            event.name !== "TraceSummary" &&
+            event.name !== "TaskState"
+          ) {
             emit({ type: "hook", event });
           }
         },
