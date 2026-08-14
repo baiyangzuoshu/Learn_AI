@@ -72,3 +72,5 @@
 - [阿里巴巴：Qwen3](https://home.alibabagroup.com/en-US/document-1853940226976645120)
 - [Qwen：Qwen3 技术说明](https://qwenlm.github.io/blog/qwen3/)
 - [Qwen：Qwen3.5（2026-02-15）](https://qwen.ai/blog?email_hash=23463b99b62a72f26ed677cc556c44e8&id=qwen3.5)
+
+<!-- fact-matrix: F2026-003 -->

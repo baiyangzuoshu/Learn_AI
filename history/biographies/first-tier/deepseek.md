@@ -88,3 +88,5 @@ DeepSeek-V4 把 2025 年 R1 引发的开放推理路线继续向前推进。此�
 - [DeepSeek-R1 Technical Paper](https://arxiv.org/abs/2501.12948)
 - [DeepSeek-R1 官方发布说明](https://api-docs.deepseek.com/news/news250120/)
 - [DeepSeek：透明度中心与 V4（2026-04-24）](https://www.deepseek.com/en/transparency/)
+
+<!-- fact-matrix: F2025-001,F2026-007 -->

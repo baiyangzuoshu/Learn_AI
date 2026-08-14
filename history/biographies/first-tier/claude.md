@@ -124,3 +124,5 @@ Claude 的传记在 2026 年进入“模型—工具—组织”合一阶段。A
 - [Anthropic：Claude Sonnet 4.5（2025-09-29）](https://www.anthropic.com/news/claude-sonnet-4-5)
 - [Anthropic：Anthropic Labs（2026-01-13）](https://www.anthropic.com/news/introducing-anthropic-labs)
 - [Anthropic：Claude Fable 5 与 Mythos 5（2026-06-09）](https://www.anthropic.com/news/claude-fable-5-mythos-5)
+
+<!-- fact-matrix: F2025-003,F2026-001,F2026-011 -->

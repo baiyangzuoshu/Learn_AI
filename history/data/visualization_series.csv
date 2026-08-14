@@ -8,3 +8,8 @@ organization_ai_adoption,2025,78,percent,reported adoption rate,https://hai.stan
 organization_ai_adoption,2026,88,percent,reported adoption rate,https://hai.stanford.edu/ai-index/2026-ai-index-report
 documented_ai_incidents,2024,233,incidents,annual documented incidents,https://hai.stanford.edu/ai-index/2026-ai-index-report
 documented_ai_incidents,2026,362,incidents,annual documented incidents,https://hai.stanford.edu/ai-index/2026-ai-index-report
+fact_matrix_verified_count,2022,8,facts,rows in fact_matrix.csv with spot-checked status,derived from history/sources/fact_matrix.csv
+fact_matrix_verified_count,2023,6,facts,rows in fact_matrix.csv with spot-checked status,derived from history/sources/fact_matrix.csv
+fact_matrix_verified_count,2024,10,facts,rows in fact_matrix.csv with spot-checked status,derived from history/sources/fact_matrix.csv
+fact_matrix_verified_count,2025,23,facts,rows in fact_matrix.csv with spot-checked status,derived from history/sources/fact_matrix.csv
+fact_matrix_verified_count,2026,28,facts,rows in fact_matrix.csv with spot-checked status,derived from history/sources/fact_matrix.csv

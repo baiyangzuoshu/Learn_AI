@@ -32,6 +32,8 @@
 - [2026 技术深度：长程 Agent、模型分层与专业化工作流](technology/2026.md)
 - [AI 模型列传体系](biographies/README.md)
 - [来源索引与核验规则](sources/index.md)
+- [来源—事实矩阵](sources/fact_matrix.csv)（75 条事实，覆盖 79 条年度数据记录）
+- [来源可访问性记录](sources/source_status.csv)（53 个唯一 URL）
 - [版本记录](CHANGELOG.md)
 - 2024 数据快照：[2024_snapshot.csv](data/2024_snapshot.csv)
 - 2025 数据快照：[2025_snapshot.csv](data/2025_snapshot.csv)
@@ -40,7 +42,7 @@
 
 ## 校验
 
-可运行 `python3 history/scripts/validate_yearbooks.py` 检查年度文件、CSV 字段、HTTPS 来源、2026 截止日期和传记覆盖情况。
+可运行 `python3 history/scripts/validate_yearbooks.py` 检查年度文件、CSV 字段、HTTPS 来源、事实矩阵与数据快照逐条映射、2026 截止日期和传记覆盖情况。
 
 ## 资料原则
 

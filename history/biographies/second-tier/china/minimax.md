@@ -58,3 +58,5 @@ MiniMax 的全模态路线能覆盖更多消费和创作场景，但每种模态
 - [MiniMax-01 开源](https://www.minimaxi.com/news/minimax-01-%E7%B3%BB%E5%88%97)
 - [MiniMax：M3（2026-06-01）](https://www.minimax.io/blog/minimax-m3)
 - [MiniMax API：2026 模型发布记录](https://platform.minimax.io/docs/release-notes/models)
+
+<!-- fact-matrix: F2026-010,F2026-014 -->

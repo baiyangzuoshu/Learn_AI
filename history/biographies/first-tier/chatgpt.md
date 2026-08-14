@@ -213,3 +213,5 @@ ChatGPT 的主线从“有 Agent 功能”转为“以 Agent 作为工作系统�
 - [OpenAI：GPT-5.5（2026-04-23）](https://openai.com/index/introducing-gpt-5-5/)
 - [OpenAI：GPT-5.6 Sol 预览（2026-06-26）](https://openai.com/index/previewing-gpt-5-6-sol/)
 - [OpenAI：Presence（2026-07-22）](https://openai.com/index/introducing-openai-presence/)
+
+<!-- fact-matrix: F2022-005,F2025-012,F2026-004,F2026-012,F2026-013 -->
