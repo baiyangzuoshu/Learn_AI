@@ -7,13 +7,17 @@
   padding: 10px;
   text-align: left;
 }
+:root {
+  --runtime-status-height: 48px;
+}
 .runtime-status {
   position: fixed;
   z-index: 30;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 48px;
+  height: auto;
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -34,6 +38,26 @@
   overflow-y: hidden;
   white-space: nowrap;
 }
+.runtime-status-row {
+  flex: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 21px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid #252d37;
+  background: #0d1117;
+  white-space: nowrap;
+}
+.runtime-status-row > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: max-content;
+  padding: 0 11px;
+  border-right: 1px solid #2a3038;
+}
 .runtime-status-main > span {
   display: flex;
   align-items: center;
@@ -48,6 +72,15 @@
   text-overflow: ellipsis;
   color: #8c949f;
   font-weight: 500;
+}
+.runtime-status #runtime-trace {
+  color: #72d9c4;
+}
+.runtime-status #runtime-trace.trace-error {
+  color: #ff9b9b;
+}
+.runtime-status #runtime-trace.trace-cancelled {
+  color: #e5bc78;
 }
 .runtime-status .runtime-model i {
   width: 7px;
@@ -86,14 +119,119 @@
   color: #8c949f;
   white-space: nowrap;
 }
+.runtime-status .runtime-trace-toggle {
+  flex: none;
+  margin: 2px 8px;
+  padding: 2px 7px;
+  border: 1px solid #315b57;
+  border-radius: 5px;
+  background: #10231f;
+  color: #72d9c4;
+  font: inherit;
+  cursor: pointer;
+}
+.runtime-status .runtime-trace-toggle:hover {
+  background: #17362f;
+}
+.runtime-status .runtime-trace-details {
+  display: block!important;
+  min-height: 0;
+  max-height: 185px;
+  overflow: hidden!important;
+  padding: 4px 9px;
+  white-space: normal;
+}
+.runtime-status .runtime-trace-details[hidden] {
+  display: none!important;
+}
+.runtime-trace-detail-header {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  gap: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.runtime-trace-detail-header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+  padding: 0 10px;
+  border-right: 1px solid #2a3038;
+}
+.runtime-trace-detail-header > span:first-child {
+  padding-left: 2px;
+}
+.runtime-trace-detail-header b {
+  max-width: none;
+  color: #72d9c4;
+}
+.runtime-trace-spans {
+  display: grid;
+  gap: 3px;
+  max-height: 128px;
+  margin-top: 4px;
+  overflow: auto;
+  font-size: 9px;
+}
+.runtime-trace-span {
+  display: grid;
+  grid-template-columns: 22px 52px minmax(130px, 1fr) 104px 52px 58px 42px;
+  align-items: center;
+  min-width: 520px;
+  min-height: 18px;
+  padding: 0 5px;
+  border: 1px solid #202b35;
+  border-radius: 4px;
+  background: #0a1118;
+  color: #8c949f;
+}
+.runtime-trace-span > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.runtime-trace-span .trace-span-index,
+.runtime-trace-span .trace-span-offset,
+.runtime-trace-span .trace-span-duration {
+  color: #6f8293;
+}
+.runtime-trace-span .trace-span-kind {
+  color: #9aabc0;
+}
+.runtime-trace-span .trace-span-name {
+  color: #c9d7e6;
+}
+.runtime-trace-span .trace-span-status {
+  color: #72d2a2;
+  text-align: right;
+}
+.runtime-trace-span.trace-span-error {
+  border-color: #77424e;
+}
+.runtime-trace-span.trace-span-error .trace-span-status {
+  color: #ff9caa;
+}
+.runtime-trace-span.trace-span-cancelled {
+  border-color: #725d36;
+}
+.runtime-trace-span.trace-span-cancelled .trace-span-status {
+  color: #e5bc78;
+}
+.runtime-trace-empty {
+  padding: 4px 2px;
+  color: #6f8293;
+}
 #composer {
-  bottom: 56px!important;
+  bottom: calc(var(--runtime-status-height) + 8px)!important;
 }
 body > aside {
-  height: calc(100vh - 48px)!important;
+  height: calc(100vh - var(--runtime-status-height))!important;
 }
 body > main {
-  height: calc(100vh - 48px)!important;
+  height: calc(100vh - var(--runtime-status-height))!important;
 }
 .composer-meta {
   position: absolute;

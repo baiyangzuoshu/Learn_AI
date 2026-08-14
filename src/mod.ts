@@ -28,6 +28,11 @@ export interface AgentEvent {
   name: string;
   input: string;
   output: string;
+  traceId?: string;
+  spanId?: string;
+  parentSpanId?: string;
+  durationMs?: number;
+  traceStatus?: "ok" | "error" | "cancelled";
 }
 //主循环
 export async function agentLoop(
@@ -56,6 +61,11 @@ export async function agentLoop(
           name: event.name,
           input: event.input ?? "",
           output: event.output ?? "",
+          traceId: event.traceId,
+          spanId: event.spanId,
+          parentSpanId: event.parentSpanId,
+          durationMs: event.durationMs,
+          traceStatus: event.traceStatus,
         });
       } else onHook(event);
     },
@@ -74,4 +84,6 @@ export {
   resolveRunBudget,
   RuntimeBudget,
 } from "./contracts.ts";
+export { TraceBook } from "./trace.ts";
+export type { TraceSpan, TraceStatus, TraceSummary } from "./trace.ts";
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";

@@ -122,6 +122,11 @@ export interface HarnessEvent {
   detail?: string;
   input?: string;
   output?: string;
+  traceId?: string;
+  spanId?: string;
+  parentSpanId?: string;
+  durationMs?: number;
+  traceStatus?: "ok" | "error" | "cancelled";
 }
 export interface RunOptions {
   query: string;

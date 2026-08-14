@@ -155,6 +155,18 @@ RunOptions
 - 权限检查和危险操作拒绝。
 - 上下文压缩和历史消息控制。
 
+### 结构化 Trace
+
+第 22 课的契约与追踪机制已融合到生产 Runtime。每次 `AgentRuntime.run()` 创建一个 root span，Provider
+调用和工具执行创建带有 `traceId`、`spanId`、`parentSpanId` 的子
+Span；成功、失败和取消都会记录状态与耗时。 `TraceSummary` 输出脱敏的聚合信息以及 Span 元数据：Trace
+ID、总耗时、Span 数、Provider 调用数、工具调用数、错误数和父子 Span 关系。Span 明细不包含提示词、API
+Key、工具参数、工具输出或文件内容。
+
+桌面底部状态栏第一行固定展示模型、工作区、Token、费用和会话信息，不再追加新功能；预算和 Trace
+位于第二行， 后续指标继续使用独立的 `runtime-status-row` 向下扩展。完整工具事件仍在工具面板中，详细
+Hook 事件只在开发者 模式下显示。Trace 不持久化提示词、API Key、工具参数或文件内容。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：

@@ -3,6 +3,7 @@ import {
   agentLoop,
   type PermissionMode,
   type RunBudgetSnapshot,
+  type TraceSummary,
 } from "../../src/mod.ts";
 
 export type ChatRequest = {
@@ -18,10 +19,12 @@ export async function runChat(body: ChatRequest): Promise<{
   answer: string;
   events: AgentEvent[];
   budget?: RunBudgetSnapshot;
+  trace?: TraceSummary;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
   const events: AgentEvent[] = [];
   let budget: RunBudgetSnapshot | undefined;
+  let trace: TraceSummary | undefined;
   const answer = await agentLoop(
     body.message,
     (event) => events.push(event),
@@ -35,10 +38,15 @@ export async function runChat(body: ChatRequest): Promise<{
           budget = JSON.parse(event.detail ?? "") as RunBudgetSnapshot;
         } catch { /* ignore malformed developer detail */ }
       }
+      if (event.name === "TraceSummary") {
+        try {
+          trace = JSON.parse(event.detail ?? "") as TraceSummary;
+        } catch { /* ignore malformed trace details */ }
+      }
     },
     body.providerId,
   );
-  return { answer, events, budget };
+  return { answer, events, budget, trace };
 }
 
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
@@ -77,7 +85,14 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
               emit({ type: "budget", usage: JSON.parse(event.detail ?? "") });
             } catch { /* ignore malformed usage details */ }
           }
-          if (body.developerMode && event.name !== "RunUsage") emit({ type: "hook", event });
+          if (event.name === "TraceSummary") {
+            try {
+              emit({ type: "trace", summary: JSON.parse(event.detail ?? "") });
+            } catch { /* ignore malformed trace details */ }
+          }
+          if (body.developerMode && event.name !== "RunUsage" && event.name !== "TraceSummary") {
+            emit({ type: "hook", event });
+          }
         },
         body.providerId,
       ).then((answer) => {

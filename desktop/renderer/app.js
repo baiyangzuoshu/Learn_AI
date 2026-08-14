@@ -3,7 +3,11 @@ const $ = (selector) => document.querySelector(selector);
 const messages = $("#messages"),
   events = $("#events"),
   eventsContent = $("#events-content"),
-  form = $("#composer");
+  form = $("#composer"),
+  runtimeStatus = $("#runtime-status"),
+  runtimeTraceDetails = $("#runtime-trace-details"),
+  runtimeTraceSpans = $("#runtime-trace-spans"),
+  runtimeTraceToggle = $("#runtime-trace-toggle");
 const input = $("#prompt"), send = $("#send"), status = $("#status");
 const modelSelect = $("#model-select"),
   settingsDialog = $("#settings-dialog"),
@@ -42,6 +46,19 @@ const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
 const CONTEXT_COMPACT_AT = 0.8;
 let activeWorkspaceTab = localStorage.getItem("ai-agent:workspace-tab") || "overview";
+
+function syncRuntimeStatusHeight() {
+  if (!runtimeStatus) return;
+  document.documentElement.style.setProperty(
+    "--runtime-status-height",
+    `${runtimeStatus.getBoundingClientRect().height}px`,
+  );
+}
+if (runtimeStatus && typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(syncRuntimeStatusHeight).observe(runtimeStatus);
+}
+window.addEventListener("resize", syncRuntimeStatusHeight);
+syncRuntimeStatusHeight();
 
 function formatBudgetNumber(value) {
   const number = Number(value || 0);
@@ -615,6 +632,92 @@ function formatDuration(ms) {
   const hours = Math.floor(minutes / 60), minuteRest = minutes % 60;
   return minuteRest ? `${hours}小时${minuteRest}分` : `${hours}小时`;
 }
+function formatTraceDuration(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return "—";
+  return value < 1_000 ? `${Math.max(0, Math.round(value))}ms` : formatDuration(value);
+}
+function traceStatusLabel(status) {
+  return status === "ok" ? "完成" : status === "cancelled" ? "已取消" : status === "error" ? "失败" : "运行中";
+}
+function traceKindLabel(kind) {
+  return kind === "provider" ? "Provider" : kind === "tool" ? "工具" : "运行";
+}
+function shortTraceId(value) {
+  const id = String(value || "");
+  return id ? id.slice(-12) : "—";
+}
+function renderTraceDetails(summary) {
+  if (!runtimeTraceDetails || !runtimeTraceSpans) return;
+  const spans = Array.isArray(summary?.spans) ? summary.spans : [];
+  const root = spans.find((span) => span.spanId === summary.rootSpanId) || spans[0];
+  const rootStartedAt = Number(root?.startedAt);
+  $("#runtime-trace-id").textContent = String(summary.traceId || "—");
+  $("#runtime-trace-status").textContent = traceStatusLabel(summary.status);
+  $("#runtime-trace-root").textContent = shortTraceId(summary.rootSpanId);
+  $("#runtime-trace-provider").textContent = formatBudgetNumber(summary.providerCalls);
+  $("#runtime-trace-tools").textContent = formatBudgetNumber(summary.toolCalls);
+  $("#runtime-trace-errors").textContent = formatBudgetNumber(summary.errorSpans);
+  runtimeTraceSpans.innerHTML = spans.length
+    ? spans.map((span, index) => {
+      const startedAt = Number(span.startedAt);
+      const offset = Number.isFinite(startedAt) && Number.isFinite(rootStartedAt)
+        ? `+${Math.max(0, Math.round(startedAt - rootStartedAt))}ms`
+        : "—";
+      const status = traceStatusLabel(span.status);
+      const statusClass = span.status === "error"
+        ? "trace-span-error"
+        : span.status === "cancelled" ? "trace-span-cancelled" : "trace-span-ok";
+      return `<div class="runtime-trace-span ${statusClass}" title="Span ${escapeHtml(String(span.spanId || ""))}">
+        <span class="trace-span-index">${index + 1}</span>
+        <span class="trace-span-kind">${escapeHtml(traceKindLabel(span.kind))}</span>
+        <span class="trace-span-name">${escapeHtml(String(span.name || "未命名 Span"))}</span>
+        <span class="trace-span-parent">父级 ${escapeHtml(shortTraceId(span.parentSpanId))}</span>
+        <span class="trace-span-offset">${offset}</span>
+        <span class="trace-span-duration">${formatTraceDuration(span.durationMs)}</span>
+        <span class="trace-span-status">${status}</span>
+      </div>`;
+    }).join("")
+    : `<div class="runtime-trace-empty">没有可展示的 Span 明细</div>`;
+}
+function setTraceDetailsOpen(open) {
+  if (!runtimeTraceDetails || !runtimeTraceToggle) return;
+  runtimeTraceDetails.hidden = !open;
+  runtimeTraceToggle.textContent = open ? "收起明细" : "查看明细";
+  syncRuntimeStatusHeight();
+}
+function renderTraceSummary(summary) {
+  const target = $("#runtime-trace");
+  if (!target) return;
+  if (!summary || typeof summary !== "object") {
+    target.textContent = "—";
+    target.title = "";
+    target.classList.remove("trace-error", "trace-cancelled");
+    if (runtimeTraceToggle) runtimeTraceToggle.hidden = true;
+    if (runtimeTraceSpans) runtimeTraceSpans.replaceChildren();
+    setTraceDetailsOpen(false);
+    return;
+  }
+  const traceId = String(summary.traceId || "");
+  const shortId = traceId ? traceId.slice(-8) : "未知";
+  const status = summary.status === "ok"
+    ? "完成"
+    : summary.status === "cancelled" ? "已取消" : "失败";
+  target.textContent = `${shortId} · ${formatTraceDuration(summary.durationMs)} · ${
+    formatBudgetNumber(summary.spanCount)
+  } spans · ${formatBudgetNumber(summary.errorSpans)} 错误`;
+  target.title = `Trace ${traceId || "未知"} · ${status} · Provider ${
+    formatBudgetNumber(summary.providerCalls)
+  } · 工具 ${formatBudgetNumber(summary.toolCalls)}`;
+  target.classList.toggle("trace-error", summary.status === "error");
+  target.classList.toggle("trace-cancelled", summary.status === "cancelled");
+  renderTraceDetails(summary);
+  if (runtimeTraceToggle) runtimeTraceToggle.hidden = false;
+  setTraceDetailsOpen(true);
+}
+runtimeTraceToggle?.addEventListener("click", () => {
+  setTraceDetailsOpen(Boolean(runtimeTraceDetails?.hidden));
+});
 function formatDateTime(value) {
   if (!value) return "—";
   const date = new Date(value);
@@ -1154,6 +1257,8 @@ form.addEventListener("submit", async (event) => {
   status.textContent = "Agent 正在思考和行动…";
   runToolCount = 0;
   lastBudgetUsage = null;
+  renderTraceSummary(null);
+  $("#runtime-trace").textContent = "运行中…";
   $("#runtime-budget-iterations").textContent = "运行中…";
   $("#runtime-budget-tools").textContent = "—";
   $("#runtime-budget-output").textContent = "—";
@@ -1198,6 +1303,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "budget") {
           renderBudgetUsage(data.usage);
           thinking.textContent = `本次预算：${formatBudgetUsage(data.usage, true)}`;
+        }
+        if (data.type === "trace") {
+          renderTraceSummary(data.summary);
+          thinking.textContent = `追踪完成：${$("#runtime-trace").textContent}`;
         }
         if (data.type === "tool") {
           runToolCount++;
