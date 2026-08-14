@@ -1,0 +1,29 @@
+indicator,value,unit,date,source
+Anthropic Labs launch,1,event,2026-01-13,https://www.anthropic.com/news/introducing-anthropic-labs
+OpenAI Frontier launch,1,event,2026-02-05,https://openai.com/index/introducing-openai-frontier/
+MiniMax M2.5 release,1,event,2026-02-12,https://platform.minimax.io/docs/release-notes/models
+Qwen3.5 open-weight release,1,event,2026-02-15,https://qwen.ai/blog?email_hash=23463b99b62a72f26ed677cc556c44e8&id=qwen3.5
+GPT-5.4 release,1,event,2026-03-05,https://openai.com/index/introducing-gpt-5-4/
+GPT-Rosalind release,1,event,2026-04-16,https://openai.com/index/introducing-gpt-rosalind/
+ChatGPT Images 2.0 release,1,event,2026-04-21,https://openai.com/index/introducing-chatgpt-images-2-0/
+GPT-5.5 release,1,event,2026-04-23,https://openai.com/index/introducing-gpt-5-5/
+DeepSeek-V4 release,1,event,2026-04-24,https://www.deepseek.com/en/transparency/
+Gemini app monthly users,900,million users,2026-05-19,https://blog.google/innovation-and-ai/products/gemini-app/next-evolution-gemini-app/
+Gemini app countries,230,countries,2026-05-19,https://blog.google/innovation-and-ai/products/gemini-app/next-evolution-gemini-app/
+Gemini app languages,70,languages,2026-05-19,https://blog.google/innovation-and-ai/products/gemini-app/next-evolution-gemini-app/
+Anthropic Series H post-money valuation,965,billion USD,2026-05-28,https://www.anthropic.com/news/series-h
+MiniMax M3 release,1,event,2026-06-01,https://www.minimax.io/blog/minimax-m3
+Claude Fable 5 and Mythos 5 release,1,event,2026-06-09,https://www.anthropic.com/news/claude-fable-5-mythos-5
+GPT-5.6 Sol limited preview,1,event,2026-06-26,https://openai.com/index/previewing-gpt-5-6-sol/
+MiniMax Music-3.0 release,1,event,2026-07-16,https://platform.minimax.io/docs/release-notes/models
+OpenAI Presence release,1,event,2026-07-22,https://openai.com/index/introducing-openai-presence/
+MiniMax H3 release,1,event,2026-07-31,https://platform.minimax.io/docs/release-notes/models
+SWE-bench Verified performance,near 100,percent,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+Organization AI adoption,88,percent,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+University students using generative AI,80,percent,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+Notable frontier models produced by industry,90,percent,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+AI data-center power capacity,29.6,gigawatts,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report/research-and-development
+Documented AI incidents,362,incidents,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+Documented AI incidents in 2024,233,incidents,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report
+GitHub and Hugging Face open-source projects,5.6,million projects,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report/research-and-development
+GPT-4o estimated annual inference water use,1.2,million people equivalent drinking water needs,2026,https://hai.stanford.edu/ai-index/2026-ai-index-report/research-and-development

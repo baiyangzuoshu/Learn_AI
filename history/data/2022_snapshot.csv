@@ -1,0 +1,9 @@
+indicator,value,unit,date,source
+PaLM parameters,540,billion parameters,2022-04-04,https://research.google/blog/pathways-language-model-palm-scaling-to-540-billion-parameters-for-breakthrough-performance/
+Chinchilla parameters,70,billion parameters,2022-04-12,https://deepmind.google/blog/an-empirical-analysis-of-compute-optimal-large-language-model-training/
+Chinchilla training tokens,1.3,trillion tokens,2022-04-12,https://deepmind.google/blog/an-empirical-analysis-of-compute-optimal-large-language-model-training/
+DALL-E 2 preview images,3,million images (more than),2022-05-18,https://openai.com/index/dall-e-2-update/
+DALL-E active users at waitlist removal,1.5,million users (more than),2022-09-28,https://openai.com/index/dall-e-now-available-without-waitlist/
+DALL-E daily images at waitlist removal,2,million images/day (more than),2022-09-28,https://openai.com/index/dall-e-now-available-without-waitlist/
+Stable Diffusion public release,1,event,2022-08-22,https://stability.ai/news-updates/stable-diffusion-public-release
+ChatGPT public research preview,1,event,2022-11-30,https://openai.com/index/chatgpt/

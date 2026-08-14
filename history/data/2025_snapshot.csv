@@ -1,0 +1,26 @@
+indicator,value,unit,date,source
+DeepSeek-R1 release,1,event,2025-01-20,https://api-docs.deepseek.com/news/news250120/
+OpenAI Operator release,1,event,2025-01-23,https://openai.com/index/introducing-operator/
+Claude 3.7 Sonnet release,1,event,2025-02-24,https://www.anthropic.com/news/claude-3-7-sonnet
+Gemini 2.5 family release,1,event,2025-03-25,https://blog.google/products-and-platforms/products/gemini/gemini-2-5-model-family-expands/
+Qwen3 smallest model,0.6,billion parameters,2025-04-29,https://home.alibabagroup.com/en-US/document-1853940226976645120
+Qwen3 largest model,235,billion parameters,2025-04-29,https://home.alibabagroup.com/en-US/document-1853940226976645120
+Qwen3 supported languages and dialects,119,languages and dialects,2025-04-29,https://home.alibabagroup.com/en-US/document-1853940226976645120
+OpenAI o3 and o4-mini release,1,event,2025-04-16,https://openai.com/index/introducing-o3-and-o4-mini/
+Claude Opus 4 and Sonnet 4 release,1,event,2025-05-22,https://www.anthropic.com/news/claude-4
+Veo 3 and Flow release,1,event,2025-05-20,https://blog.google/innovation-and-ai/products/generative-media-models-io-2025/
+Grok 4 release,1,event,2025-07-09,https://x.ai/news/grok-4
+ChatGPT agent release,1,event,2025-07-17,https://openai.com/index/introducing-chatgpt-agent/
+gpt-oss-120b total parameters,116.8,billion parameters,2025-08-05,https://openai.com/index/gpt-oss-model-card/
+gpt-oss-120b active parameters,5.1,billion parameters,2025-08-05,https://openai.com/index/gpt-oss-model-card/
+gpt-oss-20b total parameters,20.9,billion parameters,2025-08-05,https://openai.com/index/gpt-oss-model-card/
+gpt-oss-20b active parameters,3.6,billion parameters,2025-08-05,https://openai.com/index/gpt-oss-model-card/
+GPT-5 release,1,event,2025-08-07,https://openai.com/index/introducing-gpt-5/
+EU GPAI obligations,applicable,regulatory milestone,2025-08-02,https://digital-strategy.ec.europa.eu/en/factpages/general-purpose-ai-obligations-under-ai-act
+Industry share of notable models in 2024,90,percent,2025-04-07,https://hai.stanford.edu/ai-index/2025-ai-index-report/research-and-development
+GPT-3.5-level inference cost,0.07,USD per million tokens,2024-10,https://hai.stanford.edu/ai-index/2025-ai-index-report/research-and-development
+US private AI investment in 2024,109.1,billion USD,2025-04-07,https://hai.stanford.edu/ai-index/2025-ai-index-report
+China private AI investment in 2024,9.3,billion USD,2025-04-07,https://hai.stanford.edu/ai-index/2025-ai-index-report
+Organizations reporting AI use in 2024,78,percent,2025-04-07,https://hai.stanford.edu/ai-index/2025-ai-index-report
+Claude Sonnet 4.5 release,1,event,2025-09-29,https://www.anthropic.com/news/claude-sonnet-4-5
+Gemini 3 release,1,event,2025-11-18,https://blog.google/products-and-platforms/products/gemini/gemini-3/

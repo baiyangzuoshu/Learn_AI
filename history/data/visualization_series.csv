@@ -1,0 +1,10 @@
+series,period,value,unit,method,source
+yearbook_record_count,2022,8,records,rows in 2022_snapshot.csv,derived from history/data/2022_snapshot.csv
+yearbook_record_count,2023,7,records,rows in 2023_snapshot.csv,derived from history/data/2023_snapshot.csv
+yearbook_record_count,2024,11,records,rows in 2024_snapshot.csv,derived from history/data/2024_snapshot.csv
+yearbook_record_count,2025,25,records,rows in 2025_snapshot.csv,derived from history/data/2025_snapshot.csv
+yearbook_record_count,2026,28,records,rows in 2026_snapshot.csv,derived from history/data/2026_snapshot.csv
+organization_ai_adoption,2025,78,percent,reported adoption rate,https://hai.stanford.edu/ai-index/2025-ai-index-report
+organization_ai_adoption,2026,88,percent,reported adoption rate,https://hai.stanford.edu/ai-index/2026-ai-index-report
+documented_ai_incidents,2024,233,incidents,annual documented incidents,https://hai.stanford.edu/ai-index/2026-ai-index-report
+documented_ai_incidents,2026,362,incidents,annual documented incidents,https://hai.stanford.edu/ai-index/2026-ai-index-report
