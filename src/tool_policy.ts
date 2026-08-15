@@ -21,6 +21,9 @@ const mutatingTools = new Set([
   "task_create",
   "task_checkpoint",
   "task_verify",
+  "worker_enqueue",
+  "worker_lease",
+  "worker_settle",
 ]);
 const externalTools = new Set([
   "bash",

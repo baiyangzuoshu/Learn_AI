@@ -16,9 +16,12 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 - Todo、Memory、任务图、Skill、MCP、后台任务和周期任务
 - Subagent、Agent Teams、Git Worktree 和有边界自治循环
 - 可收起导航、工作区概览、Git 改动信息和开发者事件面板
-- 结构化运行 Trace：底部第二行显示摘要，第三行可展开查看脱敏 Span 明细（类型、父子关系、耗时和状态）
+- 结构化运行 Trace：底部四个详情按钮按需展示工具记录、预算、Trace Span 和任务/Worker
+  明细，不自动弹出工具面板
 - 工具策略：每个工具具备风险分类、权限 scope、Principal 过期校验和独立输出上限
 - 任务账本：长任务支持 goal、checkpoint、evidence、幂等键、恢复和 verified 状态
+- Worker Queue：独立持久化队列支持 Worker Lease、尝试次数、有限重试和 Dead
+  Letter；底部第三行实时展示当前 Job 状态
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
 ## 文档

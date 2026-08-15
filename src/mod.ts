@@ -10,6 +10,7 @@ import { pdfReader } from "./features/pdf_reader.ts";
 import { imageGeneration } from "./features/image_generation.ts";
 import { toolPolicy } from "./features/tool_policy.ts";
 import { taskState } from "./features/task_state.ts";
+import { workerQueue } from "./features/worker_queue.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -24,6 +25,7 @@ export const harness = new AgentRuntime([
   imageGeneration,
   toolPolicy,
   taskState,
+  workerQueue,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -106,3 +108,10 @@ export {
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";
 export { checkpointTask, createTask, resumeTask, verifyTask } from "./task_ledger.ts";
 export type { TaskEvidence, TaskRecord, TaskState } from "./task_ledger.ts";
+export {
+  enqueueWorkerJob,
+  leaseWorkerJob,
+  readWorkerJobs,
+  settleWorkerJob,
+} from "./worker_queue.ts";
+export type { WorkerJob, WorkerJobStatus } from "./worker_queue.ts";

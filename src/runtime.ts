@@ -198,6 +198,9 @@ export class AgentRuntime {
             if (call.function.name.startsWith("task_") && output.startsWith('{"task":')) {
               emitHook({ name: "TaskState", detail: output }, toolSpan);
             }
+            if (call.function.name.startsWith("worker_") && output.startsWith('{"worker":')) {
+              emitHook({ name: "WorkerState", detail: output }, toolSpan);
+            }
 
             toolCount++;
             //

@@ -1,14 +1,16 @@
 const API = "/api";
 const $ = (selector) => document.querySelector(selector);
 const messages = $("#messages"),
-  events = $("#events"),
   eventsContent = $("#events-content"),
   form = $("#composer"),
   runtimeStatus = $("#runtime-status"),
   runtimeTraceDetails = $("#runtime-trace-details"),
   runtimeTraceSpans = $("#runtime-trace-spans"),
   runtimeTaskState = $("#runtime-task-state"),
-  runtimeTraceToggle = $("#runtime-trace-toggle");
+  runtimeWorkerState = $("#runtime-worker-state"),
+  runtimeDetailPanel = $("#runtime-detail-panel"),
+  runtimeDetailTabs = [...document.querySelectorAll("[data-runtime-tab]")],
+  runtimeDetailViews = [...document.querySelectorAll("[data-runtime-view]")];
 const input = $("#prompt"), send = $("#send"), status = $("#status");
 const modelSelect = $("#model-select"),
   settingsDialog = $("#settings-dialog"),
@@ -47,6 +49,7 @@ const APP_STARTED_AT = Date.now();
 const CONTEXT_TOKEN_LIMIT = 1_000_000;
 const CONTEXT_COMPACT_AT = 0.8;
 let activeWorkspaceTab = localStorage.getItem("ai-agent:workspace-tab") || "overview";
+let activeRuntimeDetail = null;
 
 function syncRuntimeStatusHeight() {
   if (!runtimeStatus) return;
@@ -60,6 +63,25 @@ if (runtimeStatus && typeof ResizeObserver !== "undefined") {
 }
 window.addEventListener("resize", syncRuntimeStatusHeight);
 syncRuntimeStatusHeight();
+
+function setRuntimeDetailTab(tab) {
+  const next = tab && activeRuntimeDetail !== tab ? tab : activeRuntimeDetail === tab ? null : tab;
+  activeRuntimeDetail = next;
+  if (runtimeDetailPanel) runtimeDetailPanel.hidden = !next;
+  runtimeDetailTabs.forEach((button) => {
+    const active = Boolean(next && button.dataset.runtimeTab === next);
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  runtimeDetailViews.forEach((view) => {
+    view.hidden = view.dataset.runtimeView !== next;
+  });
+  syncRuntimeStatusHeight();
+}
+
+runtimeDetailTabs.forEach((button) => {
+  button.addEventListener("click", () => setRuntimeDetailTab(button.dataset.runtimeTab));
+});
 
 function formatBudgetNumber(value) {
   const number = Number(value || 0);
@@ -663,6 +685,13 @@ function taskStateLabel(state) {
     ? "已验证"
     : "已阻塞";
 }
+function syncTaskDetailEmpty() {
+  const empty = $("#runtime-task-empty");
+  if (!empty) return;
+  const hasTask = Boolean(runtimeTaskState && !runtimeTaskState.hidden);
+  const hasWorker = Boolean(runtimeWorkerState && !runtimeWorkerState.hidden);
+  empty.hidden = hasTask || hasWorker;
+}
 function renderTaskState(task) {
   if (!runtimeTaskState) return;
   if (!task || typeof task !== "object") {
@@ -673,6 +702,7 @@ function renderTaskState(task) {
       "task-verified",
       "task-blocked",
     );
+    syncTaskDetailEmpty();
     return;
   }
   $("#runtime-task-id").textContent = shortTraceId(task.id);
@@ -694,8 +724,54 @@ function renderTaskState(task) {
     "task-blocked",
   );
   runtimeTaskState.classList.add(`task-${String(task.state || "planned")}`);
-  if (runtimeTraceToggle) runtimeTraceToggle.hidden = false;
-  setTraceDetailsOpen(true);
+  syncTaskDetailEmpty();
+}
+function workerStatusLabel(status) {
+  return status === "queued"
+    ? "排队"
+    : status === "leased"
+    ? "执行中"
+    : status === "done"
+    ? "完成"
+    : status === "dead"
+    ? "Dead Letter"
+    : "—";
+}
+function workerLeaseLabel(leaseUntil) {
+  if (!leaseUntil) return "—";
+  const remaining = new Date(leaseUntil).getTime() - Date.now();
+  if (!Number.isFinite(remaining) || remaining <= 0) return "已过期";
+  return `${Math.ceil(remaining / 1_000)}秒`;
+}
+function workerRetryLabel(worker) {
+  if (worker.status !== "queued" || Number(worker.attempts) <= 0) return "—";
+  const next = Date.parse(String(worker.nextAttemptAt || ""));
+  if (Number.isFinite(next) && next > Date.now()) {
+    return `等待 ${Math.ceil((next - Date.now()) / 1_000)}秒`;
+  }
+  return "可重试";
+}
+function renderWorkerState(worker) {
+  if (!runtimeWorkerState) return;
+  const classes = ["worker-queued", "worker-leased", "worker-done", "worker-dead"];
+  if (!worker || typeof worker !== "object") {
+    runtimeWorkerState.hidden = true;
+    runtimeWorkerState.classList.remove(...classes);
+    syncTaskDetailEmpty();
+    return;
+  }
+  $("#runtime-worker-id").textContent = shortTraceId(worker.id);
+  $("#runtime-worker-status").textContent = workerStatusLabel(worker.status);
+  $("#runtime-worker-lease").textContent = workerLeaseLabel(worker.leaseUntil);
+  $("#runtime-worker-attempts").textContent = `${formatBudgetNumber(worker.attempts)}/${
+    formatBudgetNumber(worker.maxAttempts)
+  }`;
+  $("#runtime-worker-retry").textContent = workerRetryLabel(worker);
+  $("#runtime-worker-dead").textContent = worker.status === "dead" ? "是" : "否";
+  runtimeWorkerState.hidden = false;
+  runtimeWorkerState.classList.remove(...classes);
+  runtimeWorkerState.classList.add(`worker-${String(worker.status || "queued")}`);
+  syncTaskDetailEmpty();
 }
 function renderTraceDetails(summary) {
   if (!runtimeTraceDetails || !runtimeTraceSpans) return;
@@ -734,12 +810,6 @@ function renderTraceDetails(summary) {
     }).join("")
     : `<div class="runtime-trace-empty">没有可展示的 Span 明细</div>`;
 }
-function setTraceDetailsOpen(open) {
-  if (!runtimeTraceDetails || !runtimeTraceToggle) return;
-  runtimeTraceDetails.hidden = !open;
-  runtimeTraceToggle.textContent = open ? "收起明细" : "查看明细";
-  syncRuntimeStatusHeight();
-}
 function renderTraceSummary(summary) {
   const target = $("#runtime-trace");
   if (!target) return;
@@ -747,10 +817,10 @@ function renderTraceSummary(summary) {
     target.textContent = "—";
     target.title = "";
     target.classList.remove("trace-error", "trace-cancelled");
-    if (runtimeTraceToggle) runtimeTraceToggle.hidden = true;
     if (runtimeTraceSpans) runtimeTraceSpans.replaceChildren();
     renderTaskState(null);
-    setTraceDetailsOpen(false);
+    renderWorkerState(null);
+    setRuntimeDetailTab(null);
     return;
   }
   const traceId = String(summary.traceId || "");
@@ -769,12 +839,7 @@ function renderTraceSummary(summary) {
   target.classList.toggle("trace-error", summary.status === "error");
   target.classList.toggle("trace-cancelled", summary.status === "cancelled");
   renderTraceDetails(summary);
-  if (runtimeTraceToggle) runtimeTraceToggle.hidden = false;
-  setTraceDetailsOpen(true);
 }
-runtimeTraceToggle?.addEventListener("click", () => {
-  setTraceDetailsOpen(Boolean(runtimeTraceDetails?.hidden));
-});
 function formatDateTime(value) {
   if (!value) return "—";
   const date = new Date(value);
@@ -1314,6 +1379,7 @@ form.addEventListener("submit", async (event) => {
   status.textContent = "Agent 正在思考和行动…";
   runToolCount = 0;
   lastBudgetUsage = null;
+  eventsContent.replaceChildren();
   renderTraceSummary(null);
   $("#runtime-trace").textContent = "运行中…";
   $("#runtime-budget-iterations").textContent = "运行中…";
@@ -1369,17 +1435,17 @@ form.addEventListener("submit", async (event) => {
           renderTaskState(data.task);
           thinking.textContent = `任务状态：${$("#runtime-task-status").textContent}`;
         }
+        if (data.type === "worker") {
+          renderWorkerState(data.worker);
+          thinking.textContent = `Worker：${$("#runtime-worker-status").textContent}`;
+        }
         if (data.type === "tool") {
           runToolCount++;
           setRunStep(Math.min(3, 1 + runToolCount));
           thinking.textContent = `正在执行 ${data.event.name}…`;
-          events.classList.remove("hidden");
-          $("#toggle-events").classList.add("active");
           eventsContent.insertAdjacentHTML("beforeend", renderToolEvent(data.event));
         }
         if (data.type === "hook") {
-          events.classList.remove("hidden");
-          $("#toggle-events").classList.add("active");
           eventsContent.insertAdjacentHTML(
             "beforeend",
             `<div class="event hook-event"><b>Hook · ${
@@ -1510,14 +1576,6 @@ workspaceGitSummary.addEventListener("click", async (event) => {
   } catch (error) {
     workspaceGitStatus.textContent = error.message || "无法打开文件";
   }
-});
-$("#toggle-events").addEventListener("click", () => {
-  events.classList.toggle("hidden");
-  $("#toggle-events").classList.toggle("active", !events.classList.contains("hidden"));
-});
-$("#close-events").addEventListener("click", () => {
-  events.classList.add("hidden");
-  $("#toggle-events").classList.remove("active");
 });
 eventsContent.addEventListener("click", async (event) => {
   const link = event.target.closest(".file-link");

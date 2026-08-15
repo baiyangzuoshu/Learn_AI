@@ -32,7 +32,6 @@
         <div class="top-control-right">
           <button id="toggle-workspace-panel" class="workspace-panel-toggle"
             type="button">工作区</button>
-          <button id="toggle-events" class="tool-toggle" type="button">工具</button>
         </div>
       </div>
       <header>
@@ -49,11 +48,6 @@
           <div
             class="suggestions"><button>解释这个项目的架构</button><button>检查当前代码并提出改进</button><button>创建一个新功能</button></div>
         </div>
-      </section>
-      <section id="events" class="events hidden">
-        <div
-          class="events-header"><span>工具执行记录</span><button id="close-events" title="隐藏工具记录">×</button></div>
-        <div id="events-content"></div>
       </section>
       <form id="composer">
         <div id="composer-summary"
@@ -123,15 +117,44 @@
       class="runtime-status">
       <div
         class="runtime-status-main"><span class="runtime-model"><i></i><b id="runtime-model">—</b></span><span>▢ <b id="runtime-workspace">未选择项目</b></span><span>本次命中 <b id="runtime-hit">—</b></span><span>平均命中 <b id="runtime-avg-hit">—</b></span><span>会话 tokens <b id="runtime-session-tokens">—</b></span><span>本次 tokens <b id="runtime-last-tokens">—</b></span><span>本次费用 <b id="runtime-last-cost" class="runtime-money">—</b></span><span>当前会话 <b id="runtime-turns">0轮</b></span><span>上下文 <b id="runtime-context">0%</b></span><span>压缩阈值 <b>80%</b></span><span>会话费用 <b id="runtime-session-cost" class="runtime-money">—</b></span><span>余额 <b id="runtime-balance" class="runtime-money">—</b></span></div>
-      <div
-        class="runtime-budget-status runtime-status-row"><span>本次预算</span><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span><span>追踪 <b id="runtime-trace">—</b></span><button id="runtime-trace-toggle" class="runtime-trace-toggle" type="button" hidden>查看明细</button></div>
-      <div id="runtime-trace-details" class="runtime-trace-details runtime-status-row" hidden>
-        <div
-          id="runtime-task-state" class="runtime-task-state"
-          hidden><span>任务 <b id="runtime-task-id">—</b></span><span>状态 <b id="runtime-task-status">—</b></span><span>修订 <b id="runtime-task-revision">0</b></span><span>证据 <b id="runtime-task-evidence">0</b></span><span class="runtime-task-goal">目标 <b id="runtime-task-goal">—</b></span></div>
-        <div
-          class="runtime-trace-detail-header"><span>Trace ID <b id="runtime-trace-id">—</b></span><span>状态 <b id="runtime-trace-status">—</b></span><span>根 Span <b id="runtime-trace-root">—</b></span><span>Provider <b id="runtime-trace-provider">0</b></span><span>工具 <b id="runtime-trace-tools">0</b></span><span>错误 <b id="runtime-trace-errors">0</b></span></div>
-        <div id="runtime-trace-spans" class="runtime-trace-spans" aria-live="polite"></div>
+      <div id="runtime-detail-tabs" class="runtime-detail-tabs runtime-status-row" role="tablist"
+        aria-label="运行详情">
+        <button type="button" role="tab" aria-selected="false"
+          data-runtime-tab="tools">工具记录</button>
+        <button type="button" role="tab" aria-selected="false"
+          data-runtime-tab="budget">预算</button>
+        <button type="button" role="tab" aria-selected="false"
+          data-runtime-tab="trace">追踪</button>
+        <button type="button" role="tab" aria-selected="false"
+          data-runtime-tab="task">任务 / Worker</button>
+      </div>
+      <div id="runtime-detail-panel" class="runtime-detail-panel" hidden>
+        <section class="runtime-detail-view runtime-tools-detail" data-runtime-view="tools"
+          role="tabpanel" hidden>
+          <div class="runtime-detail-heading">工具执行记录</div>
+          <div id="events-content" aria-live="polite"></div>
+        </section>
+        <section class="runtime-detail-view runtime-budget-detail" data-runtime-view="budget"
+          role="tabpanel" hidden>
+          <div class="runtime-detail-heading">本次运行预算</div>
+          <div
+            class="runtime-budget-detail-grid"><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span></div>
+        </section>
+        <section id="runtime-trace-details" class="runtime-detail-view runtime-trace-details"
+          data-runtime-view="trace" role="tabpanel" hidden>
+          <span id="runtime-trace" hidden>—</span>
+          <div
+            class="runtime-trace-detail-header"><span>Trace ID <b id="runtime-trace-id">—</b></span><span>状态 <b id="runtime-trace-status">—</b></span><span>根 Span <b id="runtime-trace-root">—</b></span><span>Provider <b id="runtime-trace-provider">0</b></span><span>工具 <b id="runtime-trace-tools">0</b></span><span>错误 <b id="runtime-trace-errors">0</b></span></div>
+          <div id="runtime-trace-spans" class="runtime-trace-spans" aria-live="polite"></div>
+        </section>
+        <section class="runtime-detail-view runtime-task-detail" data-runtime-view="task"
+          role="tabpanel" hidden>
+          <div id="runtime-task-state" class="runtime-task-state"
+            hidden><span>任务 <b id="runtime-task-id">—</b></span><span>状态 <b id="runtime-task-status">—</b></span><span>修订 <b id="runtime-task-revision">0</b></span><span>证据 <b id="runtime-task-evidence">0</b></span><span class="runtime-task-goal">目标 <b id="runtime-task-goal">—</b></span></div>
+          <div id="runtime-worker-state" class="runtime-worker-state"
+            hidden><span>Worker <b id="runtime-worker-id">—</b></span><span>状态 <b id="runtime-worker-status">—</b></span><span>Lease <b id="runtime-worker-lease">—</b></span><span>尝试 <b id="runtime-worker-attempts">0/0</b></span><span>重试 <b id="runtime-worker-retry">—</b></span><span>Dead Letter <b id="runtime-worker-dead">—</b></span></div>
+          <div class="runtime-detail-empty" id="runtime-task-empty">暂无任务或 Worker 详情</div>
+        </section>
       </div>
     </footer>
     <dialog id="settings-dialog">

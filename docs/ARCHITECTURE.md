@@ -163,9 +163,10 @@ Span；成功、失败和取消都会记录状态与耗时。 `TraceSummary` 输
 ID、总耗时、Span 数、Provider 调用数、工具调用数、错误数和父子 Span 关系。Span 明细不包含提示词、API
 Key、工具参数、工具输出或文件内容。
 
-桌面底部状态栏第一行固定展示模型、工作区、Token、费用和会话信息，不再追加新功能；预算和 Trace
-位于第二行， 后续指标继续使用独立的 `runtime-status-row` 向下扩展。完整工具事件仍在工具面板中，详细
-Hook 事件只在开发者 模式下显示。Trace 不持久化提示词、API Key、工具参数或文件内容。
+桌面底部状态栏第一行固定展示模型、工作区、Token、费用和会话信息，不再追加新功能；其下改为四个
+详情按钮：工具记录、预算、Trace 和任务 /
+Worker。按钮点击后才展开对应内容，工具执行记录不会自动弹出； 详细 Hook
+事件只在开发者模式下显示。Trace 不持久化提示词、API Key、工具参数或文件内容。
 
 ### Tool Policy
 
@@ -184,8 +185,21 @@ Hook 与 Trace 关联，模型不能自行授予或延长权限。
 和 `task_verify` 使用工作区哈希后的本地 JSON
 文件持久化任务状态；写入通过原子替换完成。任务只有在存在 evidence 时才能进入 `verified`，checkpoint
 和 verify 支持幂等键，重复提交不会重复推进副作用。每次任务工具 返回的状态会关联当前
-Trace，并推送到桌面底部第三行；该行显示任务 ID、状态、revision、证据数量和目标，Trace
-明细仍在同一观察区内展示。
+Trace，并推送到桌面底部“任务 / Worker”详情面板；该面板显示任务 ID、状态、revision、证据数量和目标。
+Trace 明细通过独立的“追踪”按钮查看。
+
+### Worker Queue、Lease 与 Dead Letter
+
+第 25 课在任务账本之上新增独立 `worker-queue` Feature。`worker_enqueue` 将小型、可幂等的 payload
+写入按工作区隔离的本地 JSON 队列；`worker_lease` 以 worker identity 原子领取一个到期 Job，Lease
+到期后会自动回收；`worker_settle` 显式提交成功或失败，失败使用有上限的指数退避重试，达到
+`max_attempts` 后进入 `dead`（Dead Letter）状态。`worker_status` 用于读取队列和当前
+Job。队列写入使用原子替换，Job 数量、payload、Lease 时长和尝试次数均有边界，避免后台任务无限增长。
+
+Worker 工具输出会关联当前 Trace，并作为 `WorkerState` 事件推送到桌面底部“任务 /
+Worker”详情面板。该面板 独立于任务账本，展示当前 Worker Job 的 Lease
+剩余时间、`attempts/max_attempts`、重试等待状态和 Dead Letter
+状态；第一行继续保持模型、工作区、Token、费用和会话信息不变。
 
 ## Feature 模块
 
@@ -214,6 +228,8 @@ interface HarnessFeature {
 | `orchestration`    | Subagent、Team、Autonomous bounded loop        |
 | `integrations`     | 后台任务、Git Worktree、MCP 工具发现与调用     |
 | `image_generation` | 调用 Seedream 生成图片并安全写入工作区         |
+| `task-state`       | 任务账本、checkpoint、evidence、恢复和验证     |
+| `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter        |
 | `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具 |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
@@ -283,6 +299,7 @@ Provider 遥测除了调用次数、Token 和缓存命中数，也记录最近�
 - 对话历史。
 - Memory 和任务图。
 - 周期性 AI 对话任务。
+- Worker Queue（按工作区哈希隔离的队列 JSON，原子写入）。
 - Provider usage telemetry。
 
 Electron 主进程使用 `safeStorage` 加密 Provider 和图片 API Key，并把加密值写入用户数据目录的 secrets

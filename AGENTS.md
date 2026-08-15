@@ -141,6 +141,40 @@ Expected artifacts:
 
 - Electron Builder artifacts under `dist/releases/app/`
 
+### macOS App-only Packaging (重要)
+
+When the user asks to “打包 app” or says “不要 zip”, the deliverable is the unpacked macOS
+application bundle only. Do not use the generic `dist` script and do not run Electron Builder with
+the default macOS targets, because those targets may create a zip archive.
+
+Use the repository script, which explicitly uses `--mac --arm64 --dir`:
+
+```sh
+npm --prefix electron run dist:mac
+```
+
+The only artifact to report is:
+
+```text
+dist/releases/app/mac-arm64/AI Agent.app
+```
+
+Before reporting completion, verify the bundle exists and remove only stale generated macOS zip
+archives from the same output directory. A stale archive is not a valid deliverable:
+
+```sh
+test -d "dist/releases/app/mac-arm64/AI Agent.app"
+find dist/releases/app -maxdepth 1 -type f -name 'AI-Agent-*-mac-*.zip' -print
+```
+
+If Electron Builder has already packaged the app but then fails while downloading optional GitHub
+metadata or signing assets because of DNS/network restrictions, do not report the failed command as
+the finished package. Run `npm --prefix electron run build`, refresh the bundle’s
+`Contents/Resources/app.asar` from `electron/dist` with the local `electron/node_modules/.bin/asar`,
+apply an ad-hoc signature with `codesign --force --deep --sign -`, then verify with
+`codesign --verify --deep --strict --verbose=2`. Report the `.app` path and the network limitation
+separately. Never hand back the zip as a substitute for the requested `.app`.
+
 ### Windows Offline Packaging
 
 Keep the following Electron Builder archives under `tools/` so Windows packaging can run when GitHub
