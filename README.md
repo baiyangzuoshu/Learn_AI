@@ -22,6 +22,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 - 任务账本：长任务支持 goal、checkpoint、evidence、幂等键、恢复和 verified 状态
 - Worker Queue：独立持久化队列支持 Worker Lease、尝试次数、有限重试和 Dead
   Letter；底部第三行实时展示当前 Job 状态
+- MCP 会话管理：按工作区复用已初始化 Session，支持 HTTP、SSE、STDIO Transport、能力协商、取消和关闭
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
 ## 文档
@@ -239,6 +240,7 @@ AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases
   "servers": [
     {
       "name": "local-tools",
+      "transport": "http",
       "url": "http://127.0.0.1:3000/mcp",
       "enabled": true
     }
@@ -246,7 +248,9 @@ AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases
 }
 ```
 
-仅允许 HTTPS 远程服务或 localhost HTTP 服务。MCP 工具按需发现，实际调用受权限模式控制。
+远程服务仅允许 HTTPS，localhost 可以使用 HTTP；也可以配置 `transport: "stdio"`、`command` 和
+`args`。首次列工具或调用时会完成 MCP initialize 和能力协商，同一工作区内复用
+Session；实际调用仍受权限模式控制。
 
 ## Electron 构建与发布
 

@@ -170,10 +170,23 @@ find dist/releases/app -maxdepth 1 -type f -name 'AI-Agent-*-mac-*.zip' -print
 If Electron Builder has already packaged the app but then fails while downloading optional GitHub
 metadata or signing assets because of DNS/network restrictions, do not report the failed command as
 the finished package. Run `npm --prefix electron run build`, refresh the bundle’s
-`Contents/Resources/app.asar` from `electron/dist` with the local `electron/node_modules/.bin/asar`,
-apply an ad-hoc signature with `codesign --force --deep --sign -`, then verify with
+`Contents/Resources/app.asar` from a temporary staging directory containing both
+`electron/package.json` and `electron/dist/` (the package manifest is required for Electron to
+resolve `main`; packing `electron/dist` alone causes the default Electron welcome screen). Use the
+local `electron/node_modules/.bin/asar`, apply an ad-hoc signature with
+`codesign --force --deep --sign -`, then verify with
 `codesign --verify --deep --strict --verbose=2`. Report the `.app` path and the network limitation
 separately. Never hand back the zip as a substitute for the requested `.app`.
+
+#### App 打包交付清单（每次都必须执行）
+
+当用户要求“打包 app”时，不得只报告源码构建成功，也不得把失败的 Builder 命令当作交付完成。必须：
+
+1. 执行 `npm --prefix electron run dist:mac`。
+2. 确认 `dist/releases/app/mac-arm64/AI Agent.app` 是本次最新构建的目录。
+3. 使用 `codesign --verify --deep --strict` 校验 App；网络失败时按上面的本地 `asar`
+   兜底流程继续完成。
+4. 最终回复必须给出 `.app` 的绝对路径，并明确说明是否生成 zip；zip 不能替代 `.app` 交付。
 
 ### Windows Offline Packaging
 

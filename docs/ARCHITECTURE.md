@@ -201,6 +201,19 @@ Worker”详情面板。该面板 独立于任务账本，展示当前 Worker Jo
 剩余时间、`attempts/max_attempts`、重试等待状态和 Dead Letter
 状态；第一行继续保持模型、工作区、Token、费用和会话信息不变。
 
+### MCP Session 与 Transport
+
+第 26 课已融合为 MCP 会话管理层。`src/mcp.ts` 将 Transport（HTTP、SSE、STDIO）与 Session 生命周期
+分离：首次 `mcp_list_tools` 或 `mcp_call` 会发送 `initialize` 并记录协商结果，后续同一工作区和
+Server 复用 Session；Server 配置变化会关闭旧 Transport 并重新协商。所有请求继续传播
+`AbortSignal`，HTTP 只允许 HTTPS 或 localhost，响应限制为 2 MB；STDIO 使用 Content-Length
+framing，限制 stderr，并在进程退出时拒绝挂起请求。
+
+`mcp_servers` 只返回脱敏配置，`mcp_list_tools` 和 `mcp_call` 通过 `McpSessionManager` 执行，新增
+`mcp_status` 读取当前工作区的初始化状态和 capabilities。Electron 退出前统一调用
+`shutdownMcpSessions()`，关闭所有 HTTP / STDIO Session，避免遗留子进程。工具仍经过现有 Tool
+Policy、权限审批、Trace 和输出上限；生产代码不直接导入课程文件。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：
@@ -218,19 +231,19 @@ interface HarnessFeature {
 
 当前生产 Feature：
 
-| Feature            | 职责                                           |
-| ------------------ | ---------------------------------------------- |
-| `diagnostics`      | Agent 引擎自检和能力状态                       |
-| `runtime_limits`   | 统一运行预算、取消边界和嵌套执行子预算         |
-| `pdf_reader`       | 在工作区内提取 PDF 文本和元数据                |
-| `core_tools`       | Shell、读文件、写文件、编辑文件                |
-| `productivity`     | Todo、Memory、任务图、Skill 加载               |
-| `orchestration`    | Subagent、Team、Autonomous bounded loop        |
-| `integrations`     | 后台任务、Git Worktree、MCP 工具发现与调用     |
-| `image_generation` | 调用 Seedream 生成图片并安全写入工作区         |
-| `task-state`       | 任务账本、checkpoint、evidence、恢复和验证     |
-| `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter        |
-| `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具 |
+| Feature            | 职责                                             |
+| ------------------ | ------------------------------------------------ |
+| `diagnostics`      | Agent 引擎自检和能力状态                         |
+| `runtime_limits`   | 统一运行预算、取消边界和嵌套执行子预算           |
+| `pdf_reader`       | 在工作区内提取 PDF 文本和元数据                  |
+| `core_tools`       | Shell、读文件、写文件、编辑文件                  |
+| `productivity`     | Todo、Memory、任务图、Skill 加载                 |
+| `orchestration`    | Subagent、Team、Autonomous bounded loop          |
+| `integrations`     | 后台任务、Git Worktree、MCP Session 与 Transport |
+| `image_generation` | 调用 Seedream 生成图片并安全写入工作区           |
+| `task-state`       | 任务账本、checkpoint、evidence、恢复和验证       |
+| `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter          |
+| `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具   |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
 

@@ -3,6 +3,7 @@ import type { ToolDefinition } from "../core/types.ts";
 import { isNotFound, isWindows, runCommand, spawnCommand } from "../platform.ts";
 import { mkdir, readFile } from "node:fs/promises";
 import type { ChildProcess } from "node:child_process";
+import { type McpServerConfig, mcpSessionManager } from "../mcp.ts";
 
 const def = (
   name: string,
@@ -33,42 +34,59 @@ async function git(cwd: string, args: string[]) {
   return text.trim();
 }
 //
-async function mcpRpc(url: string, method: string, params: unknown, signal?: AbortSignal) {
-  const parsed = new URL(url), local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
-
-  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && local)) {
-    throw new Error("MCP requires HTTPS or local HTTP");
-  }
-
-  const response = await fetch(parsed, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
-    signal,
-  });
-
-  if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
-
-  const text = await response.text(),
-    data = response.headers.get("content-type")?.includes("text/event-stream")
-      ? text.split("\n").find((line) => line.startsWith("data:"))?.slice(5)
-      : text;
-  const payload = JSON.parse(data || "{}");
-
-  if (payload.error) throw new Error(payload.error.message);
-
-  return payload.result;
+function asMcpServer(value: unknown): McpServerConfig | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as Record<string, unknown>;
+  const name = typeof item.name === "string" ? item.name.trim() : "";
+  if (!name || name.length > 120) return undefined;
+  const transport =
+    item.transport === "sse" || item.transport === "stdio" || item.transport === "http"
+      ? item.transport
+      : undefined;
+  const args = Array.isArray(item.args)
+    ? item.args.filter((arg): arg is string => typeof arg === "string").slice(0, 32)
+    : undefined;
+  const env = item.env && typeof item.env === "object"
+    ? Object.fromEntries(
+      Object.entries(item.env).filter(([key, value]) =>
+        /^[A-Za-z_][A-Za-z0-9_]{0,80}$/.test(key) && typeof value === "string"
+      ).slice(0, 64),
+    )
+    : undefined;
+  return {
+    name,
+    enabled: item.enabled !== false,
+    transport,
+    url: typeof item.url === "string" ? item.url : undefined,
+    command: typeof item.command === "string" ? item.command : undefined,
+    args,
+    env,
+  };
 }
-//
-async function mcpServers(workspace: string) {
+
+async function mcpServers(workspace: string): Promise<McpServerConfig[]> {
   for (const path of [`${workspace}/.ai-agent/mcp.json`, `${workspace}/mcp.json`]) {
     try {
-      return (JSON.parse(await readFile(path, "utf8")).servers ?? []) as any[];
+      const parsed = JSON.parse(await readFile(path, "utf8")) as { servers?: unknown };
+      return Array.isArray(parsed.servers)
+        ? parsed.servers.map(asMcpServer).filter((item): item is McpServerConfig => Boolean(item))
+        : [];
     } catch (error) {
       if (!isNotFound(error)) throw error;
     }
   }
   return [];
+}
+
+function publicMcpServer(server: McpServerConfig): Record<string, unknown> {
+  return {
+    name: server.name,
+    enabled: server.enabled !== false,
+    transport: server.transport ?? (server.command ? "stdio" : "http"),
+    url: server.url,
+    command: server.command,
+    args: server.args,
+  };
 }
 //
 export const integrations: HarnessFeature = {
@@ -194,7 +212,8 @@ export const integrations: HarnessFeature = {
     //mcp_servers
     tools.register(
       def("mcp_servers", "List workspace MCP servers", {}),
-      async (_input, context) => JSON.stringify(await mcpServers(context.workspace)),
+      async (_input, context) =>
+        JSON.stringify((await mcpServers(context.workspace)).map(publicMcpServer)),
     );
     //mcp_list_tools
     tools.register(
@@ -206,7 +225,9 @@ export const integrations: HarnessFeature = {
           item.name === input.server && item.enabled !== false
         );
         if (!server) throw new Error("MCP server not found");
-        return JSON.stringify(await mcpRpc(server.url, "tools/list", {}, context.signal));
+        return JSON.stringify(
+          await mcpSessionManager.call(context.workspace, server, "tools/list", {}, context.signal),
+        );
       },
     );
     //mcp_call
@@ -222,8 +243,9 @@ export const integrations: HarnessFeature = {
         );
         if (!server) throw new Error("MCP server not found");
         return JSON.stringify(
-          await mcpRpc(
-            server.url,
+          await mcpSessionManager.call(
+            context.workspace,
+            server,
             "tools/call",
             { name: input.tool, arguments: input.arguments },
             context.signal,
@@ -231,13 +253,25 @@ export const integrations: HarnessFeature = {
         );
       },
     );
+    tools.register(
+      def("mcp_status", "Read negotiated MCP sessions for the current workspace", {
+        server: { type: "string" },
+      }),
+      async (input, context) =>
+        JSON.stringify(
+          mcpSessionManager.status(
+            context.workspace,
+            typeof input.server === "string" ? input.server : undefined,
+          ),
+        ),
+    );
     //integrations
     prompts.register({
       id: "integrations",
       title: "Background, isolation, and plugins",
       priority: 40,
       content:
-        "Use background tasks for long commands, worktrees for isolated changes, and MCP only after discovering the relevant server and tool. Never bypass permissions or remove dirty worktrees.",
+        "Use background tasks for long commands, worktrees for isolated changes, and MCP only after discovering the relevant server and tool. MCP calls reuse an initialized, negotiated Session over a bounded HTTP, SSE, or STDIO Transport; preserve AbortSignal cancellation, HTTPS/local-host policy, bounded output, and clean shutdown. Never bypass permissions or remove dirty worktrees.",
     });
   },
 };

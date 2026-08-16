@@ -2,7 +2,13 @@ import { app, BrowserWindow, dialog, safeStorage } from "electron";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setAppDataPath, setFolderChooser, setPermissionPrompt, setSecretStore } from "../src/platform.ts";
+import {
+  setAppDataPath,
+  setFolderChooser,
+  setPermissionPrompt,
+  setSecretStore,
+} from "../src/platform.ts";
+import { shutdownMcpSessions } from "../src/mod.ts";
 import { desktopAssets } from "./desktop-assets.ts";
 import { startHttpServer } from "../desktop/http.ts";
 
@@ -15,7 +21,11 @@ function configurePlatform(): void {
   setSecretStore({
     async get(service, account) {
       if (!safeStorage.isEncryptionAvailable()) return undefined;
-      const path = join(app.getPath("userData"), "secrets", `${createHash("sha256").update(`${service}:${account}`).digest("hex")}.bin`);
+      const path = join(
+        app.getPath("userData"),
+        "secrets",
+        `${createHash("sha256").update(`${service}:${account}`).digest("hex")}.bin`,
+      );
       try {
         const { readFile } = await import("node:fs/promises");
         return safeStorage.decryptString(await readFile(path));
@@ -26,14 +36,30 @@ function configurePlatform(): void {
     async set(service, account, value) {
       if (!safeStorage.isEncryptionAvailable()) throw new Error("系统安全凭据存储不可用");
       const { mkdir, writeFile } = await import("node:fs/promises");
-      const path = join(app.getPath("userData"), "secrets", `${createHash("sha256").update(`${service}:${account}`).digest("hex")}.bin`);
+      const path = join(
+        app.getPath("userData"),
+        "secrets",
+        `${createHash("sha256").update(`${service}:${account}`).digest("hex")}.bin`,
+      );
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, safeStorage.encryptString(value));
     },
   });
-  setPermissionPrompt((message) => dialog.showMessageBoxSync({ type: "warning", buttons: ["拒绝", "允许"], defaultId: 0, cancelId: 0, title: "AI Agent 请求权限", message }) === 1);
+  setPermissionPrompt((message) =>
+    dialog.showMessageBoxSync({
+      type: "warning",
+      buttons: ["拒绝", "允许"],
+      defaultId: 0,
+      cancelId: 0,
+      title: "AI Agent 请求权限",
+      message,
+    }) === 1
+  );
   setFolderChooser(async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"], title: "选择 AI Agent 工作目录" });
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "选择 AI Agent 工作目录",
+    });
     return result.canceled ? undefined : result.filePaths[0];
   });
 }
@@ -74,4 +100,12 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+let shuttingDown = false;
+app.on("before-quit", (event) => {
+  if (shuttingDown) return;
+  event.preventDefault();
+  shuttingDown = true;
+  void shutdownMcpSessions().finally(() => app.quit());
 });

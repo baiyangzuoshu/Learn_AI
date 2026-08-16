@@ -108,6 +108,15 @@ export {
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";
 export { checkpointTask, createTask, resumeTask, verifyTask } from "./task_ledger.ts";
 export type { TaskEvidence, TaskRecord, TaskState } from "./task_ledger.ts";
+export { mcpSessionManager, shutdownMcpSessions } from "./mcp.ts";
+export type {
+  McpRequest,
+  McpServerConfig,
+  McpSessionStatus,
+  McpTransport,
+  McpTransportFactory,
+  McpTransportKind,
+} from "./mcp.ts";
 export {
   enqueueWorkerJob,
   leaseWorkerJob,
