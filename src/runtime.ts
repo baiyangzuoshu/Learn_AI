@@ -208,6 +208,13 @@ export class AgentRuntime {
             ) {
               emitHook({ name: "HandoffState", detail: output }, toolSpan);
             }
+            if (
+              (call.function.name.startsWith("research_") ||
+                call.function.name === "grounded_research") &&
+              output.startsWith('{"research":')
+            ) {
+              emitHook({ name: "ResearchState", detail: output }, toolSpan);
+            }
 
             toolCount++;
             //

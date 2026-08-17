@@ -36,6 +36,7 @@ export const diagnostics: HarnessFeature = {
           "mcp",
           "a2a-handoff",
           "rag-memory",
+          "grounded-research",
           "desktop",
         ],
       }));

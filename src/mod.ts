@@ -13,6 +13,7 @@ import { taskState } from "./features/task_state.ts";
 import { workerQueue } from "./features/worker_queue.ts";
 import { handoff } from "./features/handoff.ts";
 import { memoryRag } from "./features/memory_rag.ts";
+import { research } from "./features/research.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -30,6 +31,7 @@ export const harness = new AgentRuntime([
   workerQueue,
   handoff,
   memoryRag,
+  research,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -134,6 +136,19 @@ export {
   tombstoneMemory,
   writeMemory,
 } from "./memory_service.ts";
+export {
+  addResearchSource,
+  readResearch,
+  startResearch,
+  synthesizeResearch,
+} from "./research_service.ts";
+export type {
+  ResearchRecord,
+  ResearchSource,
+  ResearchSourceInput,
+  ResearchStartInput,
+  ResearchState,
+} from "./research_service.ts";
 export type {
   MemoryCitation,
   MemoryHit,

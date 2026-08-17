@@ -22,6 +22,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 - 任务账本：长任务支持 goal、checkpoint、evidence、幂等键、恢复和 verified 状态
 - Worker Queue：独立持久化队列支持 Worker Lease、尝试次数、有限重试和 Dead
   Letter；底部第三行实时展示当前 Job 状态
+- Grounded Research：来源新鲜度、质量评分、引用、置信度和证据不足升级；底部任务详情展示研究状态
 - MCP 会话管理：按工作区复用已初始化 Session，支持 HTTP、SSE、STDIO Transport、能力协商、取消和关闭
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
@@ -268,6 +269,15 @@ procedural 记忆；`memory_search` 在注入上下文前按租户过滤 deleted
 工具继续兼容，但现在标记为 Deprecated，并转发到 `memory_service` 的 `legacy` 租户。
 `memory_migrate_legacy` 可将旧 Markdown 一次性迁移为 Typed Memory。新代码只应使用
 `memory_store`、`memory_search` 和 `memory_tombstone`，兼容别名将在迁移完成后的版本中移除。
+
+### Grounded Research
+
+第 29 课融合为独立 `grounded-research` Feature。`research_start` 创建 tenant-scoped、Trace
+关联的研究任务； `research_add_source` 只接受 HTTPS（或 localhost
+HTTP）的有界来源文本，并记录抓取时间与质量评分； `grounded_research`
+按新鲜度、质量和来源覆盖率计算置信度，输出引用，证据不足时将任务置为 `escalated`，不生成猜测答案。
+当前服务不进行任意联网抓取，来源必须由已批准的 Connector、MCP 能力或有界 Worker
+获取后提交；任务和来源按工作区原子持久化并经过现有权限、Trace、AbortSignal 和输出上限。
 
 ## Electron 构建与发布
 

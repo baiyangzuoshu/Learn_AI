@@ -237,6 +237,18 @@ lexical 检索，排除其他租户、tombstone 和过期记录，并为每条�
 生产模块和新提示只使用
 `memory_store`、`memory_search`、`memory_tombstone`，兼容别名在迁移窗口结束后移除。
 
+### Grounded Research
+
+第 29 课由 `src/research_service.ts` 和 `grounded-research` Feature 实现，形成独立的
+`planned → collecting → complete/escalated` 研究状态机。`research_start` 保存 tenant、query、Trace、
+来源上限、新鲜度窗口和最低置信度；`research_add_source` 校验 HTTPS（localhost 可用
+HTTP）、限制文本大小， 并记录 `fetchedAt` 与 `quality`；`grounded_research`
+只使用新鲜且质量不低于阈值的来源，计算有界置信度并返回 URL
+citations。证据不足、来源过期或质量不够时保留任务并升级，不输出未经引用的事实。服务不自行访问任意网络，
+来源由批准的 Connector、MCP 或 Worker
+提供；持久化按工作区分片、原子替换和锁串行化，租户隔离、幂等键、 AbortSignal、权限策略、Trace
+和输出上限沿用现有 Runtime 契约。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：
@@ -254,28 +266,29 @@ interface HarnessFeature {
 
 当前生产 Feature：
 
-| Feature            | 职责                                             |
-| ------------------ | ------------------------------------------------ |
-| `diagnostics`      | Agent 引擎自检和能力状态                         |
-| `runtime_limits`   | 统一运行预算、取消边界和嵌套执行子预算           |
-| `pdf_reader`       | 在工作区内提取 PDF 文本和元数据                  |
-| `core_tools`       | Shell、读文件、写文件、编辑文件                  |
-| `productivity`     | Todo、Memory、任务图、Skill 加载                 |
-| `orchestration`    | Subagent、Team、Autonomous bounded loop          |
-| `integrations`     | 后台任务、Git Worktree、MCP Session 与 Transport |
-| `image_generation` | 调用 Seedream 生成图片并安全写入工作区           |
-| `task-state`       | 任务账本、checkpoint、evidence、恢复和验证       |
-| `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter          |
-| `handoff`          | 租户隔离、Trace 关联、证据和幂等的 A2A 交接      |
-| `memory-rag`       | 类型化记忆、租户检索、引用和 tombstone           |
-| `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具   |
+| Feature             | 职责                                             |
+| ------------------- | ------------------------------------------------ |
+| `diagnostics`       | Agent 引擎自检和能力状态                         |
+| `runtime_limits`    | 统一运行预算、取消边界和嵌套执行子预算           |
+| `pdf_reader`        | 在工作区内提取 PDF 文本和元数据                  |
+| `core_tools`        | Shell、读文件、写文件、编辑文件                  |
+| `productivity`      | Todo、Memory、任务图、Skill 加载                 |
+| `orchestration`     | Subagent、Team、Autonomous bounded loop          |
+| `integrations`      | 后台任务、Git Worktree、MCP Session 与 Transport |
+| `image_generation`  | 调用 Seedream 生成图片并安全写入工作区           |
+| `task-state`        | 任务账本、checkpoint、evidence、恢复和验证       |
+| `worker-queue`      | Worker Queue、Lease、重试和 Dead Letter          |
+| `handoff`           | 租户隔离、Trace 关联、证据和幂等的 A2A 交接      |
+| `memory-rag`        | 类型化记忆、租户检索、引用和 tombstone           |
+| `grounded-research` | 研究任务、来源质量/新鲜度、引用、置信度和升级    |
+| `scheduling`        | 周期性 AI 对话任务的 list、write、run-now 工具   |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
 
 桌面端的“设置 → 通用 → 课程测试用例”会调用 `/api/tests/lessons`，展示并执行生产能力 Smoke Test；第
 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider 预算验收，课程 27 额外验收 A2A
 Handoff 工具注册和终态约束，课程 28 验收 RAG Memory 工具注册。生产测试另外覆盖 Provider 费用遥测和
-Seedream 请求边界。
+Seedream 请求边界，课程 29 验收 Grounded Research 工具注册、引用和证据不足升级。
 
 ### 图片生成
 

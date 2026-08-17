@@ -318,6 +318,37 @@
 .runtime-handoff-state.handoff-failed b {
   color: #ff9caa;
 }
+.runtime-research-state {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  gap: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.runtime-research-state[hidden] {
+  display: none!important;
+}
+.runtime-research-state > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+  padding: 0 10px;
+  border-right: 1px solid #2a3038;
+}
+.runtime-research-state > span:first-child {
+  padding-left: 2px;
+}
+.runtime-research-state b {
+  color: #72d9c4;
+}
+.runtime-research-state.research-complete b {
+  color: #72d2a2;
+}
+.runtime-research-state.research-escalated b {
+  color: #ffcf85;
+}
 .runtime-trace-detail-header > span {
   display: inline-flex;
   align-items: center;

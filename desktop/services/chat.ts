@@ -3,6 +3,7 @@ import {
   agentLoop,
   type HandoffRecord,
   type PermissionMode,
+  type ResearchRecord,
   type RunBudgetSnapshot,
   type TaskRecord,
   type TraceSummary,
@@ -26,6 +27,7 @@ export async function runChat(body: ChatRequest): Promise<{
   task?: TaskRecord;
   worker?: WorkerJob;
   handoff?: HandoffRecord;
+  research?: ResearchRecord;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
   const events: AgentEvent[] = [];
@@ -34,6 +36,7 @@ export async function runChat(body: ChatRequest): Promise<{
   let task: TaskRecord | undefined;
   let worker: WorkerJob | undefined;
   let handoff: HandoffRecord | undefined;
+  let research: ResearchRecord | undefined;
   const answer = await agentLoop(
     body.message,
     (event) => events.push(event),
@@ -69,10 +72,17 @@ export async function runChat(body: ChatRequest): Promise<{
             | undefined;
         } catch { /* ignore malformed handoff state details */ }
       }
+      if (event.name === "ResearchState") {
+        try {
+          research = (JSON.parse(event.detail ?? "{}").research ?? undefined) as
+            | ResearchRecord
+            | undefined;
+        } catch { /* ignore malformed research state details */ }
+      }
     },
     body.providerId,
   );
-  return { answer, events, budget, trace, task, worker, handoff };
+  return { answer, events, budget, trace, task, worker, handoff, research };
 }
 
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
@@ -131,13 +141,22 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
               emit({ type: "handoff", handoff: JSON.parse(event.detail ?? "{}").handoff ?? null });
             } catch { /* ignore malformed handoff state details */ }
           }
+          if (event.name === "ResearchState") {
+            try {
+              emit({
+                type: "research",
+                research: JSON.parse(event.detail ?? "{}").research ?? null,
+              });
+            } catch { /* ignore malformed research state details */ }
+          }
           if (
             body.developerMode &&
             event.name !== "RunUsage" &&
             event.name !== "TraceSummary" &&
             event.name !== "TaskState" &&
             event.name !== "WorkerState" &&
-            event.name !== "HandoffState"
+            event.name !== "HandoffState" &&
+            event.name !== "ResearchState"
           ) {
             emit({ type: "hook", event });
           }

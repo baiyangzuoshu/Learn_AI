@@ -9,6 +9,7 @@ const messages = $("#messages"),
   runtimeTaskState = $("#runtime-task-state"),
   runtimeWorkerState = $("#runtime-worker-state"),
   runtimeHandoffState = $("#runtime-handoff-state"),
+  runtimeResearchState = $("#runtime-research-state"),
   runtimeDetailPanel = $("#runtime-detail-panel"),
   runtimeDetailTabs = [...document.querySelectorAll("[data-runtime-tab]")],
   runtimeDetailViews = [...document.querySelectorAll("[data-runtime-view]")];
@@ -692,7 +693,8 @@ function syncTaskDetailEmpty() {
   const hasTask = Boolean(runtimeTaskState && !runtimeTaskState.hidden);
   const hasWorker = Boolean(runtimeWorkerState && !runtimeWorkerState.hidden);
   const hasHandoff = Boolean(runtimeHandoffState && !runtimeHandoffState.hidden);
-  empty.hidden = hasTask || hasWorker || hasHandoff;
+  const hasResearch = Boolean(runtimeResearchState && !runtimeResearchState.hidden);
+  empty.hidden = hasTask || hasWorker || hasHandoff || hasResearch;
 }
 function renderTaskState(task) {
   if (!runtimeTaskState) return;
@@ -808,6 +810,47 @@ function renderHandoffState(handoff) {
   runtimeHandoffState.classList.add(`handoff-${String(handoff.state || "submitted")}`);
   syncTaskDetailEmpty();
 }
+function researchStatusLabel(state) {
+  return state === "planned"
+    ? "计划中"
+    : state === "collecting"
+    ? "采集中"
+    : state === "complete"
+    ? "完成"
+    : state === "escalated"
+    ? "已升级"
+    : "—";
+}
+function renderResearchState(research) {
+  if (!runtimeResearchState) return;
+  const classes = [
+    "research-planned",
+    "research-collecting",
+    "research-complete",
+    "research-escalated",
+  ];
+  if (!research || typeof research !== "object") {
+    runtimeResearchState.hidden = true;
+    runtimeResearchState.classList.remove(...classes);
+    syncTaskDetailEmpty();
+    return;
+  }
+  $("#runtime-research-id").textContent = shortTraceId(research.id);
+  $("#runtime-research-status").textContent = researchStatusLabel(research.state);
+  $("#runtime-research-confidence").textContent = Number.isFinite(Number(research.confidence))
+    ? Number(research.confidence).toFixed(3)
+    : "—";
+  $("#runtime-research-sources").textContent = formatBudgetNumber(
+    Array.isArray(research.sources) ? research.sources.length : 0,
+  );
+  $("#runtime-research-citations").textContent = formatBudgetNumber(
+    Array.isArray(research.citations) ? research.citations.length : 0,
+  );
+  runtimeResearchState.hidden = false;
+  runtimeResearchState.classList.remove(...classes);
+  runtimeResearchState.classList.add(`research-${String(research.state || "planned")}`);
+  syncTaskDetailEmpty();
+}
 function renderTraceDetails(summary) {
   if (!runtimeTraceDetails || !runtimeTraceSpans) return;
   const spans = Array.isArray(summary?.spans) ? summary.spans : [];
@@ -856,6 +899,7 @@ function renderTraceSummary(summary) {
     renderTaskState(null);
     renderWorkerState(null);
     renderHandoffState(null);
+    renderResearchState(null);
     setRuntimeDetailTab(null);
     return;
   }
@@ -1478,6 +1522,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "handoff") {
           renderHandoffState(data.handoff);
           thinking.textContent = `A2A 交接：${$("#runtime-handoff-status").textContent}`;
+        }
+        if (data.type === "research") {
+          renderResearchState(data.research);
+          thinking.textContent = `研究：${$("#runtime-research-status").textContent}`;
         }
         if (data.type === "tool") {
           runToolCount++;
