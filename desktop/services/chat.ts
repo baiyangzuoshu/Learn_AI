@@ -1,6 +1,7 @@
 import {
   type AgentEvent,
   agentLoop,
+  type EvaluationRecord,
   type HandoffRecord,
   type PermissionMode,
   type ResearchRecord,
@@ -28,6 +29,7 @@ export async function runChat(body: ChatRequest): Promise<{
   worker?: WorkerJob;
   handoff?: HandoffRecord;
   research?: ResearchRecord;
+  evaluation?: EvaluationRecord;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
   const events: AgentEvent[] = [];
@@ -37,6 +39,7 @@ export async function runChat(body: ChatRequest): Promise<{
   let worker: WorkerJob | undefined;
   let handoff: HandoffRecord | undefined;
   let research: ResearchRecord | undefined;
+  let evaluation: EvaluationRecord | undefined;
   const answer = await agentLoop(
     body.message,
     (event) => events.push(event),
@@ -79,10 +82,17 @@ export async function runChat(body: ChatRequest): Promise<{
             | undefined;
         } catch { /* ignore malformed research state details */ }
       }
+      if (event.name === "EvaluationState") {
+        try {
+          evaluation = (JSON.parse(event.detail ?? "{}").evaluation ?? undefined) as
+            | EvaluationRecord
+            | undefined;
+        } catch { /* ignore malformed evaluation state details */ }
+      }
     },
     body.providerId,
   );
-  return { answer, events, budget, trace, task, worker, handoff, research };
+  return { answer, events, budget, trace, task, worker, handoff, research, evaluation };
 }
 
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
@@ -149,6 +159,14 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
               });
             } catch { /* ignore malformed research state details */ }
           }
+          if (event.name === "EvaluationState") {
+            try {
+              emit({
+                type: "evaluation",
+                evaluation: JSON.parse(event.detail ?? "{}").evaluation ?? null,
+              });
+            } catch { /* ignore malformed evaluation state details */ }
+          }
           if (
             body.developerMode &&
             event.name !== "RunUsage" &&
@@ -156,7 +174,8 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
             event.name !== "TaskState" &&
             event.name !== "WorkerState" &&
             event.name !== "HandoffState" &&
-            event.name !== "ResearchState"
+            event.name !== "ResearchState" &&
+            event.name !== "EvaluationState"
           ) {
             emit({ type: "hook", event });
           }

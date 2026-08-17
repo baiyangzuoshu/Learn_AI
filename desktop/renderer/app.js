@@ -10,6 +10,7 @@ const messages = $("#messages"),
   runtimeWorkerState = $("#runtime-worker-state"),
   runtimeHandoffState = $("#runtime-handoff-state"),
   runtimeResearchState = $("#runtime-research-state"),
+  runtimeEvaluationState = $("#runtime-evaluation-state"),
   runtimeDetailPanel = $("#runtime-detail-panel"),
   runtimeDetailTabs = [...document.querySelectorAll("[data-runtime-tab]")],
   runtimeDetailViews = [...document.querySelectorAll("[data-runtime-view]")];
@@ -694,7 +695,8 @@ function syncTaskDetailEmpty() {
   const hasWorker = Boolean(runtimeWorkerState && !runtimeWorkerState.hidden);
   const hasHandoff = Boolean(runtimeHandoffState && !runtimeHandoffState.hidden);
   const hasResearch = Boolean(runtimeResearchState && !runtimeResearchState.hidden);
-  empty.hidden = hasTask || hasWorker || hasHandoff || hasResearch;
+  const hasEvaluation = Boolean(runtimeEvaluationState && !runtimeEvaluationState.hidden);
+  empty.hidden = hasTask || hasWorker || hasHandoff || hasResearch || hasEvaluation;
 }
 function renderTaskState(task) {
   if (!runtimeTaskState) return;
@@ -851,6 +853,31 @@ function renderResearchState(research) {
   runtimeResearchState.classList.add(`research-${String(research.state || "planned")}`);
   syncTaskDetailEmpty();
 }
+function renderEvaluationState(evaluation) {
+  if (!runtimeEvaluationState) return;
+  const classes = ["evaluation-passed", "evaluation-blocked"];
+  if (!evaluation || typeof evaluation !== "object") {
+    runtimeEvaluationState.hidden = true;
+    runtimeEvaluationState.classList.remove(...classes);
+    syncTaskDetailEmpty();
+    return;
+  }
+  $("#runtime-evaluation-id").textContent = shortTraceId(evaluation.id);
+  $("#runtime-evaluation-status").textContent = evaluation.state === "passed" ? "通过" : "阻断";
+  $("#runtime-evaluation-pass").textContent = Number.isFinite(Number(evaluation.passRate))
+    ? `${(Number(evaluation.passRate) * 100).toFixed(1)}%`
+    : "—";
+  $("#runtime-evaluation-grounding").textContent = Number.isFinite(Number(evaluation.groundingRate))
+    ? `${(Number(evaluation.groundingRate) * 100).toFixed(1)}%`
+    : "—";
+  $("#runtime-evaluation-review").textContent = formatBudgetNumber(
+    Array.isArray(evaluation.review) ? evaluation.review.length : 0,
+  );
+  runtimeEvaluationState.hidden = false;
+  runtimeEvaluationState.classList.remove(...classes);
+  runtimeEvaluationState.classList.add(`evaluation-${String(evaluation.state || "blocked")}`);
+  syncTaskDetailEmpty();
+}
 function renderTraceDetails(summary) {
   if (!runtimeTraceDetails || !runtimeTraceSpans) return;
   const spans = Array.isArray(summary?.spans) ? summary.spans : [];
@@ -900,6 +927,7 @@ function renderTraceSummary(summary) {
     renderWorkerState(null);
     renderHandoffState(null);
     renderResearchState(null);
+    renderEvaluationState(null);
     setRuntimeDetailTab(null);
     return;
   }
@@ -1526,6 +1554,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "research") {
           renderResearchState(data.research);
           thinking.textContent = `研究：${$("#runtime-research-status").textContent}`;
+        }
+        if (data.type === "evaluation") {
+          renderEvaluationState(data.evaluation);
+          thinking.textContent = `评估 Gate：${$("#runtime-evaluation-status").textContent}`;
         }
         if (data.type === "tool") {
           runToolCount++;

@@ -37,6 +37,7 @@ export const diagnostics: HarnessFeature = {
           "a2a-handoff",
           "rag-memory",
           "grounded-research",
+          "evaluation-ci",
           "desktop",
         ],
       }));

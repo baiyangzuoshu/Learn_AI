@@ -23,6 +23,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 - Worker Queue：独立持久化队列支持 Worker Lease、尝试次数、有限重试和 Dead
   Letter；底部第三行实时展示当前 Job 状态
 - Grounded Research：来源新鲜度、质量评分、引用、置信度和证据不足升级；底部任务详情展示研究状态
+- Evaluation CI：版本化数据集、正确率、引用覆盖率、复核队列和发布阻断 Gate
 - MCP 会话管理：按工作区复用已初始化 Session，支持 HTTP、SSE、STDIO Transport、能力协商、取消和关闭
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
@@ -278,6 +279,14 @@ HTTP）的有界来源文本，并记录抓取时间与质量评分； `grounded
 按新鲜度、质量和来源覆盖率计算置信度，输出引用，证据不足时将任务置为 `escalated`，不生成猜测答案。
 当前服务不进行任意联网抓取，来源必须由已批准的 Connector、MCP 能力或有界 Worker
 获取后提交；任务和来源按工作区原子持久化并经过现有权限、Trace、AbortSignal 和输出上限。
+
+### Evaluation CI
+
+第 30 课新增 `evaluation-ci` Feature。`evaluation_gate` 接收版本化数据集和候选输出，确定性计算 exact
+pass rate 与 citation grounding rate；失败样例进入 review queue，任一阈值未达标就将发布 Gate 置为
+`blocked`。评估记录按 tenant、dataset version 和 Trace 持久化，支持幂等重跑与 `evaluation_status`
+查询；
+工具不会在后台隐式调用模型，模型运行、人工复核、安全负例、延迟和成本证据必须由上游候选执行器显式提供。
 
 ## Electron 构建与发布
 

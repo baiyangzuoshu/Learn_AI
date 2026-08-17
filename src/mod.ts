@@ -14,6 +14,7 @@ import { workerQueue } from "./features/worker_queue.ts";
 import { handoff } from "./features/handoff.ts";
 import { memoryRag } from "./features/memory_rag.ts";
 import { research } from "./features/research.ts";
+import { evaluation } from "./features/evaluation.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -32,6 +33,7 @@ export const harness = new AgentRuntime([
   handoff,
   memoryRag,
   research,
+  evaluation,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -142,6 +144,14 @@ export {
   startResearch,
   synthesizeResearch,
 } from "./research_service.ts";
+export { readEvaluations, runEvaluation } from "./evaluation_service.ts";
+export type {
+  EvaluationCase,
+  EvaluationRecord,
+  EvaluationResult,
+  EvaluationRunInput,
+  EvaluationState,
+} from "./evaluation_service.ts";
 export type {
   ResearchRecord,
   ResearchSource,

@@ -215,6 +215,12 @@ export class AgentRuntime {
             ) {
               emitHook({ name: "ResearchState", detail: output }, toolSpan);
             }
+            if (
+              call.function.name.startsWith("evaluation_") &&
+              output.startsWith('{"evaluation":')
+            ) {
+              emitHook({ name: "EvaluationState", detail: output }, toolSpan);
+            }
 
             toolCount++;
             //

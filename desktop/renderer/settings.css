@@ -349,6 +349,37 @@
 .runtime-research-state.research-escalated b {
   color: #ffcf85;
 }
+.runtime-evaluation-state {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  gap: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.runtime-evaluation-state[hidden] {
+  display: none!important;
+}
+.runtime-evaluation-state > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+  padding: 0 10px;
+  border-right: 1px solid #2a3038;
+}
+.runtime-evaluation-state > span:first-child {
+  padding-left: 2px;
+}
+.runtime-evaluation-state b {
+  color: #72d9c4;
+}
+.runtime-evaluation-state.evaluation-passed b {
+  color: #72d2a2;
+}
+.runtime-evaluation-state.evaluation-blocked b {
+  color: #ff9caa;
+}
 .runtime-trace-detail-header > span {
   display: inline-flex;
   align-items: center;
