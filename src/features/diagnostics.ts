@@ -35,6 +35,7 @@ export const diagnostics: HarnessFeature = {
           "worktree",
           "mcp",
           "a2a-handoff",
+          "rag-memory",
           "desktop",
         ],
       }));

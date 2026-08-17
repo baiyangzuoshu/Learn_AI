@@ -3,6 +3,13 @@ import type { ToolDefinition } from "../core/types.ts";
 import { appDataDir } from "../config/paths.ts";
 import { isNotFound, readUtf8, writeTextAtomic } from "../platform.ts";
 import { readdir, readFile, stat } from "node:fs/promises";
+import {
+  legacyMemoryTenant,
+  migrateLegacyMemory,
+  readMemoryRecords,
+  replaceMemory,
+  writeMemory,
+} from "../memory_service.ts";
 
 const def = (
   name: string,
@@ -47,45 +54,46 @@ export const productivity: HarnessFeature = {
         } completed)`;
       },
     );
-    //memory_read
+    //memory_read (deprecated compatibility alias)
     tools.register(
-      def("memory_read", "Read durable project memory", {}),
-      async (_input, context) =>
-        await readOptional(`${appDataDir()}/memory/${await key(context.workspace)}.md`) ||
-        "(project memory is empty)",
-    );
-    //memory_append
-    tools.register(
-      def("memory_append", "Append a durable project fact", { content: { type: "string" } }, [
-        "content",
-      ]),
-      async (input, context) => {
-        const path = `${appDataDir()}/memory/${await key(context.workspace)}.md`,
-          current = await readOptional(path),
-          addition = String(input.content ?? "").trim();
-        if (!addition || addition.length > 4_000) throw new Error("memory content is invalid");
-        await writeData(
-          path,
-          `${current.trim()}${current.trim() ? "\n" : ""}- ${
-            new Date().toISOString().slice(0, 10)
-          }: ${addition}\n`,
-        );
-        return "Project memory updated";
+      def("memory_read", "[Deprecated] Read legacy project memory; use memory_search", {}),
+      async (_input, context) => {
+        await migrateLegacyMemory(context.workspace, context.signal);
+        const records = await readMemoryRecords(context.workspace, { tenant: legacyMemoryTenant });
+        return records.map((record) => `- ${record.text}`).join("\n") ||
+          "(project memory is empty)";
       },
     );
-    //memory_replace
+    //memory_append (deprecated compatibility alias)
     tools.register(
-      def("memory_replace", "Replace project memory with a concise version", {
+      def("memory_append", "[Deprecated] Append legacy memory; use memory_store", {
         content: { type: "string" },
       }, ["content"]),
       async (input, context) => {
-        const content = String(input.content ?? "").trim();
-        if (content.length > 16_000) throw new Error("memory exceeds 16000 characters");
-        await writeData(
-          `${appDataDir()}/memory/${await key(context.workspace)}.md`,
-          `${content}\n`,
-        );
-        return "Project memory replaced";
+        await migrateLegacyMemory(context.workspace, context.signal);
+        const record = await writeMemory(context.workspace, {
+          tenant: legacyMemoryTenant,
+          kind: "semantic",
+          text: String(input.content ?? "").trim(),
+          source: "deprecated-memory_append",
+        }, context.signal);
+        return `[Deprecated] Project memory updated via memory_service (${record.id})`;
+      },
+    );
+    //memory_replace (deprecated compatibility alias)
+    tools.register(
+      def("memory_replace", "[Deprecated] Replace legacy memory; use memory_store", {
+        content: { type: "string" },
+      }, ["content"]),
+      async (input, context) => {
+        await migrateLegacyMemory(context.workspace, context.signal);
+        const record = await replaceMemory(context.workspace, {
+          tenant: legacyMemoryTenant,
+          kind: "semantic",
+          text: String(input.content ?? "").trim(),
+          source: "deprecated-memory_replace",
+        }, context.signal);
+        return `[Deprecated] Project memory replaced via memory_service (${record.id})`;
       },
     );
     //task_graph_read
@@ -175,7 +183,7 @@ export const productivity: HarnessFeature = {
       title: "Planning and durable state",
       priority: 20,
       content:
-        "Use todo_write for temporary multi-step plans, task_graph tools for durable dependency-aware projects, skills only on demand, and memory only for stable non-secret facts.",
+        "Use todo_write for temporary multi-step plans, task_graph tools for durable dependency-aware projects, skills only on demand, and memory_store/memory_search for stable non-secret facts. The legacy memory_read/memory_append/memory_replace aliases are deprecated and exist only during migration.",
     });
   },
 };

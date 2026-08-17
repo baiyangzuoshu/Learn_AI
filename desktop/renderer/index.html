@@ -199,7 +199,7 @@
               <label
                 class="developer-option"><input id="developer-mode" type="checkbox" /><span><b>开发者模式</b><small>在工具抽屉中实时显示Hook生命周期事件</small></span></label>
               <div
-                class="settings-card acceptance-card"><b>1–21 课程测试用例</b><p>打开独立测试面板，查看每课验收项，再单独测试某课或一键运行全部。</p><div class="update-actions"><button id="open-lesson-tests" type="button">打开 1–21 测试面板</button></div></div>
+                class="settings-card acceptance-card"><b>课程测试用例</b><p>打开独立测试面板，查看每课验收项，再单独测试某课或一键运行全部。</p><div class="update-actions"><button id="open-lesson-tests" type="button">打开测试面板</button></div></div>
               <div
                 class="settings-card"><b>本地数据</b><p>聊天、记忆、任务图和定时任务保存在macOS Application Support中；API Key保存在Keychain。</p></div>
               <div
@@ -236,12 +236,12 @@
     <dialog id="tests-dialog">
       <div class="tests-dialog-panel">
         <div
-          class="dialog-title"><div><h2>1–21 课程测试用例</h2><p>Fake Provider Smoke Test · 不调用真实模型</p></div><button id="close-tests" class="close" type="button">×</button></div>
+          class="dialog-title"><div><h2>课程测试用例</h2><p>Fake Provider Smoke Test · 不调用真实模型</p></div><button id="close-tests" class="close" type="button">×</button></div>
         <div
-          class="update-actions"><button id="show-lesson-tests" type="button">加载 1–21 用例</button><button id="run-all-lesson-tests" type="button" disabled>一键测试全部</button></div>
+          class="update-actions"><button id="show-lesson-tests" type="button">加载用例</button><button id="run-all-lesson-tests" type="button" disabled>一键测试全部</button></div>
         <div id="lesson-test-summary" class="lesson-test-summary">尚未运行测试</div>
         <div id="lesson-test-list" class="lesson-test-list"></div>
-        <pre id="runtime-test-output">点击“加载 1–21 用例”开始。</pre>
+        <pre id="runtime-test-output">点击“加载用例”开始。</pre>
       </div>
     </dialog>
     <dialog id="cron-dialog">

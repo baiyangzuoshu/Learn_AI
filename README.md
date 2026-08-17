@@ -85,9 +85,8 @@ deno task test
 deno task check
 ```
 
-桌面端也可打开“设置 → 通用 → 1–21
-课程测试用例”，先查看每课验收项，再单独测试或一键运行全部；该流程使用 Fake
-Provider，不调用真实模型。
+桌面端也可打开“设置 → 通用 → 课程测试用例”，先查看每课验收项，再单独测试或一键运行全部；该流程使用
+Fake Provider，不调用真实模型。
 
 每次桌面对话结束后，回答下方和底部状态栏会显示本次预算的迭代、工具调用、输出字符和成本单位用量；
 底部第一行同时显示最近一次模型费用和累计费用。DeepSeek 会根据响应中的 token/cache usage
@@ -259,6 +258,16 @@ Session；实际调用仍受权限模式控制。
 `handoff_complete` 只有在持久证据存在时才能完成，`handoff_fail` 记录终态失败原因，`handoff_status`
 读取当前工作区的交接状态。 记录按工作区原子持久化，租户不匹配、终态重复迁移、超大
 Artifact、缺少证据和取消操作都会被拒绝。
+
+### RAG Memory
+
+第 28 课新增独立 `memory-rag` Feature。`memory_store` 保存 tenant-scoped 的 semantic、episodic 或
+procedural 记忆；`memory_search` 在注入上下文前按租户过滤 deleted/expired 记录，进行有界 lexical
+检索并返回 `citation`；`memory_tombstone` 保留审计记录但从检索结果移除，`memory_status`
+查看保留状态。 写入使用幂等键和原子持久化，旧的 `memory_read`、`memory_append`、`memory_replace`
+工具继续兼容，但现在标记为 Deprecated，并转发到 `memory_service` 的 `legacy` 租户。
+`memory_migrate_legacy` 可将旧 Markdown 一次性迁移为 Typed Memory。新代码只应使用
+`memory_store`、`memory_search` 和 `memory_tombstone`，兼容别名将在迁移完成后的版本中移除。
 
 ## Electron 构建与发布
 

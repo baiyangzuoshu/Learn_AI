@@ -224,6 +224,19 @@ checkpoint；`handoff_complete` 仅允许带有持久证据的 `running` 记录�
 工作区锁串行化；租户不匹配、终态重复迁移、超大产物、缺少证据和取消请求都会被拒绝。工具输出中的
 handoff 状态会作为 `HandoffState` Hook 推送到桌面底部“任务 / Worker”详情面板。
 
+### RAG Memory
+
+第 28 课由 `src/memory_service.ts` 和独立 `memory-rag` Feature 实现。`memory_store` 保存
+tenant-scoped 的 `semantic`、`episodic`、`procedural` 记录；`memory_search` 在有限结果集上执行
+lexical 检索，排除其他租户、tombstone 和过期记录，并为每条结果返回 citation。`memory_tombstone`
+执行可审计删除，`memory_status` 读取保留状态。记录按工作区 SHA-256 分片并原子替换，写入支持幂等键和
+工作区锁；工具通过现有权限、AbortSignal、Trace 和输出上限。当前检索模式明确标记为
+`lexical`，后续可在 同一契约下替换向量索引或 reranker，不能把课程中的占位 embedding
+当作生产质量保证。旧的 `memory_read`、`memory_append`、`memory_replace` 已标记 Deprecated，并通过
+`legacy` tenant 转发到同一 Service；`memory_migrate_legacy` 把旧 Markdown 原子迁移为 Typed Memory。
+生产模块和新提示只使用
+`memory_store`、`memory_search`、`memory_tombstone`，兼容别名在迁移窗口结束后移除。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：
@@ -254,13 +267,15 @@ interface HarnessFeature {
 | `task-state`       | 任务账本、checkpoint、evidence、恢复和验证       |
 | `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter          |
 | `handoff`          | 租户隔离、Trace 关联、证据和幂等的 A2A 交接      |
+| `memory-rag`       | 类型化记忆、租户检索、引用和 tombstone           |
 | `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具   |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
 
-桌面端的“设置 → 通用 → 1–21 课程测试用例”会调用 `/api/tests/lessons`，展示并执行 1–21 课程的生产能力
-Smoke Test；第 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider 预算验收，课程 27
-额外验收 A2A Handoff 工具注册和终态约束。生产测试另外覆盖 Provider 费用遥测和 Seedream 请求边界。
+桌面端的“设置 → 通用 → 课程测试用例”会调用 `/api/tests/lessons`，展示并执行生产能力 Smoke Test；第
+21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider 预算验收，课程 27 额外验收 A2A
+Handoff 工具注册和终态约束，课程 28 验收 RAG Memory 工具注册。生产测试另外覆盖 Provider 费用遥测和
+Seedream 请求边界。
 
 ### 图片生成
 

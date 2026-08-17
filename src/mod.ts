@@ -12,6 +12,7 @@ import { toolPolicy } from "./features/tool_policy.ts";
 import { taskState } from "./features/task_state.ts";
 import { workerQueue } from "./features/worker_queue.ts";
 import { handoff } from "./features/handoff.ts";
+import { memoryRag } from "./features/memory_rag.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -28,6 +29,7 @@ export const harness = new AgentRuntime([
   taskState,
   workerQueue,
   handoff,
+  memoryRag,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -123,6 +125,22 @@ export type {
   HandoffState,
   HandoffSubmitInput,
 } from "./handoff.ts";
+export {
+  legacyMemoryTenant,
+  migrateLegacyMemory,
+  readMemoryRecords,
+  replaceMemory,
+  searchMemory,
+  tombstoneMemory,
+  writeMemory,
+} from "./memory_service.ts";
+export type {
+  MemoryCitation,
+  MemoryHit,
+  MemoryKind,
+  MemoryRecord,
+  MemoryWriteInput,
+} from "./memory_service.ts";
 export { mcpSessionManager, shutdownMcpSessions } from "./mcp.ts";
 export type {
   McpRequest,

@@ -2062,12 +2062,12 @@ openLessonTestsButton.addEventListener("click", () => {
 $("#close-tests").addEventListener("click", () => testsDialog.close());
 showLessonTestsButton.addEventListener("click", async () => {
   showLessonTestsButton.disabled = true;
-  runtimeTestOutput.textContent = "正在加载 1–21 测试用例…";
+  runtimeTestOutput.textContent = "正在加载课程测试用例…";
   try {
     const response = await fetch(`${API}/tests/lessons`), data = await response.json();
     if (!response.ok) throw new Error(data.error || "测试用例加载失败");
     renderLessonTests(data.cases || []);
-    runAllLessonTestsButton.disabled = lessonTests.length !== 21;
+    runAllLessonTestsButton.disabled = lessonTests.length === 0;
     lessonTestSummary.classList.remove("passed", "failed");
     lessonTestSummary.textContent =
       `已加载 ${lessonTests.length} 个用例；现在可以单独测试或一键测试全部。`;
@@ -2099,8 +2099,8 @@ lessonTestList.addEventListener("click", async (event) => {
 runAllLessonTestsButton.addEventListener("click", async () => {
   runAllLessonTestsButton.disabled = true;
   lessonTestSummary.classList.remove("passed", "failed");
-  lessonTestSummary.textContent = "⟳ 正在运行 1–21 全部测试…";
-  runtimeTestOutput.textContent = "正在运行 1–21 全部测试…";
+  lessonTestSummary.textContent = "⟳ 正在运行全部课程测试…";
+  runtimeTestOutput.textContent = "正在运行全部课程测试…";
   try {
     const response = await fetch(`${API}/tests/lessons`, {
       method: "POST",
