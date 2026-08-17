@@ -128,6 +128,9 @@ export const lessonTestCases: readonly LessonTestCase[] = [
   lesson(19, "MCP Plugins", "验证 MCP 发现和调用工具已注册。", () => {
     assertTools("mcp_servers", "mcp_list_tools", "mcp_call");
   }),
+  lesson(27, "A2A Handoff", "验证租户隔离、证据交接和终态约束工具已注册。", () => {
+    assertTools("handoff_submit", "agent_handoff", "handoff_complete", "handoff_status");
+  }),
   lesson(20, "Comprehensive Harness", "验证 1–20 机制汇聚到同一个工具池。", () => {
     assert(harness.tools.names().length >= 30, "complete harness tool registry is incomplete");
   }),
@@ -149,7 +152,7 @@ export async function runLessonAcceptance(lessonNumber?: number): Promise<Lesson
   const selected = lessonNumber === undefined
     ? lessonTestCases
     : lessonTestCases.filter((test) => test.lesson === lessonNumber);
-  if (!selected.length) throw new Error("lesson must be an integer from 1 to 21");
+  if (!selected.length) throw new Error("lesson must be an integer from 1 to 27");
 
   const results: LessonTestResult[] = [];
   for (const test of selected) {

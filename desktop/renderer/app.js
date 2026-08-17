@@ -8,6 +8,7 @@ const messages = $("#messages"),
   runtimeTraceSpans = $("#runtime-trace-spans"),
   runtimeTaskState = $("#runtime-task-state"),
   runtimeWorkerState = $("#runtime-worker-state"),
+  runtimeHandoffState = $("#runtime-handoff-state"),
   runtimeDetailPanel = $("#runtime-detail-panel"),
   runtimeDetailTabs = [...document.querySelectorAll("[data-runtime-tab]")],
   runtimeDetailViews = [...document.querySelectorAll("[data-runtime-view]")];
@@ -690,7 +691,8 @@ function syncTaskDetailEmpty() {
   if (!empty) return;
   const hasTask = Boolean(runtimeTaskState && !runtimeTaskState.hidden);
   const hasWorker = Boolean(runtimeWorkerState && !runtimeWorkerState.hidden);
-  empty.hidden = hasTask || hasWorker;
+  const hasHandoff = Boolean(runtimeHandoffState && !runtimeHandoffState.hidden);
+  empty.hidden = hasTask || hasWorker || hasHandoff;
 }
 function renderTaskState(task) {
   if (!runtimeTaskState) return;
@@ -773,6 +775,39 @@ function renderWorkerState(worker) {
   runtimeWorkerState.classList.add(`worker-${String(worker.status || "queued")}`);
   syncTaskDetailEmpty();
 }
+function handoffStatusLabel(state) {
+  return state === "submitted"
+    ? "已提交"
+    : state === "running"
+    ? "交接中"
+    : state === "complete"
+    ? "已完成"
+    : state === "failed"
+    ? "失败"
+    : "—";
+}
+function renderHandoffState(handoff) {
+  if (!runtimeHandoffState) return;
+  const classes = ["handoff-submitted", "handoff-running", "handoff-complete", "handoff-failed"];
+  if (!handoff || typeof handoff !== "object") {
+    runtimeHandoffState.hidden = true;
+    runtimeHandoffState.classList.remove(...classes);
+    syncTaskDetailEmpty();
+    return;
+  }
+  $("#runtime-handoff-id").textContent = shortTraceId(handoff.id);
+  $("#runtime-handoff-tenant").textContent = String(handoff.tenant || "—");
+  $("#runtime-handoff-role").textContent = String(handoff.role || "—");
+  $("#runtime-handoff-status").textContent = handoffStatusLabel(handoff.state);
+  $("#runtime-handoff-trace").textContent = shortTraceId(handoff.traceId);
+  $("#runtime-handoff-evidence").textContent = formatBudgetNumber(
+    Array.isArray(handoff.evidence) ? handoff.evidence.length : 0,
+  );
+  runtimeHandoffState.hidden = false;
+  runtimeHandoffState.classList.remove(...classes);
+  runtimeHandoffState.classList.add(`handoff-${String(handoff.state || "submitted")}`);
+  syncTaskDetailEmpty();
+}
 function renderTraceDetails(summary) {
   if (!runtimeTraceDetails || !runtimeTraceSpans) return;
   const spans = Array.isArray(summary?.spans) ? summary.spans : [];
@@ -820,6 +855,7 @@ function renderTraceSummary(summary) {
     if (runtimeTraceSpans) runtimeTraceSpans.replaceChildren();
     renderTaskState(null);
     renderWorkerState(null);
+    renderHandoffState(null);
     setRuntimeDetailTab(null);
     return;
   }
@@ -1438,6 +1474,10 @@ form.addEventListener("submit", async (event) => {
         if (data.type === "worker") {
           renderWorkerState(data.worker);
           thinking.textContent = `Worker：${$("#runtime-worker-status").textContent}`;
+        }
+        if (data.type === "handoff") {
+          renderHandoffState(data.handoff);
+          thinking.textContent = `A2A 交接：${$("#runtime-handoff-status").textContent}`;
         }
         if (data.type === "tool") {
           runToolCount++;

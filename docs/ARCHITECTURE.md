@@ -214,6 +214,16 @@ framing，限制 stderr，并在进程退出时拒绝挂起请求。
 `shutdownMcpSessions()`，关闭所有 HTTP / STDIO Session，避免遗留子进程。工具仍经过现有 Tool
 Policy、权限审批、Trace 和输出上限；生产代码不直接导入课程文件。
 
+### A2A Handoff
+
+第 27 课由 `src/handoff.ts` 和独立 `handoff` Feature 实现。`handoff_submit` 创建 tenant-scoped、
+role-aware、trace-linked 的目标；`agent_handoff` 通过幂等键追加有上限的 Artifact 与 evidence
+checkpoint；`handoff_complete` 仅允许带有持久证据的 `running` 记录进入 `complete`，`handoff_fail`
+记录终态失败原因，`handoff_status` 只返回当前工作区中指定租户可见的记录。文件按工作区 SHA-256
+分片并原子替换，写操作使用
+工作区锁串行化；租户不匹配、终态重复迁移、超大产物、缺少证据和取消请求都会被拒绝。工具输出中的
+handoff 状态会作为 `HandoffState` Hook 推送到桌面底部“任务 / Worker”详情面板。
+
 ## Feature 模块
 
 每个 Feature 通过统一接口注册工具和提示：
@@ -243,13 +253,14 @@ interface HarnessFeature {
 | `image_generation` | 调用 Seedream 生成图片并安全写入工作区           |
 | `task-state`       | 任务账本、checkpoint、evidence、恢复和验证       |
 | `worker-queue`     | Worker Queue、Lease、重试和 Dead Letter          |
+| `handoff`          | 租户隔离、Trace 关联、证据和幂等的 A2A 交接      |
 | `scheduling`       | 周期性 AI 对话任务的 list、write、run-now 工具   |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
 
 桌面端的“设置 → 通用 → 1–21 课程测试用例”会调用 `/api/tests/lessons`，展示并执行 1–21 课程的生产能力
-Smoke Test；第 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider
-预算验收。生产测试另外覆盖 Provider 费用遥测和 Seedream 请求边界。
+Smoke Test；第 21 课继续调用 `tests/21test_runtime_budget.ts` 中的 Fake Provider 预算验收，课程 27
+额外验收 A2A Handoff 工具注册和终态约束。生产测试另外覆盖 Provider 费用遥测和 Seedream 请求边界。
 
 ### 图片生成
 

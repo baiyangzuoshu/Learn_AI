@@ -201,6 +201,13 @@ export class AgentRuntime {
             if (call.function.name.startsWith("worker_") && output.startsWith('{"worker":')) {
               emitHook({ name: "WorkerState", detail: output }, toolSpan);
             }
+            if (
+              (call.function.name.startsWith("handoff_") ||
+                call.function.name === "agent_handoff") &&
+              output.startsWith('{"handoff":')
+            ) {
+              emitHook({ name: "HandoffState", detail: output }, toolSpan);
+            }
 
             toolCount++;
             //

@@ -11,6 +11,7 @@ import { imageGeneration } from "./features/image_generation.ts";
 import { toolPolicy } from "./features/tool_policy.ts";
 import { taskState } from "./features/task_state.ts";
 import { workerQueue } from "./features/worker_queue.ts";
+import { handoff } from "./features/handoff.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -26,6 +27,7 @@ export const harness = new AgentRuntime([
   toolPolicy,
   taskState,
   workerQueue,
+  handoff,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -108,6 +110,19 @@ export {
 export { listCronSchedules, runCronSchedule, saveCronSchedules } from "./scheduler.ts";
 export { checkpointTask, createTask, resumeTask, verifyTask } from "./task_ledger.ts";
 export type { TaskEvidence, TaskRecord, TaskState } from "./task_ledger.ts";
+export {
+  completeHandoff,
+  failHandoff,
+  readHandoffs,
+  submitHandoff,
+  transferHandoff,
+} from "./handoff.ts";
+export type {
+  HandoffEvidence,
+  HandoffRecord,
+  HandoffState,
+  HandoffSubmitInput,
+} from "./handoff.ts";
 export { mcpSessionManager, shutdownMcpSessions } from "./mcp.ts";
 export type {
   McpRequest,

@@ -252,6 +252,14 @@ AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases
 `args`。首次列工具或调用时会完成 MCP initialize 和能力协商，同一工作区内复用
 Session；实际调用仍受权限模式控制。
 
+### A2A Handoff
+
+第 27 课融合为独立 `handoff` Feature。`handoff_submit` 创建租户隔离、角色明确、Trace
+关联的交接目标；`agent_handoff` 以幂等键传递有大小上限的 Artifact 和证据 checkpoint；
+`handoff_complete` 只有在持久证据存在时才能完成，`handoff_fail` 记录终态失败原因，`handoff_status`
+读取当前工作区的交接状态。 记录按工作区原子持久化，租户不匹配、终态重复迁移、超大
+Artifact、缺少证据和取消操作都会被拒绝。
+
 ## Electron 构建与发布
 
 桌面构建由 Electron Builder 负责打包：

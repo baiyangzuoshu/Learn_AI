@@ -34,6 +34,7 @@ export const diagnostics: HarnessFeature = {
           "bounded-runtime",
           "worktree",
           "mcp",
+          "a2a-handoff",
           "desktop",
         ],
       }));
