@@ -292,6 +292,7 @@ interface HarnessFeature {
 | `memory-rag`        | 类型化记忆、租户检索、引用和 tombstone            |
 | `grounded-research` | 研究任务、来源质量/新鲜度、引用、置信度和升级     |
 | `evaluation-ci`     | 版本化评估、正确率、引用覆盖、复核队列和发布 Gate |
+| `security-boundary` | 身份、租户/scope、出口、SSRF、DLP 和安全审计      |
 | `scheduling`        | 周期性 AI 对话任务的 list、write、run-now 工具    |
 
 新增工具时优先新增或扩展 Feature，而不是把业务逻辑塞进 `runtime.ts`。
@@ -301,6 +302,15 @@ interface HarnessFeature {
 Handoff 工具注册和终态约束，课程 28 验收 RAG Memory 工具注册。生产测试另外覆盖 Provider 费用遥测和
 Seedream 请求边界，课程 29 验收 Grounded Research 工具注册、引用和证据不足升级。 课程 30 验收
 Evaluation CI 工具注册、通过 Gate、回归阻断和复核队列。
+
+### Security Boundary
+
+第 31 课由 `src/security_boundary.ts` 与 `security-boundary` Feature 实现。Runtime 将短期 Principal
+传入 `ToolContext`，工具在外部动作前检查 subject、tenant、expiresAt 与所需 scope；出口只允许 HTTPS
+或 localhost HTTP，拒绝 URL 中的凭据、loopback/私有/链路本地/多播 IP 等 SSRF 目标。`redactSecrets`
+在文本返回和审计前 移除 API Key、Bearer Token、密码和 Secret；允许与拒绝决策按工作区原子持久化并由
+`security_audit` 查询。 该边界与已有 Tool Policy、权限审批、工作区路径 sandbox、Trace 和 AbortSignal
+叠加，安全失败默认阻断， 不能由模型自行授予 scope 或延长 Principal。
 
 ### 图片生成
 

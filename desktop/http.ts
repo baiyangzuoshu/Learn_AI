@@ -46,8 +46,8 @@ async function routeApi(request: Request, url: URL): Promise<Response | undefine
       const lesson = body && typeof body === "object" && "lesson" in body
         ? Number((body as { lesson?: unknown }).lesson)
         : undefined;
-      if (lesson !== undefined && (!Number.isInteger(lesson) || lesson < 1 || lesson > 30)) {
-        return errorResponse("lesson must be an integer from 1 to 30", 400);
+      if (lesson !== undefined && (!Number.isInteger(lesson) || lesson < 1 || lesson > 31)) {
+        return errorResponse("lesson must be an integer from 1 to 31", 400);
       }
       return json(await runLessonAcceptance(lesson));
     } catch (error) {

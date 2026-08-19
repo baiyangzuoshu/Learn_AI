@@ -38,6 +38,7 @@ export const diagnostics: HarnessFeature = {
           "rag-memory",
           "grounded-research",
           "evaluation-ci",
+          "security-boundary",
           "desktop",
         ],
       }));

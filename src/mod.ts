@@ -15,6 +15,7 @@ import { handoff } from "./features/handoff.ts";
 import { memoryRag } from "./features/memory_rag.ts";
 import { research } from "./features/research.ts";
 import { evaluation } from "./features/evaluation.ts";
+import { securityBoundary } from "./features/security_boundary.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
@@ -34,6 +35,7 @@ export const harness = new AgentRuntime([
   memoryRag,
   research,
   evaluation,
+  securityBoundary,
   scheduling,
 ]);
 export const runAgent = harness.run.bind(harness);
@@ -152,6 +154,8 @@ export type {
   EvaluationRunInput,
   EvaluationState,
 } from "./evaluation_service.ts";
+export { checkSecurityBoundary, readSecurityAudit, redactSecrets } from "./security_boundary.ts";
+export type { SecurityAuditEntry, SecurityCheckInput } from "./security_boundary.ts";
 export type {
   ResearchRecord,
   ResearchSource,

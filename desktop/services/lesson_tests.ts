@@ -146,6 +146,9 @@ export const lessonTestCases: readonly LessonTestCase[] = [
   lesson(30, "Evaluation CI", "验证版本化数据集、引用覆盖率和发布 Gate 工具已注册。", () => {
     assertTools("evaluation_gate", "evaluation_status");
   }),
+  lesson(31, "Security Boundary", "验证身份、出口、SSRF、DLP 和审计工具已注册。", () => {
+    assertTools("security_boundary", "security_audit");
+  }),
   lesson(20, "Comprehensive Harness", "验证 1–20 机制汇聚到同一个工具池。", () => {
     assert(harness.tools.names().length >= 30, "complete harness tool registry is incomplete");
   }),
@@ -167,7 +170,7 @@ export async function runLessonAcceptance(lessonNumber?: number): Promise<Lesson
   const selected = lessonNumber === undefined
     ? lessonTestCases
     : lessonTestCases.filter((test) => test.lesson === lessonNumber);
-  if (!selected.length) throw new Error("lesson must be an integer from 1 to 30");
+  if (!selected.length) throw new Error("lesson must be an integer from 1 to 31");
 
   const results: LessonTestResult[] = [];
   for (const test of selected) {

@@ -94,7 +94,11 @@ export class AgentRuntime {
     };
     //
     const workspace = options.workspace ?? await getWorkspace();
-    const principal = createPrincipal(options.permissionMode ?? "ask", options.principal);
+    const principal = {
+      ...createPrincipal(options.permissionMode ?? "ask", options.principal),
+      subject: options.principal?.subject ?? "local-agent",
+      tenant: options.principal?.tenant ?? "local",
+    };
     //
     const config = await this.#resolveProviderConfig(options.providerId, options.model);
     //
@@ -184,7 +188,12 @@ export class AgentRuntime {
               tool.policy,
             );
             //
-            output = await tool.handler(input, { workspace, signal: options.signal, budget });
+            output = await tool.handler(input, {
+              workspace,
+              signal: options.signal,
+              budget,
+              principal,
+            });
 
             const bounded = boundedToolOutput(output, tool.policy);
             if (bounded.length !== output.length) {

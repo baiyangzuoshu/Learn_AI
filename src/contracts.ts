@@ -16,6 +16,8 @@ export interface Principal {
   id: string;
   scopes: ReadonlySet<string>;
   expiresAt: number;
+  subject?: string;
+  tenant?: string;
 }
 
 export type RunBudget = {
@@ -111,6 +113,7 @@ export interface ToolContext {
   workspace: string;
   signal?: AbortSignal;
   budget: RuntimeBudget;
+  principal?: Principal;
 }
 export interface ToolRequest {
   name: string;

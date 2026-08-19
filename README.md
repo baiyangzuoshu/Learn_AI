@@ -24,6 +24,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
   Letter；底部第三行实时展示当前 Job 状态
 - Grounded Research：来源新鲜度、质量评分、引用、置信度和证据不足升级；底部任务详情展示研究状态
 - Evaluation CI：版本化数据集、正确率、引用覆盖率、复核队列和发布阻断 Gate
+- Security Boundary：短期身份、scope/租户校验、HTTPS 出口、SSRF 防护、DLP 脱敏和审计
 - MCP 会话管理：按工作区复用已初始化 Session，支持 HTTP、SSE、STDIO Transport、能力协商、取消和关闭
 - GitHub Release 检查、下载、退出替换和重新打开的 macOS 自动更新
 
@@ -287,6 +288,13 @@ pass rate 与 citation grounding rate；失败样例进入 review queue，任一
 `blocked`。评估记录按 tenant、dataset version 和 Trace 持久化，支持幂等重跑与 `evaluation_status`
 查询；
 工具不会在后台隐式调用模型，模型运行、人工复核、安全负例、延迟和成本证据必须由上游候选执行器显式提供。
+
+### Security Boundary
+
+第 31 课新增 `security-boundary` Feature。`security_boundary` 在外部动作前检查短期 Principal 的
+scope、 tenant 和过期时间，限制出口为 HTTPS 或 localhost HTTP，拒绝 URL 凭据与私有网段
+SSRF，并在返回文本前脱敏 API Key、Bearer Token、密码和 Secret；`security_audit`
+读取最近的允许/拒绝记录。安全检查不通过时会留下审计 证据并拒绝继续，不能通过模型输入自行扩大权限。
 
 ## Electron 构建与发布
 
