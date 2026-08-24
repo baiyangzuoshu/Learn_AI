@@ -4,7 +4,7 @@ import {
   type ToolHooks,
   type ToolRequest,
 } from "../s02_tool_use/code.ts";
-import type { Message } from "../../src/core/types.ts";
+import type { Message } from "../../typescript/src/core/types.ts";
 
 const denyPatterns = [
   { pattern: /rm\s+-[^\n]*r[^\n]*f[^\n]*\s+\/(?:\s|$)/i, reason: "禁止递归删除系统根目录" },

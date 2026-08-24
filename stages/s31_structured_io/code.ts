@@ -3,7 +3,7 @@ import {
   agentLoop as previousAgentLoop,
 } from "../s30_production_readiness/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type Identity = { subject: string; tenant: string; scopes: Set<string>; expiresAt: number };
 export class SecurityBoundary {

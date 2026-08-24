@@ -1,6 +1,6 @@
 import { type AgentEvent, agentLoop as previousAgentLoop } from "../s31_structured_io/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type CognitiveState = {
   confidence: number;

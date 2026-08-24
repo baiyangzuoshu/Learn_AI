@@ -4,7 +4,7 @@ AI Agent 是一个本地优先的开发者 Agent 客户端。桌面端使用 Ele
 原生能力和窗口，renderer 使用框架无关的 HTML/CSS/JavaScript。
 
 从产品角度看，它是一个桌面客户端：负责工作区、会话、模型配置、工具权限、MCP/Skill 扩展、Git
-信息、用量遥测、图片生成和软件更新。从技术角度看，`src/` 根目录的 Runtime 和 Feature 模块组成客户端
+信息、用量遥测、图片生成和软件更新。从技术角度看，`typescript/src/` 根目录的 Runtime 和 Feature 模块组成客户端
 内部的 Agent 引擎。
 
 ## 设计目标
@@ -15,7 +15,7 @@ AI Agent 是一个本地优先的开发者 Agent 客户端。桌面端使用 Ele
 - 插件化 Agent 引擎：新增能力通过 Feature 注册工具和系统提示，不修改运行时核心。
 - 权限可控：文件、Shell、后台任务和外部工具调用都经过权限模式与硬拒绝规则。
 - 生产与演进示例隔离：`stages/` 只做机制对照，生产代码不能 import `stages/`。
-- 桌面 UI 极简：`desktop/renderer/` 使用原生 HTML、CSS、JavaScript。
+- 桌面 UI 极简：`typescript/desktop/renderer/` 使用原生 HTML、CSS、JavaScript。
 
 ## 客户端边界
 
@@ -33,33 +33,33 @@ AI Agent 客户端由四层组成：
 ```text
 用户输入
   ↓
-desktop/renderer/           原生桌面 UI
+typescript/desktop/renderer/           原生桌面 UI
   ↓ HTTP / NDJSON stream
-electron/main.ts            Electron 组装入口
-  ├── desktop/http.ts       HTTP API 路由
-  └── desktop/services/     工作区、Git、更新和 Chat 服务
+typescript/electron/main.ts            Electron 组装入口
+  ├── typescript/desktop/http.ts       HTTP API 路由
+  └── typescript/desktop/services/     工作区、Git、更新和 Chat 服务
   ↓
-src/mod.ts                  Agent 引擎组合入口
+typescript/src/mod.ts                  Agent 引擎组合入口
   ↓
-src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执行
-  ├── src/features/         工具与系统提示 Feature
-  ├── src/providers/        模型 Provider
-  └── src/config/           设置、密钥、对话、工作区和本地路径
+typescript/src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执行
+  ├── typescript/src/features/         工具与系统提示 Feature
+  ├── typescript/src/providers/        模型 Provider
+  └── typescript/src/config/           设置、密钥、对话、工作区和本地路径
 ```
 
 ## 目录结构
 
 ```text
 .
-├── electron/
+├── typescript/electron/
 │   ├── main.ts              # 产品进程入口：窗口、原生能力和 HTTP 服务
 │   ├── preload.ts           # contextBridge 安全桥接
 │   └── package.json          # Electron Builder 配置
-├── desktop/
+├── typescript/desktop/
 │   ├── http.ts               # HTTP API 路由
 │   ├── services/             # 工作区、Git、更新和 Chat 服务
 │   └── renderer/             # 无框架桌面 UI 源文件
-├── src/
+├── typescript/src/
 │   ├── core/                # Message、ToolDefinition 等核心类型
 │   ├── config/              # 设置、密钥、工作区、会话持久化、跨平台路径
 │   ├── providers/           # 对话 Provider、Seedream 和 usage telemetry
@@ -72,18 +72,17 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
 │   ├── scheduler.ts         # 周期性 AI 对话调度
 │   └── features/            # 可拆卸 Feature 模块
 ├── stages/                  # 每课一个 README.md + code.ts，不进入生产依赖图
-├── scripts/                 # 本地发布脚本
-├── docs/                    # 开源文档
-├── deno.json                # 课程和底层测试任务
-└── dist/                    # 构建产物
+├── typescript/docs/        # 开源文档
+├── typescript/deno.json    # 课程和底层测试任务
+└── typescript/dist/        # 构建产物
 ```
 
 ## 产品入口
 
-`electron/main.ts` 是唯一产品入口。它负责：
+`typescript/electron/main.ts` 是唯一产品入口。它负责：
 
 - 创建 Electron `BrowserWindow` 桌面窗口。
-- 启动 loopback HTTP 服务并加载 `desktop/renderer/` 静态资源。
+- 启动 loopback HTTP 服务并加载 `typescript/desktop/renderer/` 静态资源。
 - 提供 HTTP API，例如：
   - `/api/chat`、`/api/chat/stream`
   - `/api/settings`
@@ -98,14 +97,14 @@ src/runtime.ts              Agent loop、权限、上下文、Hooks、工具执�
   - `/api/tests/lessons`（课程 Smoke Test）
   - `/api/update/check`
   - `/api/update/install`
-- 调用 `src/mod.ts` 暴露的 `agentLoop()`。
+- 调用 `typescript/src/mod.ts` 暴露的 `agentLoop()`。
 - 管理软件更新检查、下载、退出替换和重启。
 
 桌面关闭时进程会主动退出，避免本地 HTTP 服务继续保持后台进程。
 
 ## Agent 引擎组合入口
 
-`src/mod.ts` 是生产 Agent 引擎的组合根：
+`typescript/src/mod.ts` 是生产 Agent 引擎的组合根：
 
 ```ts
 export const harness = new AgentRuntime([
@@ -203,7 +202,7 @@ Worker”详情面板。该面板 独立于任务账本，展示当前 Worker Jo
 
 ### MCP Session 与 Transport
 
-第 26 课已融合为 MCP 会话管理层。`src/mcp.ts` 将 Transport（HTTP、SSE、STDIO）与 Session 生命周期
+第 26 课已融合为 MCP 会话管理层。`typescript/src/mcp.ts` 将 Transport（HTTP、SSE、STDIO）与 Session 生命周期
 分离：首次 `mcp_list_tools` 或 `mcp_call` 会发送 `initialize` 并记录协商结果，后续同一工作区和
 Server 复用 Session；Server 配置变化会关闭旧 Transport 并重新协商。所有请求继续传播
 `AbortSignal`，HTTP 只允许 HTTPS 或 localhost，响应限制为 2 MB；STDIO 使用 Content-Length
@@ -216,7 +215,7 @@ Policy、权限审批、Trace 和输出上限；生产代码不直接导入课�
 
 ### A2A Handoff
 
-第 27 课由 `src/handoff.ts` 和独立 `handoff` Feature 实现。`handoff_submit` 创建 tenant-scoped、
+第 27 课由 `typescript/src/handoff.ts` 和独立 `handoff` Feature 实现。`handoff_submit` 创建 tenant-scoped、
 role-aware、trace-linked 的目标；`agent_handoff` 通过幂等键追加有上限的 Artifact 与 evidence
 checkpoint；`handoff_complete` 仅允许带有持久证据的 `running` 记录进入 `complete`，`handoff_fail`
 记录终态失败原因，`handoff_status` 只返回当前工作区中指定租户可见的记录。文件按工作区 SHA-256
@@ -226,7 +225,7 @@ handoff 状态会作为 `HandoffState` Hook 推送到桌面底部“任务 / Wor
 
 ### RAG Memory
 
-第 28 课由 `src/memory_service.ts` 和独立 `memory-rag` Feature 实现。`memory_store` 保存
+第 28 课由 `typescript/src/memory_service.ts` 和独立 `memory-rag` Feature 实现。`memory_store` 保存
 tenant-scoped 的 `semantic`、`episodic`、`procedural` 记录；`memory_search` 在有限结果集上执行
 lexical 检索，排除其他租户、tombstone 和过期记录，并为每条结果返回 citation。`memory_tombstone`
 执行可审计删除，`memory_status` 读取保留状态。记录按工作区 SHA-256 分片并原子替换，写入支持幂等键和
@@ -239,7 +238,7 @@ lexical 检索，排除其他租户、tombstone 和过期记录，并为每条�
 
 ### Grounded Research
 
-第 29 课由 `src/research_service.ts` 和 `grounded-research` Feature 实现，形成独立的
+第 29 课由 `typescript/src/research_service.ts` 和 `grounded-research` Feature 实现，形成独立的
 `planned → collecting → complete/escalated` 研究状态机。`research_start` 保存 tenant、query、Trace、
 来源上限、新鲜度窗口和最低置信度；`research_add_source` 校验 HTTPS（localhost 可用
 HTTP）、限制文本大小， 并记录 `fetchedAt` 与 `quality`；`grounded_research`
@@ -251,7 +250,7 @@ citations。证据不足、来源过期或质量不够时保留任务并升级�
 
 ### Evaluation CI
 
-第 30 课由 `src/evaluation_service.ts` 和 `evaluation-ci` Feature 实现。`evaluation_gate` 接收
+第 30 课由 `typescript/src/evaluation_service.ts` 和 `evaluation-ci` Feature 实现。`evaluation_gate` 接收
 tenant、dataset version、受限 EvalCase 集合与候选输出，计算 exact correctness、citation
 grounding、review queue 和 `passed/blocked` 发布状态；默认质量与引用阈值均为
 0.95，任一指标回归都会阻断 Gate。记录按工作区分片原子 持久化，支持 Trace、幂等重跑、租户隔离和
@@ -305,7 +304,7 @@ Evaluation CI 工具注册、通过 Gate、回归阻断和复核队列。
 
 ### Security Boundary
 
-第 31 课由 `src/security_boundary.ts` 与 `security-boundary` Feature 实现。Runtime 将短期 Principal
+第 31 课由 `typescript/src/security_boundary.ts` 与 `security-boundary` Feature 实现。Runtime 将短期 Principal
 传入 `ToolContext`，工具在外部动作前检查 subject、tenant、expiresAt 与所需 scope；出口只允许 HTTPS
 或 localhost HTTP，拒绝 URL 中的凭据、loopback/私有/链路本地/多播 IP 等 SSRF 目标。`redactSecrets`
 在文本返回和审计前 移除 API Key、Bearer Token、密码和 Secret；允许与拒绝决策按工作区原子持久化并由
@@ -325,9 +324,9 @@ API Key 不进入 `settings.json` 或 renderer 状态，公开设置只返回 `h
 
 ### Provider 路由
 
-对话 Provider 由 `src/providers/registry.ts` 按 Provider ID 或名称选择：DeepSeek 和 MiMo
+对话 Provider 由 `typescript/src/providers/registry.ts` 按 Provider ID 或名称选择：DeepSeek 和 MiMo
 使用专用适配器， 其他供应商回退到 OpenAI-compatible 适配器。Provider 配置、模型列表和默认模型由
-`src/config/settings.ts` 归一化，API Key 通过平台安全存储读取。Seedream 是独立的图片
+`typescript/src/config/settings.ts` 归一化，API Key 通过平台安全存储读取。Seedream 是独立的图片
 Provider，不进入对话 Provider 的路由。
 
 ## 权限与安全边界
@@ -353,7 +352,7 @@ Shell 命令还会经过硬拒绝规则。取消运行时使用同一个 `AbortS
 
 ## 持久化
 
-跨平台数据目录由 `src/config/paths.ts` 统一管理：
+跨平台数据目录由 `typescript/src/config/paths.ts` 统一管理：
 
 | 平台    | 数据目录                                             |
 | ------- | ---------------------------------------------------- |
@@ -382,7 +381,7 @@ Electron 主进程使用 `safeStorage` 加密 Provider 和图片 API Key，并�
 
 ## 桌面 UI
 
-`desktop/renderer/` 是无框架 UI：
+`typescript/desktop/renderer/` 是无框架 UI：
 
 - `index.html`：页面结构和设置面板。
 - `app.js`：状态管理、API 调用、流式消息、工作区面板、更新按钮。
@@ -430,7 +429,7 @@ GitHub Release 必须公开可访问。私有仓库的未授权 latest release A
 
 Electron Builder 的 `dist:win` 生成 Windows 安装包，`dist:linux` 生成 AppImage，`dist:mac` 默认生成
 macOS arm64 的 `.app` 目录；用于自动更新的 macOS ZIP 必须以 `AI Agent.app`
-作为根目录内容。发布构建只打包 `electron/dist` 和 `package.json`，不包含 `src/`、`stages/`
+作为根目录内容。发布构建只打包 `typescript/electron/dist` 和 `package.json`，不包含 `typescript/src/`、`stages/`
 或开发环境文件。
 
 ## 生产验证
@@ -438,13 +437,13 @@ macOS arm64 的 `.app` 目录；用于自动更新的 macOS ZIP 必须以 `AI Ag
 架构相关修改完成后至少运行：
 
 ```sh
-deno fmt --check src desktop README.md AGENTS.md
-deno task check
-deno task test
-rg 'stages/' src desktop
-npm --prefix electron run dist:win
-npm --prefix electron run dist:mac
-npm --prefix electron run dist:linux
+deno fmt --check typescript/src typescript/desktop README.md AGENTS.md
+(cd typescript && deno task check)
+(cd typescript && deno task test)
+rg 'stages/' typescript/src typescript/desktop
+npm --prefix typescript/electron run dist:win
+npm --prefix typescript/electron run dist:mac
+npm --prefix typescript/electron run dist:linux
 ```
 
-`rg 'stages/' src desktop` 应无输出。
+`rg 'stages/' typescript/src typescript/desktop` 应无输出。

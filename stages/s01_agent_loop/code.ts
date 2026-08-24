@@ -1,7 +1,7 @@
-import { createChatCompletion } from "../../src/providers/deepseek.ts";
-import { resolveDeepSeekConfig } from "../../src/config/settings.ts";
-import { getWorkspace } from "../../src/config/settings.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import { createChatCompletion } from "../../typescript/src/providers/deepseek.ts";
+import { resolveDeepSeekConfig } from "../../typescript/src/config/settings.ts";
+import { getWorkspace } from "../../typescript/src/config/settings.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 
 function systemPrompt(workspace: string): string {
   return `You are a coding agent working in ${workspace}.

@@ -1,7 +1,7 @@
 import { type AgentEvent, agentLoop as promptAgentLoop } from "../s10_system_prompt/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection } from "../s02_tool_use/code.ts";
-import type { Message } from "../../src/core/types.ts";
+import type { Message } from "../../typescript/src/core/types.ts";
 
 registerSystemPromptSection({
   id: "s11-recovery",

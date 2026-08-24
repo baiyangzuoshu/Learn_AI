@@ -3,7 +3,7 @@ import {
   agentLoop as previousAgentLoop,
 } from "../s32_reasoning_strategies/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type Delivery = {
   mode: "embedded" | "api" | "worker";

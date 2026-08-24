@@ -8,7 +8,7 @@ framework-free HTML/CSS/JavaScript UI.
 ## Development
 
 ```sh
-cd electron
+cd typescript/electron
 npm install
 npm run dev
 ```

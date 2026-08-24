@@ -4,8 +4,8 @@ import {
   type PermissionMode,
 } from "../s03_permission/code.ts";
 import type { ToolHooks, ToolRequest } from "../s02_tool_use/code.ts";
-import type { Message } from "../../src/core/types.ts";
-import { getWorkspace } from "../../src/config/settings.ts";
+import type { Message } from "../../typescript/src/core/types.ts";
+import { getWorkspace } from "../../typescript/src/config/settings.ts";
 
 type HookEvent = "UserPromptSubmit" | "PreToolUse" | "PostToolUse" | "Stop" | "ErrorRecovery";
 type Hook = (...args: unknown[]) => void | string | Promise<void | string>;

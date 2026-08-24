@@ -5,8 +5,8 @@ import {
   registerTool,
   systemPromptSnapshot,
 } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
-import { getPublicSettings } from "../../src/config/settings.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
+import { getPublicSettings } from "../../typescript/src/config/settings.ts";
 
 const capabilities = [
   "Agent Loop",

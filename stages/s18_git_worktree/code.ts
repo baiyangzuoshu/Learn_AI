@@ -1,8 +1,8 @@
 import { type AgentEvent, agentLoop as autonomousAgentLoop } from "../s17_autonomous_agent/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
-import { withWorkspace } from "../../src/config/settings.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
+import { withWorkspace } from "../../typescript/src/config/settings.ts";
 
 interface WorktreeRecord {
   id: string;

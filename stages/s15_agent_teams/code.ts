@@ -1,7 +1,7 @@
 import { type AgentEvent, agentLoop as cronAgentLoop } from "../s14_cron_scheduling/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 
 interface TeamMember {
   id: string;

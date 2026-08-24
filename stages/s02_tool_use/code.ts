@@ -1,6 +1,6 @@
-import { createChatCompletion, ProviderError } from "../../src/providers/deepseek.ts";
-import { getWorkspace, resolveDeepSeekConfig } from "../../src/config/settings.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import { createChatCompletion, ProviderError } from "../../typescript/src/providers/deepseek.ts";
+import { getWorkspace, resolveDeepSeekConfig } from "../../typescript/src/config/settings.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 import { isAbsolute, relative, resolve } from "node:path";
 
 export interface AgentEvent {

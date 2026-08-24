@@ -1,8 +1,8 @@
 import { type AgentEvent, agentLoop as memoryAgentLoop } from "../s09_memory/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, systemPromptSnapshot } from "../s02_tool_use/code.ts";
-import type { Message } from "../../src/core/types.ts";
-import { getWorkspace } from "../../src/config/settings.ts";
+import type { Message } from "../../typescript/src/core/types.ts";
+import { getWorkspace } from "../../typescript/src/config/settings.ts";
 
 registerSystemPromptSection({
   id: "s10-workflow",

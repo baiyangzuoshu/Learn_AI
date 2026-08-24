@@ -3,7 +3,7 @@ import {
   agentLoop as previousAgentLoop,
 } from "../s37_security_governance/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type Observation = {
   traceId: string;

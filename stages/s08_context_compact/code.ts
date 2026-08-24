@@ -1,6 +1,6 @@
 import { type AgentEvent, agentLoop as skillAgentLoop } from "../s07_skill_loading/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
-import type { Message } from "../../src/core/types.ts";
+import type { Message } from "../../typescript/src/core/types.ts";
 
 const CONTEXT_CHAR_BUDGET = 24_000;
 const KEEP_RECENT_MESSAGES = 10;

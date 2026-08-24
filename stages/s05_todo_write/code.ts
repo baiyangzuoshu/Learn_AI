@@ -1,7 +1,7 @@
 import { type AgentEvent, agentLoop as hooksAgentLoop } from "../s04_hooks/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerTool, setSystemGuidance } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 
 const definition: ToolDefinition = {
   type: "function",

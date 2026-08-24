@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { type AgentEvent, agentLoop as teamsAgentLoop } from "../s15_agent_teams/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 interface Member {
   id: string;
   role: string;

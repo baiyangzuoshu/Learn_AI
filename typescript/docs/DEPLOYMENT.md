@@ -1,35 +1,35 @@
 # AI Agent 部署与发布
 
 AI Agent 桌面端使用 Node.js、Electron 和 Electron Builder。课程与底层测试仍可使用
-`deno.json`，但 Deno 不参与桌面运行或安装包构建。
+`typescript/deno.json`，但 Deno 不参与桌面运行或安装包构建。
 
 ## 本地开发
 
 ```sh
-npm --prefix electron install
-npm --prefix electron run typecheck
-npm --prefix electron run dev
+npm --prefix typescript/electron install
+npm --prefix typescript/electron run typecheck
+npm --prefix typescript/electron run dev
 ```
 
 课程检查是独立流程：
 
 ```sh
-deno task check
-deno task test
+(cd typescript && deno task check)
+(cd typescript && deno task test)
 ```
 
 ## 安装包构建
 
 ```sh
-npm --prefix electron run dist:win
-npm --prefix electron run dist:mac
-npm --prefix electron run dist:linux
+npm --prefix typescript/electron run dist:win
+npm --prefix typescript/electron run dist:mac
+npm --prefix typescript/electron run dist:linux
 ```
 
 默认产物目录：
 
 ```text
-dist/releases/app/
+typescript/dist/releases/app/
 ├── AI Agent Setup.exe
 ├── mac-arm64/AI Agent.app
 └── AI Agent.AppImage
@@ -40,7 +40,7 @@ Developer ID Application 签署 `.app` 并完成 Apple 公证。
 
 ## 版本与更新
 
-版本号在 `electron/package.json`。发布 tag 推荐使用 `v1.0.2` 或 `ai-agent-v1.0.2`。
+版本号在 `typescript/electron/package.json`。发布 tag 推荐使用 `v1.0.2` 或 `ai-agent-v1.0.2`。
 
 应用支持 GitHub latest release API 或自定义 HTTPS manifest：
 
@@ -62,11 +62,11 @@ AI_AGENT_UPDATE_URL=https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases
 ## 发布前检查
 
 ```sh
-npm --prefix electron run typecheck
-npm --prefix electron run build
-rg 'stages/' src desktop
-npm --prefix electron run dist:win
-npm --prefix electron run dist:mac
+npm --prefix typescript/electron run typecheck
+npm --prefix typescript/electron run build
+rg 'stages/' typescript/src typescript/desktop
+npm --prefix typescript/electron run dist:win
+npm --prefix typescript/electron run dist:mac
 ```
 
 还应在目标系统验证启动、目录选择、凭据存储、Shell、Git、WebView、应用退出和安装覆盖升级。

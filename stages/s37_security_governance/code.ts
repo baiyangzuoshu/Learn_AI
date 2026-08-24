@@ -3,7 +3,7 @@ import {
   agentLoop as previousAgentLoop,
 } from "../s36_deploy_worker_queue/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type ThreatCase = { id: string; payload: string; expected: "deny" | "allow" };
 export function policy(payload: string): "deny" | "allow" {

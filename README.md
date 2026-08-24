@@ -4,8 +4,9 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 工具、技能、定时任务、软件更新和模型用量遥测整合到一个桌面应用里。
 
 桌面端基于 Electron 构建，Windows、macOS、Linux 均使用 Electron Builder 打包，运行时使用 Node.js。
-`src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent 引擎，`electron/`
-是桌面主进程和打包入口，`desktop/` 保留共享 API 服务、业务服务和 renderer UI 资源。
+`typescript/src/` 根目录中的 Runtime、Feature、工具、提示、权限和调度模块组成内部 Agent
+引擎，`typescript/electron/` 是桌面主进程和打包入口，`typescript/desktop/` 保留共享 API
+服务、业务服务和 renderer UI 资源。
 
 ## 客户端能力
 
@@ -30,9 +31,9 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 
 ## 文档
 
-- [产品策划](docs/PRODUCT_PLAN.md)：Agent 客户端定位、目标用户、核心场景、路线图和开源边界。
-- [架构说明](docs/ARCHITECTURE.md)：客户端分层、Agent Runtime、Feature、权限、持久化和更新架构。
-- [部署与发布](docs/DEPLOYMENT.md)：客户端开发运行、打包、版本号、GitHub Release
+- [产品策划](typescript/docs/PRODUCT_PLAN.md)：Agent 客户端定位、目标用户、核心场景、路线图和开源边界。
+- [架构说明](typescript/docs/ARCHITECTURE.md)：客户端分层、Agent Runtime、Feature、权限、持久化和更新架构。
+- [部署与发布](typescript/docs/DEPLOYMENT.md)：客户端开发运行、打包、版本号、GitHub Release
   上传和自动更新流程。
 - [分阶段课程](stages/README.md)：`s01–s40` 的逐课教程、运行方式、观察重点和练习。
 
@@ -40,7 +41,7 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 
 ```text
 .
-├── src/
+├── typescript/src/
 │   ├── mod.ts                # Agent 引擎组合入口
 │   ├── runtime.ts            # Agent Runtime 主循环
 │   ├── features/             # 工具与系统提示 Feature
@@ -52,23 +53,22 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 │   ├── config/               # 设置、路径、聊天持久化
 │   ├── core/                 # 核心类型
 │   └── providers/            # 运行时 Provider 路由、适配器与 usage 遥测
-├── electron/
+├── typescript/electron/
 │   ├── main.ts               # Electron 主进程入口
 │   ├── preload.ts             # contextBridge preload
 │   └── package.json           # Electron Builder 配置
-├── desktop/
+├── typescript/desktop/
 │   ├── http.ts                # 本地 loopback API
 │   ├── services/              # 桌面业务服务
 │   └── renderer/              # 原生 HTML/CSS/JS 界面源文件
-├── docs/
+├── typescript/docs/
 ├── stages/                  # 每课一个目录：README.md + code.ts + images/overview.svg
-├── scripts/
-├── deno.json
-└── dist/
+├── typescript/deno.json
+└── typescript/dist/
 ```
 
-`electron/main.ts` 是唯一桌面产品入口，并调用 `src/mod.ts` 中的 Agent 引擎。`stages/`
-保留为内部演进和对照示例，不进入正式桌面运行时依赖图。
+`typescript/electron/main.ts` 是唯一桌面产品入口，并调用 `typescript/src/mod.ts` 中的 Agent
+引擎。`stages/` 保留为内部演进和对照示例，不进入正式桌面运行时依赖图。
 
 内部 Agent 引擎按职责拆分为：
 
@@ -83,9 +83,8 @@ AI Agent 是一个面向开发者的本地 Agent 客户端。它把对话、工�
 
 ```sh
 deno --version
-deno task check
-deno task test
-deno task check
+(cd typescript && deno task check)
+(cd typescript && deno task test)
 ```
 
 桌面端也可打开“设置 → 通用 → 课程测试用例”，先查看每课验收项，再单独测试或一键运行全部；该流程使用
@@ -96,12 +95,12 @@ Fake Provider，不调用真实模型。
 按已配置的人民币模型价格估算，网关若直接返回 `usage.cost` 则优先采用；未知价格的自定义供应商显示
 `—`，避免伪造费用。DeepSeek 供应商还会用当前 API Key 查询余额并显示在状态栏。
 
-`deno task s01` 到 `deno task s40` 用于理解和对照内部演进机制。`s21–s40` 继续覆盖生产级 Agent
+`(cd typescript && deno task s01)` 到 `(cd typescript && deno task s40)` 用于理解和对照内部演进机制。`s21–s40` 继续覆盖生产级 Agent
 所需的运行预算、可靠性、追踪、评估、RAG、规划、MCP 协商、多 Agent
 交接、恢复、部署和生产验收。运行桌面应用：
 
 ```sh
-cd electron
+cd typescript/electron
 npm install
 npm run dev
 ```
@@ -301,22 +300,22 @@ SSRF，并在返回文本前脱敏 API Key、Bearer Token、密码和 Secret；`
 桌面构建由 Electron Builder 负责打包：
 
 ```sh
-npm --prefix electron run dist:win
-npm --prefix electron run dist:mac
-npm --prefix electron run dist:linux
+npm --prefix typescript/electron run dist:win
+npm --prefix typescript/electron run dist:mac
+npm --prefix typescript/electron run dist:linux
 ```
 
 也可以分别构建：
 
 ```sh
-npm --prefix electron run typecheck
-npm --prefix electron run build
+npm --prefix typescript/electron run typecheck
+npm --prefix typescript/electron run build
 ```
 
 产物目录：
 
 ```text
-dist/releases/app/
+typescript/dist/releases/app/
 ├── AI Agent Setup.exe
 ├── mac-arm64/AI Agent.app
 └── linux/...
@@ -334,15 +333,15 @@ dist/releases/app/
 正式分发前仍应在目标系统进行启动、文件选择器、凭据存储、Shell、Git 和窗口生命周期验收，并配置
 平台代码签名。
 
-macOS App 图标使用 `desktop/assets/app-icon.icns`，界面品牌图使用
-`desktop/assets/app-icon.png`。如果替换图标，需要同步更新这两个文件。
+macOS App 图标使用 `typescript/desktop/assets/app-icon.icns`，界面品牌图使用
+`typescript/desktop/assets/app-icon.png`。如果替换图标，需要同步更新这两个文件。
 
 ## 验证
 
 ```sh
-deno fmt --check src desktop README.md AGENTS.md
-deno task check
-rg 'stages/' desktop src
+deno fmt --check typescript/src typescript/desktop README.md AGENTS.md
+(cd typescript && deno task check)
+rg 'stages/' typescript/desktop typescript/src
 ```
 
 最后一条命令应无输出，证明生产代码没有回退依赖演进示例。

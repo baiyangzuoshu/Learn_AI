@@ -1,7 +1,7 @@
 import { type AgentEvent, agentLoop as graphAgentLoop } from "../s12_persistent_task_graph/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
 
 type JobStatus = "running" | "completed" | "failed" | "cancelled" | "timed_out";
 export interface BackgroundJob {

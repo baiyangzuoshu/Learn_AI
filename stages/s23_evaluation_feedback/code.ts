@@ -1,6 +1,6 @@
 import { type AgentEvent, agentLoop as previousAgentLoop } from "../s22_structured_tracing/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { ToolDefinition } from "../../src/core/types.ts";
+import type { ToolDefinition } from "../../typescript/src/core/types.ts";
 
 export type ToolPolicy = { name: string; mutation: boolean; scopes: string[]; maxOutput: number };
 export type Principal = { id: string; scopes: Set<string>; expiresAt: number };

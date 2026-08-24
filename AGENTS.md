@@ -5,33 +5,34 @@ teaching stages. The production desktop runtime and packaging use Node.js and El
 
 ## Product Architecture
 
-- `src/mod.ts` is the only production Harness entry point.
-- `src/runtime.ts` owns the agent loop, permission checks, hooks, context compaction, tool
-  execution, and provider retry behavior.
-- `src/features/` contains production feature modules. Register new tools and prompt sections
-  through the feature registration contract.
-- `src/scheduler.ts` owns recurring AI conversation scheduling and persistence.
-- `src/config/` owns settings, secrets integration, application paths, workspaces, and conversation
-  persistence.
-- `src/providers/` owns model-provider clients and telemetry.
-- `electron/main.ts` is the Electron desktop entry point.
-- `electron/preload.ts` is the context-isolated renderer bridge.
-- `desktop/http.ts` and `desktop/services/` provide the shared local API and desktop services.
-- `desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
+- `typescript/src/mod.ts` is the only production Harness entry point.
+- `typescript/src/runtime.ts` owns the agent loop, permission checks, hooks, context compaction,
+  tool execution, and provider retry behavior.
+- `typescript/src/features/` contains production feature modules. Register new tools and prompt
+  sections through the feature registration contract.
+- `typescript/src/scheduler.ts` owns recurring AI conversation scheduling and persistence.
+- `typescript/src/config/` owns settings, secrets integration, application paths, workspaces, and
+  conversation persistence.
+- `typescript/src/providers/` owns model-provider clients and telemetry.
+- `typescript/electron/main.ts` is the Electron desktop entry point.
+- `typescript/electron/preload.ts` is the context-isolated renderer bridge.
+- `typescript/desktop/http.ts` and `typescript/desktop/services/` provide the shared local API and
+  desktop services.
+- `typescript/desktop/renderer/` is a framework-free HTML/CSS/JavaScript UI.
 - `stages/s01_*/code.ts` through `stages/s40_*/code.ts` are teaching examples only.
 
 ## Critical Boundary
 
-Production code under `src/` and `desktop/` must never import from `stages/`.
+Production code under `typescript/src/` and `typescript/desktop/` must never import from `stages/`.
 
 Do not implement a production feature by moving, renaming, or directly importing a stage file. Use
 the stage only as behavioral reference, then design the production implementation around the
-contracts in `src/`.
+contracts in `typescript/src/`.
 
 After architecture changes, this command must return no matches:
 
 ```sh
-rg 'stages/' src desktop
+rg 'stages/' typescript/src typescript/desktop
 ```
 
 ## Harness Development
@@ -83,8 +84,8 @@ Remote MCP endpoints must use HTTPS. Plain HTTP is allowed only for localhost de
 
 ## Persistence and Cross-Platform Paths
 
-Use `src/config/paths.ts` for application data paths. Do not hard-code the macOS Application Support
-path in production modules.
+Use `typescript/src/config/paths.ts` for application data paths. Do not hard-code the macOS
+Application Support path in production modules.
 
 Expected data roots:
 
@@ -120,10 +121,10 @@ platform-specific error.
 Run the smallest relevant checks while developing, then run the production checks before completion:
 
 ```sh
-deno fmt --check src desktop README.md AGENTS.md
-deno task check
-rg 'stages/' src desktop
-npm --prefix electron run dist:win
+deno fmt --check typescript/src typescript/desktop README.md AGENTS.md
+(cd typescript && deno task check)
+rg 'stages/' typescript/src typescript/desktop
+npm --prefix typescript/electron run dist:win
 ```
 
 The repository contains intentionally compact legacy UI CSS and teaching files, so avoid formatting
@@ -132,14 +133,14 @@ unrelated files merely to satisfy a whole-repository format check.
 For release or cross-platform changes, also run:
 
 ```sh
-npm --prefix electron run dist:win
-npm --prefix electron run dist:mac
-npm --prefix electron run dist:linux
+npm --prefix typescript/electron run dist:win
+npm --prefix typescript/electron run dist:mac
+npm --prefix typescript/electron run dist:linux
 ```
 
 Expected artifacts:
 
-- Electron Builder artifacts under `dist/releases/app/`
+- Electron Builder artifacts under `typescript/dist/releases/app/`
 
 ### macOS App-only Packaging (重要)
 
@@ -150,31 +151,31 @@ the default macOS targets, because those targets may create a zip archive.
 Use the repository script, which explicitly uses `--mac --arm64 --dir`:
 
 ```sh
-npm --prefix electron run dist:mac
+npm --prefix typescript/electron run dist:mac
 ```
 
 The only artifact to report is:
 
 ```text
-dist/releases/app/mac-arm64/AI Agent.app
+typescript/dist/releases/app/mac-arm64/AI Agent.app
 ```
 
 Before reporting completion, verify the bundle exists and remove only stale generated macOS zip
 archives from the same output directory. A stale archive is not a valid deliverable:
 
 ```sh
-test -d "dist/releases/app/mac-arm64/AI Agent.app"
-find dist/releases/app -maxdepth 1 -type f -name 'AI-Agent-*-mac-*.zip' -print
+test -d "typescript/dist/releases/app/mac-arm64/AI Agent.app"
+find typescript/dist/releases/app -maxdepth 1 -type f -name 'AI-Agent-*-mac-*.zip' -print
 ```
 
 If Electron Builder has already packaged the app but then fails while downloading optional GitHub
 metadata or signing assets because of DNS/network restrictions, do not report the failed command as
-the finished package. Run `npm --prefix electron run build`, refresh the bundle’s
+the finished package. Run `npm --prefix typescript/electron run build`, refresh the bundle’s
 `Contents/Resources/app.asar` from a temporary staging directory containing both
-`electron/package.json` and `electron/dist/` (the package manifest is required for Electron to
-resolve `main`; packing `electron/dist` alone causes the default Electron welcome screen). Use the
-local `electron/node_modules/.bin/asar`, apply an ad-hoc signature with
-`codesign --force --deep --sign -`, then verify with
+`typescript/electron/package.json` and `typescript/electron/dist/` (the package manifest is required
+for Electron to resolve `main`; packing `typescript/electron/dist` alone causes the default Electron
+welcome screen). Use the local `typescript/electron/node_modules/.bin/asar`, apply an ad-hoc
+signature with `codesign --force --deep --sign -`, then verify with
 `codesign --verify --deep --strict --verbose=2`. Report the `.app` path and the network limitation
 separately. Never hand back the zip as a substitute for the requested `.app`.
 
@@ -182,15 +183,15 @@ separately. Never hand back the zip as a substitute for the requested `.app`.
 
 当用户要求“打包 app”时，不得只报告源码构建成功，也不得把失败的 Builder 命令当作交付完成。必须：
 
-1. 执行 `npm --prefix electron run dist:mac`。
-2. 确认 `dist/releases/app/mac-arm64/AI Agent.app` 是本次最新构建的目录。
+1. 执行 `npm --prefix typescript/electron run dist:mac`。
+2. 确认 `typescript/dist/releases/app/mac-arm64/AI Agent.app` 是本次最新构建的目录。
 3. 使用 `codesign --verify --deep --strict` 校验 App；网络失败时按上面的本地 `asar`
    兜底流程继续完成。
 4. 最终回复必须给出 `.app` 的绝对路径，并明确说明是否生成 zip；zip 不能替代 `.app` 交付。
 
 ### Windows Offline Packaging
 
-Keep the following Electron Builder archives under `tools/` so Windows packaging can run when GitHub
+Keep the following Electron Builder archives under `typescript/tools/` so Windows packaging can run when GitHub
 release downloads are unavailable:
 
 - `7zip-win-x64.tar.gz`
@@ -198,12 +199,12 @@ release downloads are unavailable:
 - `nsis-resources-3.4.1.7z`
 - `winCodeSign-2.6.0.7z`
 
-The extracted/cache directories under `tools/` are generated files and must remain ignored by Git.
+The extracted/cache directories under `typescript/tools/` are generated files and must remain ignored by Git.
 From the repository root, prepare the local tool directories with PowerShell:
 
 ```powershell
 $repoRoot = (Get-Location).Path
-$toolRoot = Join-Path $repoRoot "tools"
+$toolRoot = Join-Path $repoRoot "typescript\tools"
 $sevenRoot = Join-Path $toolRoot "7zip-extracted"
 $nsisRoot = Join-Path $toolRoot "nsis-extracted"
 $resourcesRoot = Join-Path $toolRoot "nsis-resources-extracted"
@@ -233,9 +234,9 @@ $env:ELECTRON_BUILDER_RCEDIT_PATH = Join-Path $toolRoot "winCodeSign-extracted"
 $env:ELECTRON_BUILDER_NSIS_DIR = Join-Path $toolRoot "nsis-extracted"
 $env:ELECTRON_BUILDER_NSIS_RESOURCES_DIR = Join-Path $toolRoot "nsis-resources-extracted"
 $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
-$electronDist = Join-Path $repoRoot "electron\node_modules\electron\dist"
+$electronDist = Join-Path $repoRoot "typescript\electron\node_modules\electron\dist"
 
-Push-Location (Join-Path $repoRoot "electron")
+Push-Location (Join-Path $repoRoot "typescript\electron")
 npm.cmd run build
 npx.cmd electron-builder --win nsis --x64 `
   --config.win.target=nsis `
@@ -245,13 +246,13 @@ Pop-Location
 
 Use `npm.cmd` and `npx.cmd` on Windows because PowerShell execution policy may block the `.ps1`
 launchers. The explicit `--config.win.target=nsis` override is required for an x64-only build:
-`electron/package.json` currently declares both x64 and arm64 under `build.win.target`, and `--x64`
-alone does not override that architecture list.
+`typescript/electron/package.json` currently declares both x64 and arm64 under `build.win.target`,
+and `--x64` alone does not override that architecture list.
 
-The expected installer is `dist/releases/app/AI Agent Setup <version>.exe`, accompanied by its
-`.blockmap`. The unpacked executable is under `dist/releases/app/win-unpacked/`.
+The expected installer is `typescript/dist/releases/app/AI Agent Setup <version>.exe`, accompanied by its
+`.blockmap`. The unpacked executable is under `typescript/dist/releases/app/win-unpacked/`.
 
-Build output must embed `desktop/` and `src/`, never `stages/`.
+Build output must embed `typescript/desktop/` and `typescript/src/`, never `stages/`.
 
 Cross-compilation verifies compilation and packaging, not native runtime behavior. Before release,
 test credential storage, directory selection, shell execution, Git, WebView behavior, and
@@ -261,14 +262,14 @@ For every production or desktop change, always run the Electron Windows package 
 verification step:
 
 ```sh
-npm --prefix electron run dist:win
+npm --prefix typescript/electron run dist:win
 ```
 
 ## Change Discipline
 
 - Preserve unrelated user changes and generated release artifacts unless the task explicitly covers
   them.
-- Prefer small cohesive modules over adding more responsibilities to `electron/main.ts`.
+- Prefer small cohesive modules over adding more responsibilities to `typescript/electron/main.ts`.
 - Keep public contracts typed and avoid `any` when a narrow runtime-validated type is practical.
 - Update `README.md` whenever architecture, setup, persistence, models, permissions, or release
   commands change.

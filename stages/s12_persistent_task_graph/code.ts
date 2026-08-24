@@ -1,8 +1,8 @@
 import { type AgentEvent, agentLoop as recoveryAgentLoop } from "../s11_error_recovery/code.ts";
 import type { PermissionMode } from "../s03_permission/code.ts";
 import { registerSystemPromptSection, registerTool } from "../s02_tool_use/code.ts";
-import type { Message, ToolDefinition } from "../../src/core/types.ts";
-import { getWorkspace } from "../../src/config/settings.ts";
+import type { Message, ToolDefinition } from "../../typescript/src/core/types.ts";
+import { getWorkspace } from "../../typescript/src/config/settings.ts";
 
 type TaskStatus = "pending" | "in_progress" | "completed" | "blocked";
 interface TaskNode {
