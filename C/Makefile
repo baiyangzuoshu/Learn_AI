@@ -1,0 +1,71 @@
+CC ?= cc
+CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L
+CURL_CFLAGS ?= $(shell curl-config --cflags 2>/dev/null)
+CURL_LIBS ?= $(shell curl-config --libs 2>/dev/null || echo -lcurl)
+CJSON_CFLAGS ?= $(shell pkg-config --cflags libcjson 2>/dev/null || echo -I/opt/homebrew/include)
+CJSON_LIBS ?= $(shell pkg-config --libs libcjson 2>/dev/null || echo -L/opt/homebrew/lib -lcjson)
+
+CPPFLAGS += -Iinclude $(CURL_CFLAGS) $(CJSON_CFLAGS)
+LDFLAGS += $(CURL_LIBS) $(CJSON_LIBS)
+SOURCES := $(wildcard src/*.c)
+OBJECTS := $(SOURCES:src/%.c=build/%.o)
+TARGET := build/agent-s01
+
+MACOS_ARCH ?= $(shell uname -m)
+MACOS_SDK ?= $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
+MACOS_MIN_VERSION ?= 15.0
+MACOS_BUILD_DIR := build/macos-$(MACOS_ARCH)
+MACOS_TARGET := $(MACOS_BUILD_DIR)/agent-s01
+MACOS_APP := dist/macos-$(MACOS_ARCH)/AI Agent.app
+MACOS_OBJECTS := $(SOURCES:src/%.c=$(MACOS_BUILD_DIR)/%.o)
+MACOS_CJSON_LIB := $(if $(wildcard /opt/homebrew/lib/libcjson.a),/opt/homebrew/lib/libcjson.a,$(CJSON_LIBS))
+MACOS_CFLAGS := $(CFLAGS) -arch $(MACOS_ARCH) -mmacosx-version-min=$(MACOS_MIN_VERSION)
+MACOS_CPPFLAGS := -Iinclude -isysroot $(MACOS_SDK) $(CJSON_CFLAGS)
+MACOS_LDFLAGS := -arch $(MACOS_ARCH) -isysroot $(MACOS_SDK) -mmacosx-version-min=$(MACOS_MIN_VERSION) -lcurl $(MACOS_CJSON_LIB)
+
+.PHONY: all clean check run macos macos-app
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS) | build
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@
+
+build/%.o: src/%.c | build
+	$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c $< -o $@
+
+build:
+	mkdir -p build
+
+-include $(OBJECTS:.o=.d)
+
+check: $(TARGET)
+	@echo "C s01 build passed: $(TARGET)"
+
+run: $(TARGET)
+	$(TARGET) $(QUERY)
+
+macos: $(MACOS_TARGET)
+	@mkdir -p dist/macos-$(MACOS_ARCH)
+	@cp $(MACOS_TARGET) dist/macos-$(MACOS_ARCH)/agent-s01
+	@echo "macOS $(MACOS_ARCH) binary: dist/macos-$(MACOS_ARCH)/agent-s01"
+
+macos-app: macos
+	@rm -rf "$(MACOS_APP)"
+	@mkdir -p "$(MACOS_APP)/Contents/MacOS" "$(MACOS_APP)/Contents/Resources"
+	@cp $(MACOS_TARGET) "$(MACOS_APP)/Contents/MacOS/AI Agent C"
+	@cp macos/Info.plist "$(MACOS_APP)/Contents/Info.plist"
+	@codesign --force --deep --sign - "$(MACOS_APP)"
+	@echo "macOS app: $(MACOS_APP)"
+
+$(MACOS_TARGET): $(MACOS_OBJECTS) | $(MACOS_BUILD_DIR)
+	$(CC) $(MACOS_CFLAGS) $(MACOS_OBJECTS) $(MACOS_LDFLAGS) -o $@
+
+$(MACOS_BUILD_DIR)/%.o: src/%.c | $(MACOS_BUILD_DIR)
+	$(CC) $(MACOS_CFLAGS) $(MACOS_CPPFLAGS) -MMD -MP -c $< -o $@
+
+$(MACOS_BUILD_DIR):
+	mkdir -p $@
+
+clean:
+	rm -rf build
+	rm -rf dist
