@@ -174,7 +174,9 @@ the finished package. Run `npm --prefix typescript/electron run build`, refresh 
 `Contents/Resources/app.asar` from a temporary staging directory containing both
 `typescript/electron/package.json` and `typescript/electron/dist/` (the package manifest is required
 for Electron to resolve `main`; packing `typescript/electron/dist` alone causes the default Electron
-welcome screen). Use the local `typescript/electron/node_modules/.bin/asar`, apply an ad-hoc
+welcome screen). Use the local `typescript/electron/node_modules/.bin/asar`; after replacing
+`app.asar`, update `Contents/Info.plist` → `ElectronAsarIntegrity` → `Resources/app.asar` with
+the archive's SHA-256 (Electron's integrity fuse otherwise aborts at launch). Apply an ad-hoc
 signature with `codesign --force --deep --sign -`, then verify with
 `codesign --verify --deep --strict --verbose=2`. Report the `.app` path and the network limitation
 separately. Never hand back the zip as a substitute for the requested `.app`.

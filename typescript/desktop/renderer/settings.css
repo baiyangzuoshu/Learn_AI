@@ -629,6 +629,12 @@ dialog::backdrop {
 .provider-toolbar .secondary {
   white-space: nowrap;
 }
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  color: #7f8da0;
+  font-size: 11px;
+}
 @media (max-width:680px) {
   #settings-dialog {
     height: calc(100vh - 30px);

@@ -329,6 +329,15 @@ API Key 不进入 `settings.json` 或 renderer 状态，公开设置只返回 `h
 `typescript/src/config/settings.ts` 归一化，API Key 通过平台安全存储读取。Seedream 是独立的图片
 Provider，不进入对话 Provider 的路由。
 
+设置界面提供 Ollama 本地 Provider 预设：`http://127.0.0.1:11434/v1`、本地占位 Key `ollama` 和适合
+16GB 统一内存机器的模型列表（当前包括 `granite4.2:3b`、`gemma4:e4b`、
+`gemma4:e2b`、`gemma4:12b`、`deepseek-r1:8b` 和 `deepseek-v4-flash:cloud`）。其中 V4-Flash 走 Ollama
+Cloud，需要本机 Ollama 完成登录；它复用 OpenAI-compatible 适配器，仍要求服务返回标准
+`message.tool_calls`；没有
+工具调用模板或 parser 的模型只能作为普通对话模型使用，不能可靠驱动 Agent 工具链。
+桌面 HTTP 层的 `GET /api/ollama/models` 代理本机 `/api/tags`，renderer 依据返回结果过滤模型下拉框；
+Ollama 未启动或没有可用模型时，下拉框为空并在发送时给出安装/启动提示。
+
 ## 权限与安全边界
 
 权限模式：

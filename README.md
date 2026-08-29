@@ -139,6 +139,13 @@ Models:
   model-b
 ```
 
+设置界面提供 “+ Ollama” 快捷预设，默认使用本机的 `http://127.0.0.1:11434/v1`，并填入本地 Key
+`ollama`。启动 Ollama 后，应用会读取 `/api/tags`，模型选择器只显示本机实际可用的模型；未安装或
+服务不可用时不会展示对应选项。当前预设优先列出
+`granite4.2:3b`、`gemma4:e4b`、`gemma4:e2b`、`gemma4:12b`、
+`deepseek-r1:8b` 和 `deepseek-v4-flash:cloud`。其中 V4-Flash 是 Ollama Cloud 模型，需要先执行
+`ollama signin`；模型在云端托管，不会下载大模型权重到本机。
+
 `Base URL` 可以填写 OpenAI-compatible 的根路径；如果误填到
 `/chat/completions`，应用会自动归一化为根路径。 远程接口必须使用 HTTPS，本地开发允许
 `http://127.0.0.1`、`http://localhost` 或 `http://[::1]`。

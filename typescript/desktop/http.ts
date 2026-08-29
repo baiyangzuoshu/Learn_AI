@@ -17,6 +17,7 @@ import { openWorkspaceFile, readWorkspaceImage, readWorkspaceTree } from "./serv
 import { runRuntimeBudgetAcceptance } from "./services/acceptance.ts";
 import { readProviderBalance } from "./services/balance.ts";
 import { listLessonTests, runLessonAcceptance } from "./services/lesson_tests.ts";
+import { listOllamaModels } from "./services/ollama.ts";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 
@@ -55,6 +56,9 @@ async function routeApi(request: Request, url: URL): Promise<Response | undefine
     }
   }
   if (url.pathname === "/api/telemetry") return json(providerTelemetry());
+  if (url.pathname === "/api/ollama/models" && request.method === "GET") {
+    return json(await listOllamaModels());
+  }
   if (url.pathname === "/api/balance" && request.method === "GET") {
     try {
       return json(await readProviderBalance(url.searchParams.get("providerId") || undefined));

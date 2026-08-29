@@ -39,6 +39,7 @@ const settingsForm = $("#settings-form"),
   runtimeTestOutput = $("#runtime-test-output");
 let settings = {}, sessions = [], activeSessionId = null;
 let providerApiKeys = {}, activeProviderId = null;
+let ollamaAvailableModels = new Map();
 let generationController = null;
 let cronSchedules = [];
 let runStep = 0, runToolCount = 0;
@@ -527,6 +528,27 @@ function providerList() {
     builtIn: true,
   }];
 }
+function isOllamaProvider(provider) {
+  if (provider?.id === "ollama-local") return true;
+  try {
+    const url = new URL(provider?.baseUrl || "");
+    return url.port === "11434" &&
+      ["127.0.0.1", "localhost", "[::1]", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+function providerModels(provider) {
+  const configured = (provider?.models || []).filter(Boolean);
+  if (!isOllamaProvider(provider) || !ollamaAvailableModels.has(provider.id)) return configured;
+  const available = [...new Set(ollamaAvailableModels.get(provider.id))];
+  const installed = new Set(available);
+  const configuredInstalled = configured.filter((model) => installed.has(model));
+  return [
+    ...configuredInstalled,
+    ...available.filter((model) => !configuredInstalled.includes(model)),
+  ];
+}
 function modelOptionValue(providerId, model) {
   return `${encodeURIComponent(providerId)}:${encodeURIComponent(model)}`;
 }
@@ -534,7 +556,8 @@ function selectedModel(select) {
   const option = select.selectedOptions?.[0];
   return {
     providerId: option?.dataset.providerId || settings.defaultProviderId || providerList()[0]?.id,
-    model: option?.dataset.model || select.value || settings.defaultModel,
+    model: option?.dataset.model ||
+      (select.options.length ? select.value || settings.defaultModel : ""),
   };
 }
 function selectedModelLabel(select) {
@@ -548,15 +571,22 @@ function fillModels(select, selected = {}) {
     : settings.defaultProviderId || providers[0]?.id;
   const selectedModelName = typeof selected === "string" ? selected : selected.model ||
     providers.find((provider) => provider.id === selectedProviderId)?.defaultModel;
-  select.innerHTML = providers.map((provider) =>
-    `<optgroup label="${escapeHtml(provider.name)}">${
-      (provider.models || []).map((model) =>
-        `<option value="${escapeHtml(modelOptionValue(provider.id, model))}" data-provider-id="${
-          escapeHtml(provider.id)
-        }" data-model="${escapeHtml(model)}">${escapeHtml(model)}</option>`
-      ).join("")
-    }</optgroup>`
-  ).join("");
+  select.innerHTML = providers.flatMap((provider) => {
+    const models = providerModels(provider);
+    return models.length
+      ? [
+        `<optgroup label="${escapeHtml(provider.name)}">${
+          models.map((model) =>
+            `<option value="${
+              escapeHtml(modelOptionValue(provider.id, model))
+            }" data-provider-id="${escapeHtml(provider.id)}" data-model="${escapeHtml(model)}">${
+              escapeHtml(model)
+            }</option>`
+          ).join("")
+        }</optgroup>`,
+      ]
+      : [];
+  }).join("");
   const selectedValue = modelOptionValue(selectedProviderId, selectedModelName || "");
   select.value = selectedValue;
   if (!select.value && select.options.length) select.selectedIndex = 0;
@@ -565,7 +595,7 @@ function activeProvider() {
   return providerList().find((provider) => provider.id === activeProviderId) || providerList()[0];
 }
 function fillDefaultModel(provider) {
-  const models = (provider?.models || []).filter(Boolean);
+  const models = providerModels(provider);
   defaultModel.innerHTML = models.map((model) =>
     `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`
   ).join("");
@@ -598,7 +628,7 @@ function renderProviderEditor() {
   const provider = activeProvider();
   providerNameInput.value = provider?.name || "";
   $("#base-url").value = provider?.baseUrl || "";
-  modelsInput.value = (provider?.models || []).join("\n");
+  modelsInput.value = providerModels(provider).join("\n");
   fillDefaultModel(provider);
   $("#api-key").value = providerApiKeys[provider?.id] || "";
   $("#key-status").textContent = provider?.hasApiKey || providerApiKeys[provider?.id]
@@ -1453,10 +1483,30 @@ async function loadSettings() {
   activeProviderId = settings.defaultProviderId;
   fillModels(modelSelect, { providerId: settings.defaultProviderId, model: settings.defaultModel });
   renderProviderEditor();
+  await refreshOllamaModels();
   $("#developer-mode").checked = localStorage.getItem("ai-agent:developer-mode") === "true";
   if (previousWorkspace !== settings.workspace) await loadSessions();
   else renderWorkspaceTree();
   maybeCheckUpdateOnStartup();
+}
+
+async function refreshOllamaModels() {
+  const ollamaProviders = providerList().filter(isOllamaProvider);
+  if (!ollamaProviders.length) return;
+  try {
+    const response = await fetch(`${API}/ollama/models`);
+    const data = await response.json();
+    const available = response.ok && data.available === true && Array.isArray(data.models)
+      ? data.models.filter((model) => typeof model === "string")
+      : [];
+    ollamaProviders.forEach((provider) => ollamaAvailableModels.set(provider.id, available));
+    fillModels(modelSelect, selectedModel(modelSelect));
+    renderProviderEditor();
+  } catch {
+    ollamaProviders.forEach((provider) => ollamaAvailableModels.set(provider.id, []));
+    fillModels(modelSelect);
+    renderProviderEditor();
+  }
 }
 
 async function connect(retries = 30) {
@@ -1502,6 +1552,9 @@ form.addEventListener("submit", async (event) => {
     messages.append(thinking);
     scrollMessagesToBottom();
     const chosenModel = selectedModel(modelSelect);
+    if (!chosenModel.model) {
+      throw new Error("当前没有可用模型，请启动 Ollama 并安装模型后重试");
+    }
     const response = await fetch(`${API}/chat/stream`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -2010,6 +2063,39 @@ providerSelect.addEventListener("change", () => {
   activeProviderId = providerSelect.value;
   renderProviderEditor();
 });
+async function addOllamaProvider() {
+  syncActiveProviderDraft();
+  const existing = providerList().find((provider) => provider.id === "ollama-local");
+  if (existing) {
+    activeProviderId = existing.id;
+    providerApiKeys[existing.id] ||= "ollama";
+    renderProviderEditor();
+    await refreshOllamaModels();
+    return;
+  }
+  const id = "ollama-local";
+  settings.providers = [...providerList(), {
+    id,
+    name: "Ollama 本地",
+    protocol: "openai",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    models: [
+      "granite4.2:3b",
+      "gemma4:e4b",
+      "gemma4:e2b",
+      "gemma4:12b",
+      "deepseek-r1:8b",
+      "deepseek-v4-flash:cloud",
+    ],
+    defaultModel: "granite4.2:3b",
+    hasApiKey: true,
+  }];
+  providerApiKeys[id] = "ollama";
+  activeProviderId = id;
+  renderProviderEditor();
+  await refreshOllamaModels();
+}
+$("#add-ollama").addEventListener("click", addOllamaProvider);
 $("#add-provider").addEventListener("click", () => {
   syncActiveProviderDraft();
   const id = `custom-${Date.now().toString(36)}`;
