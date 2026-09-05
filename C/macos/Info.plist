@@ -7,7 +7,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>AI Agent C</string>
 	<key>CFBundleExecutable</key>
-	<string>AI Agent C</string>
+	<string>ai-agent-launcher</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.youjunmao.ai-agent-c</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -20,5 +20,15 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>0.1.0</string>
-</dict>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+	</dict>
 </plist>

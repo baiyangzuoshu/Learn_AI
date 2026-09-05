@@ -27,15 +27,19 @@ int agent_init(Agent *agent, const char *api_key, const char *base_url, const ch
     }
     message_list_init(&agent->messages);
     tool_registry_init(&agent->tools);
-    size_t prompt_length = strlen(workspace) + 160;
+    static const char *prompt_format =
+        "You are a coding agent working in %s. Use the bash tool to inspect and modify this workspace. "
+        "Keep going until the user's task is complete. Return only the useful final response; do not expose "
+        "internal reasoning or planning. Use concise Markdown with short headings, lists, tables, and code "
+        "blocks only when they improve readability. Do not include raw tool output or incidental command "
+        "errors unless they directly support the answer.";
+    size_t prompt_length = strlen(workspace) + strlen(prompt_format) + 1;
     char *prompt = malloc(prompt_length);
     if (!prompt) {
         agent_free(agent);
         return -1;
     }
-    snprintf(prompt, prompt_length,
-             "You are a coding agent working in %s. Use the bash tool to inspect and modify this workspace. "
-             "Keep going until the user's task is complete.", workspace);
+    snprintf(prompt, prompt_length, prompt_format, workspace);
     int setup_failed = message_list_push_text(&agent->messages, MESSAGE_SYSTEM, prompt) != 0 ||
                        tool_registry_add(&agent->tools, shell_tool_definition(&agent->shell_tool)) != 0;
     free(prompt);

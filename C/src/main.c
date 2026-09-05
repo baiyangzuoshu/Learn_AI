@@ -8,7 +8,29 @@
 
 static void print_event(const AgentEvent *event, void *context) {
     (void)context;
+    if (getenv("AI_AGENT_QUIET_TOOLS")) return;
     printf("\n[tool:%s iteration:%zu]\n%s\n", event->tool_name, event->iteration, event->output);
+}
+
+static int launched_from_finder(void) {
+#ifdef __APPLE__
+    return !isatty(STDIN_FILENO) && !isatty(STDOUT_FILENO);
+#else
+    return 0;
+#endif
+}
+
+static void show_macos_message(const char *message) {
+#ifdef __APPLE__
+    char command[2048];
+    snprintf(command, sizeof(command),
+             "osascript -e 'display dialog \"%s\" with title \"AI Agent C\" buttons {\"好\"} "
+             "default button \"好\"' >/dev/null 2>&1",
+             message);
+    (void)system(command);
+#else
+    (void)message;
+#endif
 }
 
 static char *join_arguments(int argc, char **argv) {
@@ -28,6 +50,12 @@ int main(int argc, char **argv) {
     const char *api_key = getenv("DEEPSEEK_API_KEY");
     const char *base_url = getenv("DEEPSEEK_BASE_URL");
     const char *model = getenv("DEEPSEEK_MODEL");
+    if (launched_from_finder() && argc == 1) {
+        show_macos_message("C 版第 1 课是命令行 Agent。请打开终端，设置 DEEPSEEK_API_KEY 后运行 C/dist/macos-arm64/agent-s01。"
+                           "\n\n双击 .app 不会继承终端环境变量，也没有可输入任务的终端。\n\n"
+                           "示例：export DEEPSEEK_API_KEY=你的 Key");
+        return 0;
+    }
     if (!api_key || !api_key[0]) {
         fprintf(stderr, "DEEPSEEK_API_KEY is required\n");
         return 1;

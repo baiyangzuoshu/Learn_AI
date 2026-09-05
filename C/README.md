@@ -28,7 +28,10 @@ C/
 └── Makefile
 ```
 
-macOS 打包资源位于 `macos/Info.plist`。
+macOS 桌面层按职责拆分：`macos/launcher.m` 负责窗口和进程，`macos/secret_store.m` 负责凭据，
+`macos/chat_view.m` 与 `macos/renderer/` 负责对话和 Markdown 渲染。`.app` 启动
+`Resources/agent-s01`；Agent 核心仍然全部使用 C 实现。对话区支持标题、强调、列表、表格、
+引用、行内代码和代码块，不会显示未经渲染的 Markdown 标记。
 
 ## 依赖
 
@@ -62,8 +65,12 @@ make macos
 make macos-app
 ```
 
-输出：`dist/macos-arm64/AI Agent.app`。这是一个命令行 Agent，启动时仍需要从终端继承
-`DEEPSEEK_API_KEY`；`.app` 主要用于 macOS 原生交付和后续签名。
+输出：`dist/macos-arm64/AI Agent.app`。从 Finder 双击后只打开对话窗口，不会连接 DeepSeek。
+启动后可通过“选择目录”指定 Agent 的工作目录，Agent 的文件工具和命令都会在该目录中执行。
+输入任务并点击“发送”后，如果还没有 Key，才会弹出设置窗口；保存后的 Key 会写入当前用户的
+`~/Library/Application Support/AI Agent C/data/deepseek.key`，下次打开应用无需重新设置，
+也可以随时点击“设置 Key”。数据目录权限为 `700`，Key 文件权限为 `600`，不会写入仓库或 App 包。
+环境变量 `DEEPSEEK_API_KEY` 仍然兼容直接运行二进制的方式。
 
 ## 运行
 

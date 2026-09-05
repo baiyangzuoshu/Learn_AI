@@ -1,0 +1,201 @@
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --page: #f6f7f9;
+  --text: #20242b;
+  --muted: #727985;
+  --border: #dfe3e8;
+  --assistant: #ffffff;
+  --user: #e8f1ff;
+  --user-border: #cddff7;
+  --code: #f2f4f7;
+  --accent: #1677ff;
+  --quote: #eef1f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #17191d;
+    --text: #eceff4;
+    --muted: #939aa6;
+    --border: #31353d;
+    --assistant: #1d2025;
+    --user: #202d3d;
+    --user-border: #31465e;
+    --code: #111318;
+    --accent: #70a9ff;
+    --quote: #252930;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+}
+
+body { font-size: 15px; }
+
+#messages {
+  width: min(100%, 820px);
+  margin: 0 auto;
+  padding: 24px 22px 36px;
+}
+
+.message { margin: 0 0 22px; }
+
+.message.system {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 12px;
+}
+
+.message.user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message.user .bubble {
+  max-width: 78%;
+  padding: 11px 15px;
+  border: 1px solid var(--user-border);
+  border-radius: 16px 16px 4px 16px;
+  background: var(--user);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message.assistant {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--assistant);
+  color: #4fd1b5;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.assistant-body {
+  min-width: 0;
+  padding: 2px 1px 0;
+}
+
+.role {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.markdown {
+  line-height: 1.72;
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p { margin: 0 0 13px; }
+.markdown h1, .markdown h2, .markdown h3,
+.markdown h4, .markdown h5, .markdown h6 {
+  margin: 22px 0 10px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.markdown h1 { font-size: 23px; }
+.markdown h2 { font-size: 20px; }
+.markdown h3 { font-size: 17px; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 15px; }
+.markdown ul, .markdown ol { margin: 8px 0 14px; padding-left: 24px; }
+.markdown li { margin: 5px 0; }
+.markdown strong { font-weight: 720; }
+.markdown a { color: var(--accent); text-decoration: none; }
+.markdown a:hover { text-decoration: underline; }
+.markdown hr { border: 0; border-top: 1px solid var(--border); margin: 22px 0; }
+.markdown blockquote {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--quote);
+  color: var(--muted);
+}
+.markdown code {
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--code);
+  font: 0.88em ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.markdown pre {
+  position: relative;
+  margin: 14px 0;
+  padding: 34px 15px 15px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--code);
+  line-height: 1.55;
+}
+.markdown pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12.5px;
+  white-space: pre;
+}
+.code-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  color: var(--muted);
+  font: 11px ui-monospace, monospace;
+}
+.copy-code {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--assistant);
+  color: var(--muted);
+  font: 11px inherit;
+  cursor: pointer;
+}
+.table-wrap {
+  margin: 14px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.markdown table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.markdown th, .markdown td {
+  padding: 9px 11px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.markdown th { background: var(--code); font-weight: 700; }
+.markdown th:last-child, .markdown td:last-child { border-right: 0; }
+.markdown tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 620px) {
+  #messages { padding: 18px 14px 28px; }
+  .message.user .bubble { max-width: 90%; }
+}
