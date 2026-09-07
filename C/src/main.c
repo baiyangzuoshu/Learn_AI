@@ -1,4 +1,5 @@
 #include "agent.h"
+#include "string_builder.h"
 
 #include <curl/curl.h>
 #include <stdio.h>
@@ -34,15 +35,20 @@ static void show_macos_message(const char *message) {
 }
 
 static char *join_arguments(int argc, char **argv) {
-    size_t length = 1;
-    for (int i = 1; i < argc; i++) length += strlen(argv[i]) + 1;
-    char *query = malloc(length);
-    if (!query) return NULL;
-    query[0] = '\0';
+    StringBuilder *builder = string_builder_create();
+    if (!builder) return NULL;
     for (int i = 1; i < argc; i++) {
-        if (i > 1) strcat(query, " ");
-        strcat(query, argv[i]);
+        if (i > 1 && string_builder_append_char(builder, ' ') != 0) {
+            string_builder_destroy(builder);
+            return NULL;
+        }
+        if (string_builder_append(builder, argv[i]) != 0) {
+            string_builder_destroy(builder);
+            return NULL;
+        }
     }
+    char *query = strdup(string_builder_data(builder));
+    string_builder_destroy(builder);
     return query;
 }
 

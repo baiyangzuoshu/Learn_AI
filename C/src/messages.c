@@ -7,6 +7,13 @@ static char *copy_string(const char *value) {
     return value ? strdup(value) : NULL;
 }
 
+static void free_message_value(void *value) {
+    Message *message = value;
+    if (!message) return;
+    message_free(message);
+    free(message);
+}
+
 void message_init(Message *message, MessageRole role) {
     memset(message, 0, sizeof(*message));
     message->role = role;
@@ -25,15 +32,24 @@ void message_free(Message *message) {
     memset(message, 0, sizeof(*message));
 }
 
-void message_list_init(MessageList *list) {
+int message_list_init(MessageList *list) {
     memset(list, 0, sizeof(*list));
+    list->items = vector_create(free_message_value);
+    return list->items ? 0 : -1;
 }
 
 void message_list_free(MessageList *list) {
     if (!list) return;
-    for (size_t i = 0; i < list->count; i++) message_free(&list->items[i]);
-    free(list->items);
+    vector_destroy(list->items);
     memset(list, 0, sizeof(*list));
+}
+
+size_t message_list_count(const MessageList *list) {
+    return list ? vector_size(list->items) : 0;
+}
+
+const Message *message_list_get(const MessageList *list, size_t index) {
+    return list ? vector_get(list->items, index) : NULL;
 }
 
 int message_set_content(Message *message, const char *content) {
@@ -73,14 +89,14 @@ int message_add_tool_call(Message *message, const char *id, const char *name, co
 }
 
 int message_list_push_move(MessageList *list, Message *message) {
-    if (list->count == list->capacity) {
-        size_t next_capacity = list->capacity ? list->capacity * 2 : 8;
-        Message *next = realloc(list->items, next_capacity * sizeof(*next));
-        if (!next) return -1;
-        list->items = next;
-        list->capacity = next_capacity;
+    if (!list || !list->items || !message) return -1;
+    Message *owned = malloc(sizeof(*owned));
+    if (!owned) return -1;
+    *owned = *message;
+    if (vector_push_back(list->items, owned) != 0) {
+        free(owned);
+        return -1;
     }
-    list->items[list->count++] = *message;
     memset(message, 0, sizeof(*message));
     return 0;
 }

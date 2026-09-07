@@ -1,105 +1,129 @@
 #include "deepseek.h"
 
 #include "http.h"
+#include "string_builder.h"
 
-#include <cjson/cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static cJSON *message_to_json(const Message *message) {
-    cJSON *json = cJSON_CreateObject();
+static JsonValue *message_to_json(const Message *message) {
+    JsonValue *json = json_object_create();
     if (!json) return NULL;
-    cJSON_AddStringToObject(json, "role", message_role_name(message->role));
-    if (message->content) cJSON_AddStringToObject(json, "content", message->content);
-    else cJSON_AddNullToObject(json, "content");
-    if (message->tool_call_id) cJSON_AddStringToObject(json, "tool_call_id", message->tool_call_id);
+    if (json_object_set_string(json, "role", message_role_name(message->role)) != 0 ||
+        (message->content ? json_object_set_string(json, "content", message->content)
+                          : json_object_set_null(json, "content")) != 0 ||
+        (message->tool_call_id && json_object_set_string(json, "tool_call_id", message->tool_call_id) != 0)) {
+        json_destroy(json);
+        return NULL;
+    }
 
     if (message->tool_call_count) {
-        cJSON *calls = cJSON_CreateArray();
+        JsonValue *calls = json_array_create();
         if (!calls) {
-            cJSON_Delete(json);
+            json_destroy(json);
             return NULL;
         }
         for (size_t i = 0; i < message->tool_call_count; i++) {
             const ToolCall *call = &message->tool_calls[i];
-            cJSON *call_json = cJSON_CreateObject();
-            cJSON *function = cJSON_CreateObject();
-            if (!call_json || !function) {
-                cJSON_Delete(call_json);
-                cJSON_Delete(function);
-                cJSON_Delete(calls);
-                cJSON_Delete(json);
+            JsonValue *call_json = json_object_create();
+            JsonValue *function = json_object_create();
+            if (!call_json || !function ||
+                json_object_set_string(call_json, "id", call->id ? call->id : "") != 0 ||
+                json_object_set_string(call_json, "type", "function") != 0 ||
+                json_object_set_string(function, "name", call->name ? call->name : "") != 0 ||
+                json_object_set_string(function, "arguments", call->arguments ? call->arguments : "{}") != 0) {
+                json_destroy(call_json);
+                json_destroy(function);
+                json_destroy(calls);
+                json_destroy(json);
                 return NULL;
             }
-            cJSON_AddStringToObject(call_json, "id", call->id ? call->id : "");
-            cJSON_AddStringToObject(call_json, "type", "function");
-            cJSON_AddStringToObject(function, "name", call->name ? call->name : "");
-            cJSON_AddStringToObject(function, "arguments", call->arguments ? call->arguments : "{}");
-            cJSON_AddItemToObject(call_json, "function", function);
-            cJSON_AddItemToArray(calls, call_json);
+            if (json_object_set(call_json, "function", function) != 0) {
+                json_destroy(function);
+                json_destroy(call_json);
+                json_destroy(calls);
+                json_destroy(json);
+                return NULL;
+            }
+            if (json_array_append(calls, call_json) != 0) {
+                json_destroy(call_json);
+                json_destroy(calls);
+                json_destroy(json);
+                return NULL;
+            }
         }
-        cJSON_AddItemToObject(json, "tool_calls", calls);
+        if (json_object_set(json, "tool_calls", calls) != 0) {
+            json_destroy(calls);
+            json_destroy(json);
+            return NULL;
+        }
     }
     return json;
 }
 
-static cJSON *request_to_json(const DeepSeekConfig *config, const MessageList *messages, const ToolRegistry *tools) {
-    cJSON *root = cJSON_CreateObject();
-    cJSON *message_array = cJSON_CreateArray();
-    if (!root || !message_array) {
-        cJSON_Delete(root);
-        cJSON_Delete(message_array);
+static JsonValue *request_to_json(const DeepSeekConfig *config, const MessageList *messages,
+                                  const ToolRegistry *tools) {
+    JsonValue *root = json_object_create();
+    JsonValue *message_array = json_array_create();
+    if (!root || !message_array || json_object_set_string(root, "model", config->model) != 0) {
+        json_destroy(root);
+        json_destroy(message_array);
         return NULL;
     }
-    cJSON_AddStringToObject(root, "model", config->model);
-    for (size_t i = 0; i < messages->count; i++) {
-        cJSON *message = message_to_json(&messages->items[i]);
-        if (!message) {
-            cJSON_Delete(root);
-            cJSON_Delete(message_array);
+    for (size_t i = 0; i < message_list_count(messages); i++) {
+        const Message *stored_message = message_list_get(messages, i);
+        JsonValue *message = stored_message ? message_to_json(stored_message) : NULL;
+        if (!message || json_array_append(message_array, message) != 0) {
+            json_destroy(message);
+            json_destroy(root);
+            json_destroy(message_array);
             return NULL;
         }
-        cJSON_AddItemToArray(message_array, message);
     }
-    cJSON_AddItemToObject(root, "messages", message_array);
-    if (tools && tools->count) {
-        cJSON *tool_json = tool_registry_to_json(tools);
-        if (!tool_json) {
-            cJSON_Delete(root);
+    if (json_object_set(root, "messages", message_array) != 0) {
+        json_destroy(message_array);
+        json_destroy(root);
+        return NULL;
+    }
+    if (tools && tool_registry_count(tools)) {
+        JsonValue *tool_json = tool_registry_to_json(tools);
+        if (!tool_json || json_object_set(root, "tools", tool_json) != 0) {
+            json_destroy(tool_json);
+            json_destroy(root);
             return NULL;
         }
-        cJSON_AddItemToObject(root, "tools", tool_json);
     }
     return root;
 }
 
-static int parse_assistant(const cJSON *root, Message *assistant, char *error, size_t error_capacity) {
-    const cJSON *choices = cJSON_GetObjectItemCaseSensitive(root, "choices");
-    const cJSON *choice = cJSON_IsArray(choices) ? cJSON_GetArrayItem(choices, 0) : NULL;
-    const cJSON *message = choice ? cJSON_GetObjectItemCaseSensitive(choice, "message") : NULL;
-    if (!cJSON_IsObject(message)) {
+static int parse_assistant(const JsonValue *root, Message *assistant, char *error, size_t error_capacity) {
+    JsonValue *choices = json_object_get(root, "choices");
+    JsonValue *choice = json_array_get(choices, 0);
+    JsonValue *message = json_object_get(choice, "message");
+    if (!json_is_object(message)) {
         snprintf(error, error_capacity, "model returned no assistant message");
         return -1;
     }
 
-    const cJSON *content = cJSON_GetObjectItemCaseSensitive(message, "content");
-    const cJSON *calls = cJSON_GetObjectItemCaseSensitive(message, "tool_calls");
+    JsonValue *content = json_object_get(message, "content");
+    JsonValue *calls = json_object_get(message, "tool_calls");
     message_init(assistant, MESSAGE_ASSISTANT);
-    if (cJSON_IsString(content) && message_set_content(assistant, content->valuestring) != 0) goto allocation_error;
+    const char *content_text = json_string_value(content);
+    if (content_text && message_set_content(assistant, content_text) != 0) goto allocation_error;
 
-    if (cJSON_IsArray(calls)) {
-        cJSON *call = NULL;
-        cJSON_ArrayForEach(call, calls) {
-            const cJSON *function = cJSON_GetObjectItemCaseSensitive(call, "function");
-            const cJSON *id = cJSON_GetObjectItemCaseSensitive(call, "id");
-            const cJSON *name = function ? cJSON_GetObjectItemCaseSensitive(function, "name") : NULL;
-            const cJSON *arguments = function ? cJSON_GetObjectItemCaseSensitive(function, "arguments") : NULL;
-            if (!cJSON_IsString(name) || !cJSON_IsString(arguments) ||
-                message_add_tool_call(assistant, cJSON_IsString(id) ? id->valuestring : "", name->valuestring,
-                                       arguments->valuestring) != 0) {
-                goto allocation_error;
-            }
+    for (size_t i = 0; i < json_array_size(calls); i++) {
+        JsonValue *call = json_array_get(calls, i);
+        JsonValue *function = json_object_get(call, "function");
+        JsonValue *id = json_object_get(call, "id");
+        JsonValue *name = json_object_get(function, "name");
+        JsonValue *arguments = json_object_get(function, "arguments");
+        const char *id_text = json_string_value(id);
+        const char *name_text = json_string_value(name);
+        const char *arguments_text = json_string_value(arguments);
+        if (!name_text || !arguments_text ||
+            message_add_tool_call(assistant, id_text ? id_text : "", name_text, arguments_text) != 0) {
+            goto allocation_error;
         }
     }
     return 0;
@@ -116,27 +140,40 @@ int deepseek_chat_completion(const DeepSeekConfig *config, const MessageList *me
         snprintf(error, error_capacity, "DeepSeek configuration is incomplete");
         return -1;
     }
-    cJSON *request = request_to_json(config, messages, tools);
+    JsonValue *request = request_to_json(config, messages, tools);
     if (!request) {
         snprintf(error, error_capacity, "failed to build DeepSeek request");
         return -1;
     }
-    char *body = cJSON_PrintUnformatted(request);
-    cJSON_Delete(request);
+    char *body = json_stringify(request);
+    json_destroy(request);
     if (!body) {
         snprintf(error, error_capacity, "failed to encode DeepSeek request");
         return -1;
     }
 
-    size_t url_length = strlen(config->base_url) + strlen("/chat/completions") + 2;
-    char *url = malloc(url_length);
-    if (!url) {
+    size_t base_length = strlen(config->base_url);
+    if (base_length == 0) {
+        free(body);
+        snprintf(error, error_capacity, "DeepSeek base URL is empty");
+        return -1;
+    }
+    StringBuilder *url_builder = string_builder_create();
+    if (!url_builder || string_builder_append(url_builder, config->base_url) != 0 ||
+        (config->base_url[base_length - 1] != '/' && string_builder_append_char(url_builder, '/') != 0) ||
+        string_builder_append(url_builder, "chat/completions") != 0) {
+        string_builder_destroy(url_builder);
         free(body);
         snprintf(error, error_capacity, "out of memory while building DeepSeek URL");
         return -1;
     }
-    snprintf(url, url_length, "%s%s/chat/completions", config->base_url,
-             config->base_url[strlen(config->base_url) - 1] == '/' ? "" : "/");
+    char *url = strdup(string_builder_data(url_builder));
+    string_builder_destroy(url_builder);
+    if (!url) {
+        free(body);
+        snprintf(error, error_capacity, "out of memory while copying DeepSeek URL");
+        return -1;
+    }
 
     HttpResponse response;
     int http_result = http_post_json(url, config->api_key, body, &response, error, error_capacity);
@@ -144,23 +181,24 @@ int deepseek_chat_completion(const DeepSeekConfig *config, const MessageList *me
     free(body);
     if (http_result != 0) return -1;
 
-    cJSON *root = cJSON_Parse(response.body ? response.body : "");
+    JsonValue *root = json_parse(response.body ? response.body : "");
     if (!root) {
         snprintf(error, error_capacity, "DeepSeek returned invalid JSON (HTTP %ld)", response.status_code);
         http_response_free(&response);
         return -1;
     }
     if (response.status_code < 200 || response.status_code >= 300) {
-        const cJSON *api_error = cJSON_GetObjectItemCaseSensitive(root, "error");
-        const cJSON *message = api_error ? cJSON_GetObjectItemCaseSensitive(api_error, "message") : NULL;
+        JsonValue *api_error = json_object_get(root, "error");
+        JsonValue *message = json_object_get(api_error, "message");
+        const char *message_text = json_string_value(message);
         snprintf(error, error_capacity, "DeepSeek HTTP %ld: %s", response.status_code,
-                 cJSON_IsString(message) ? message->valuestring : "request failed");
-        cJSON_Delete(root);
+                 message_text ? message_text : "request failed");
+        json_destroy(root);
         http_response_free(&response);
         return -1;
     }
     int parse_result = parse_assistant(root, assistant, error, error_capacity);
-    cJSON_Delete(root);
+    json_destroy(root);
     http_response_free(&response);
     return parse_result;
 }

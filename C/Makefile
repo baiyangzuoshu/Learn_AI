@@ -13,7 +13,7 @@ BASE_SOURCES := $(wildcard base/*.c)
 BASE_OBJECTS := $(BASE_SOURCES:base/%.c=build/base/%.o)
 TARGET := build/agent-s01
 COLLECTION_TEST := build/test-collections
-COLLECTION_SOURCES := $(BASE_SOURCES)
+COLLECTION_SOURCES := $(BASE_SOURCES) src/messages.c src/tool.c
 
 MACOS_ARCH ?= $(shell uname -m)
 MACOS_SDK ?= $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
@@ -60,7 +60,7 @@ test: $(COLLECTION_TEST)
 	$(COLLECTION_TEST)
 
 $(COLLECTION_TEST): tests/test_collections.c $(COLLECTION_SOURCES) | build
-	$(CC) $(CFLAGS) -Ibase $^ -o $@
+	$(CC) $(CFLAGS) -Iinclude -Ibase $(CJSON_CFLAGS) $^ $(CJSON_LIBS) -o $@
 
 run: $(TARGET)
 	$(TARGET) $(QUERY)

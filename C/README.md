@@ -16,6 +16,7 @@ C/
 │   ├── stack.h/.c     # LIFO 栈
 │   ├── vector.h/.c    # 动态数组
 │   ├── hash_map.h/.c  # 字符串键哈希表
+│   ├── json.h/.c      # JSON 统一封装（底层使用 cJSON）
 │   ├── string_builder.h/.c # 字符串构建器
 │   ├── ring_buffer.h/.c # 固定容量环形缓冲区
 │   └── priority_queue.h/.c # 二叉堆优先队列
@@ -49,6 +50,14 @@ C/
 `StringBuilder` 专门负责可增长的 UTF-8 字节字符串，支持普通追加、追加指定长度、追加字符
 和格式化追加。`HashMap` 使用字符串键和开放寻址，`PriorityQueue` 使用二叉堆，并复用
 `Vector` 的存储层。环形缓冲区容量固定，满时会拒绝新元素，适合流式输出和事件缓冲。
+
+`json.h/.c` 是项目自己的 JSON 边界层。业务代码通过 `JsonValue`、`json_parse`、
+`json_object_get` 和 `json_stringify` 等函数访问 JSON，只有 `base/json.c` 直接依赖 cJSON，
+后续替换 JSON 库时不需要修改 Agent 业务模块。
+
+核心代码已经开始使用这些容器：`MessageList` 使用 `Vector` 保存消息指针，`ToolRegistry`
+使用 `HashMap` 做名称查找并用 `Vector` 保留注册顺序，多工具调用使用 `Queue` 顺序执行，
+命令行参数、Shell 命令和 DeepSeek URL 使用 `StringBuilder` 拼接。
 
 ```sh
 make test

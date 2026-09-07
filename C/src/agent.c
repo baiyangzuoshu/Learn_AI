@@ -1,5 +1,7 @@
 #include "agent.h"
 
+#include "queue.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,8 +27,10 @@ int agent_init(Agent *agent, const char *api_key, const char *base_url, const ch
         agent_free(agent);
         return -1;
     }
-    message_list_init(&agent->messages);
-    tool_registry_init(&agent->tools);
+    if (message_list_init(&agent->messages) != 0 || tool_registry_init(&agent->tools) != 0) {
+        agent_free(agent);
+        return -1;
+    }
     static const char *prompt_format =
         "You are a coding agent working in %s. Use the bash tool to inspect and modify this workspace. "
         "Keep going until the user's task is complete. Return only the useful final response; do not expose "
@@ -80,17 +84,28 @@ int agent_loop_run(Agent *agent, const char *query, AgentEventFn on_event, void 
             return set_error(error, error_capacity, "failed to append assistant message");
         }
 
-        Message *stored_assistant = &agent->messages.items[agent->messages.count - 1];
+        const Message *stored_assistant = message_list_get(&agent->messages, message_list_count(&agent->messages) - 1);
         if (stored_assistant->tool_call_count == 0) {
             *answer = copy_string(stored_assistant->content ? stored_assistant->content : "");
             return *answer ? 0 : set_error(error, error_capacity, "failed to copy final answer");
         }
 
+        Queue *pending_calls = queue_create(NULL);
+        if (!pending_calls) return set_error(error, error_capacity, "failed to create tool call queue");
         for (size_t call_index = 0; call_index < stored_assistant->tool_call_count; call_index++) {
-            ToolCall *call = &stored_assistant->tool_calls[call_index];
+            if (queue_enqueue(pending_calls, &stored_assistant->tool_calls[call_index]) != 0) {
+                queue_destroy(pending_calls);
+                return set_error(error, error_capacity, "failed to queue tool call");
+            }
+        }
+        while (!queue_is_empty(pending_calls)) {
+            ToolCall *call = queue_dequeue(pending_calls);
             const ToolDefinition *tool = tool_registry_find(&agent->tools, call->name);
             char *tool_output = malloc(agent->options.max_tool_output + 1);
-            if (!tool_output) return set_error(error, error_capacity, "failed to allocate tool output");
+            if (!tool_output) {
+                queue_destroy(pending_calls);
+                return set_error(error, error_capacity, "failed to allocate tool output");
+            }
             if (!tool) {
                 snprintf(tool_output, agent->options.max_tool_output + 1, "Error: unknown tool '%s'", call->name);
             } else {
@@ -107,9 +122,12 @@ int agent_loop_run(Agent *agent, const char *query, AgentEventFn on_event, void 
             }
             int append_result = message_list_push_tool(&agent->messages, call->id, tool_output);
             free(tool_output);
-            if (append_result != 0) return set_error(error, error_capacity, "failed to append tool result");
-            stored_assistant = &agent->messages.items[agent->messages.count - call_index - 2];
+            if (append_result != 0) {
+                queue_destroy(pending_calls);
+                return set_error(error, error_capacity, "failed to append tool result");
+            }
         }
+        queue_destroy(pending_calls);
     }
     return set_error(error, error_capacity, "agent loop reached its iteration limit");
 }

@@ -1,6 +1,8 @@
 #ifndef C_AGENT_MESSAGES_H
 #define C_AGENT_MESSAGES_H
 
+#include "vector.h"
+
 #include <stddef.h>
 
 typedef enum {
@@ -25,15 +27,15 @@ typedef struct {
 } Message;
 
 typedef struct {
-    Message *items;
-    size_t count;
-    size_t capacity;
+    Vector *items;
 } MessageList;
 
 void message_init(Message *message, MessageRole role);
 void message_free(Message *message);
-void message_list_init(MessageList *list);
+int message_list_init(MessageList *list);
 void message_list_free(MessageList *list);
+size_t message_list_count(const MessageList *list);
+const Message *message_list_get(const MessageList *list, size_t index);
 
 int message_set_content(Message *message, const char *content);
 int message_set_tool_call_id(Message *message, const char *id);

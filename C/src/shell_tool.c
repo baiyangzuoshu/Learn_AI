@@ -1,6 +1,7 @@
 #include "shell_tool.h"
 
-#include <cjson/cJSON.h>
+#include "string_builder.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,34 +40,36 @@ void shell_tool_free(ShellTool *tool) {
 
 int shell_tool_execute(const char *arguments_json, char *output, size_t output_capacity, void *context) {
     ShellTool *tool = context;
-    cJSON *arguments = cJSON_Parse(arguments_json ? arguments_json : "{}");
-    cJSON *command = arguments ? cJSON_GetObjectItemCaseSensitive(arguments, "command") : NULL;
-    if (!cJSON_IsString(command) || !command->valuestring[0]) {
+    JsonValue *arguments = json_parse(arguments_json ? arguments_json : "{}");
+    JsonValue *command = json_object_get(arguments, "command");
+    const char *command_text = json_string_value(command);
+    if (!command_text || !command_text[0]) {
         snprintf(output, output_capacity, "Error: command is required");
-        cJSON_Delete(arguments);
+        json_destroy(arguments);
         return -1;
     }
 
     char *quoted_workspace = shell_quote(tool->workspace);
     if (!quoted_workspace) {
         snprintf(output, output_capacity, "Error: out of memory");
-        cJSON_Delete(arguments);
+        json_destroy(arguments);
         return -1;
     }
-    size_t command_length = strlen(quoted_workspace) + strlen(command->valuestring) + 32;
-    char *shell_command = malloc(command_length);
-    if (!shell_command) {
+    StringBuilder *command_builder = string_builder_create();
+    if (!command_builder ||
+        string_builder_append_format(command_builder, "cd %s && %s 2>&1", quoted_workspace,
+                                     command_text) != 0) {
+        string_builder_destroy(command_builder);
         free(quoted_workspace);
-        cJSON_Delete(arguments);
+        json_destroy(arguments);
         snprintf(output, output_capacity, "Error: out of memory");
         return -1;
     }
-    snprintf(shell_command, command_length, "cd %s && %s 2>&1", quoted_workspace, command->valuestring);
 
-    FILE *pipe = popen(shell_command, "r");
-    free(shell_command);
+    FILE *pipe = popen(string_builder_data(command_builder), "r");
+    string_builder_destroy(command_builder);
     free(quoted_workspace);
-    cJSON_Delete(arguments);
+    json_destroy(arguments);
     if (!pipe) {
         snprintf(output, output_capacity, "Error: failed to start shell");
         return -1;

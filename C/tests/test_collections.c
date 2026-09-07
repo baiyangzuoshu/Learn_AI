@@ -1,10 +1,13 @@
 #include "list.h"
 #include "hash_map.h"
+#include "json.h"
+#include "messages.h"
 #include "priority_queue.h"
 #include "queue.h"
 #include "ring_buffer.h"
 #include "stack.h"
 #include "string_builder.h"
+#include "tool.h"
 #include "vector.h"
 
 #include <assert.h>
@@ -121,6 +124,28 @@ static void test_string_builder(void) {
     string_builder_destroy(builder);
 }
 
+static void test_json(void) {
+    JsonValue *root = json_parse("{\"name\":\"agent\",\"items\":[\"one\",\"two\"],\"enabled\":true}");
+    assert(root && json_is_object(root));
+    assert(strcmp(json_string_value(json_object_get(root, "name")), "agent") == 0);
+
+    JsonValue *items = json_object_get(root, "items");
+    assert(items && json_is_array(items));
+    assert(json_array_size(items) == 2);
+    assert(strcmp(json_string_value(json_array_get(items, 1)), "two") == 0);
+
+    JsonValue *extra = json_object_create();
+    assert(extra);
+    assert(json_object_set_string(extra, "status", "ready") == 0);
+    assert(json_object_set(root, "extra", extra) == 0);
+
+    char *encoded = json_stringify(root);
+    assert(encoded);
+    assert(strstr(encoded, "\"status\":\"ready\"") != NULL);
+    free(encoded);
+    json_destroy(root);
+}
+
 static void test_ring_buffer(void) {
     RingBuffer *buffer = ring_buffer_create(2, free);
     assert(buffer && ring_buffer_is_empty(buffer));
@@ -158,6 +183,46 @@ static void test_priority_queue(void) {
     priority_queue_destroy(queue);
 }
 
+static int test_tool_execute(const char *arguments_json, char *output, size_t output_capacity, void *context) {
+    (void)arguments_json;
+    (void)context;
+    snprintf(output, output_capacity, "ok");
+    return 0;
+}
+
+static void test_message_list_and_tool_registry(void) {
+    MessageList messages;
+    assert(message_list_init(&messages) == 0);
+    assert(message_list_push_text(&messages, MESSAGE_USER, "hello") == 0);
+
+    Message assistant;
+    message_init(&assistant, MESSAGE_ASSISTANT);
+    assert(message_set_content(&assistant, "working") == 0);
+    assert(message_add_tool_call(&assistant, "call-1", "bash", "{}") == 0);
+    assert(message_list_push_move(&messages, &assistant) == 0);
+    assert(message_list_count(&messages) == 2);
+    assert(strcmp(message_list_get(&messages, 0)->content, "hello") == 0);
+    assert(message_list_get(&messages, 1)->tool_call_count == 1);
+    message_list_free(&messages);
+
+    ToolRegistry registry;
+    assert(tool_registry_init(&registry) == 0);
+    ToolDefinition definition = {
+        .name = "test_tool",
+        .description = "test",
+        .parameters_json = "{\"type\":\"object\"}",
+        .execute = test_tool_execute,
+        .context = NULL,
+    };
+    assert(tool_registry_add(&registry, definition) == 0);
+    assert(tool_registry_count(&registry) == 1);
+    assert(tool_registry_find(&registry, "test_tool") != NULL);
+    JsonValue *serialized = tool_registry_to_json(&registry);
+    assert(serialized != NULL);
+    json_destroy(serialized);
+    tool_registry_free(&registry);
+}
+
 int main(void) {
     test_list();
     test_queue();
@@ -165,8 +230,10 @@ int main(void) {
     test_vector();
     test_hash_map();
     test_string_builder();
+    test_json();
     test_ring_buffer();
     test_priority_queue();
-    puts("collections tests passed: list queue stack vector hash-map string-builder ring-buffer priority-queue");
+    test_message_list_and_tool_registry();
+    puts("collections tests passed: base containers, MessageList, ToolRegistry");
     return 0;
 }
