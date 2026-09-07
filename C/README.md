@@ -10,6 +10,15 @@
 
 ```text
 C/
+├── base/              # 通用数据结构和基础工具
+│   ├── list.h/.c      # 单向链表
+│   ├── queue.h/.c     # FIFO 队列
+│   ├── stack.h/.c     # LIFO 栈
+│   ├── vector.h/.c    # 动态数组
+│   ├── hash_map.h/.c  # 字符串键哈希表
+│   ├── string_builder.h/.c # 字符串构建器
+│   ├── ring_buffer.h/.c # 固定容量环形缓冲区
+│   └── priority_queue.h/.c # 二叉堆优先队列
 ├── include/
 │   ├── agent.h       # Agent Loop 编排和事件
 │   ├── deepseek.h    # Provider 接口
@@ -25,8 +34,28 @@ C/
 │   ├── messages.c
 │   ├── shell_tool.c
 │   └── tool.c
+├── tests/
+│   └── test_collections.c
 └── Makefile
 ```
+
+## 基础容器
+
+`base/` 目录集中放置通用数据结构和基础工具。`list.h`、`queue.h`、`stack.h`、`vector.h`、`hash_map.h`、`ring_buffer.h` 和
+`priority_queue.h` 是后续 Agent 功能共用的基础容器。它们保存 `void *`，
+由创建容器时传入的 `CollectionFreeFn` 负责释放元素。元素成功插入后，所有权交给容器；
+`pop` 操作会把所有权交还给调用方，调用方需要负责释放返回值。
+
+`StringBuilder` 专门负责可增长的 UTF-8 字节字符串，支持普通追加、追加指定长度、追加字符
+和格式化追加。`HashMap` 使用字符串键和开放寻址，`PriorityQueue` 使用二叉堆，并复用
+`Vector` 的存储层。环形缓冲区容量固定，满时会拒绝新元素，适合流式输出和事件缓冲。
+
+```sh
+make test
+```
+
+当前消息历史仍使用专用的 `MessageList` 动态数组，因为 DeepSeek 请求需要按索引遍历消息；
+后续可以逐步把工具注册表、事件缓冲、任务调度和 Prompt 拼接迁移到这些基础模块上。
 
 macOS 桌面层按职责拆分：`macos/launcher.m` 负责窗口和进程，`macos/secret_store.m` 负责凭据，
 `macos/chat_view.m` 与 `macos/renderer/` 负责对话和 Markdown 渲染。`.app` 启动
