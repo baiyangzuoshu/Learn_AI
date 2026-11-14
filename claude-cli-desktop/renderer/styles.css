@@ -152,6 +152,12 @@ kbd { display: inline-block; border: 1px solid rgba(142,154,149,.22); border-rad
 .assistant-activity-copy { display: grid; min-width: 0; gap: 2px; }
 .assistant-activity-title { color: #68786b; font-size: 10px; font-weight: 650; }
 .assistant-activity-details { color: #9aa49c; font-size: 9px; overflow-wrap: anywhere; }
+.assistant-activity-progress { margin-top: 3px; padding-left: 7px; border-left: 1px solid #dce8dc; }
+.assistant-activity-progress-title { color: #798a7b; font-size: 9px; font-weight: 650; }
+.assistant-activity-progress-list { display: grid; gap: 2px; margin: 2px 0 0; padding: 0; list-style: none; }
+.assistant-activity-progress-list li { display: flex; gap: 5px; color: #9aa49c; font-size: 9px; overflow-wrap: anywhere; }
+.assistant-activity-progress-list li.current { color: #66846a; font-weight: 600; }
+.assistant-activity-progress-marker { width: 9px; flex: 0 0 9px; text-align: center; color: #8eaa91; }
 .assistant-activity-compaction { color: #688d6d; font-weight: 600; }
 .assistant-activity-compaction.failed { color: #b46a59; }
 @keyframes activity-pulse { 50% { opacity: .45; box-shadow: 0 0 0 5px rgba(118,167,123,.06); } }

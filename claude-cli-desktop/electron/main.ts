@@ -24,6 +24,7 @@ import {
   renameSession,
   setAssistantAutoCompaction,
   setAssistantActivitySummary,
+  setAssistantProgressSummary,
   setAssistantDuration,
   validateSettings,
   writeApiKey,
@@ -39,6 +40,8 @@ const MAX_PROMPT_LENGTH = 30_000;
 const MAX_PERMISSION_PREVIEW = 5_000;
 const MAX_AGENTIC_TURNS = 40;
 const TOOL_IDLE_TIMEOUT_MS = 10 * 60_000;
+const MAX_PROGRESS_SUMMARIES = 6;
+const MAX_PROGRESS_SUMMARY_LENGTH = 220;
 const appDataDirectory = join(app.getPath("appData"), "Claude CLI Studio");
 
 interface ActiveTurn {
@@ -51,6 +54,7 @@ interface ActiveTurn {
   query?: ReturnType<typeof query>;
   stopRequested: boolean;
   toolActionCounts: Map<string, number>;
+  progressSummary: string[];
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
   task: Promise<void>;
@@ -163,15 +167,61 @@ function recordToolAction(active: ActiveTurn, toolName: string): { action: strin
   return { action, total, summary: summarizeToolActions(active.toolActionCounts) };
 }
 
+function describeToolProgress(toolName: string): string {
+  switch (toolName) {
+    case "Glob":
+    case "LS": return "定位相关文件";
+    case "Read": return "阅读相关实现";
+    case "Grep": return "检索调用关系";
+    case "Bash": return "核对项目状态";
+    case "Edit":
+    case "Write":
+    case "NotebookEdit": return "落实代码修改";
+    case "WebSearch":
+    case "WebFetch": return "查阅相关资料";
+    default: return "继续核查任务";
+  }
+}
+
+function removeProgressMarkerLines(value: string): string {
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !line.trimStart().startsWith("【进度】"))
+    .join("\n")
+    .trim();
+}
+
+function recordProgressSummary(active: ActiveTurn, value: string, apiKey?: string): void {
+  const summary = sanitizeDiagnosticText(value, apiKey)
+    .replace(/^【进度】\s*/, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_PROGRESS_SUMMARY_LENGTH);
+  if (!summary || active.progressSummary.includes(summary)) return;
+  active.progressSummary = [...active.progressSummary, summary].slice(-MAX_PROGRESS_SUMMARIES);
+  setAssistantProgressSummary(active.sessionId, active.messageId, active.progressSummary);
+  emit(active.senderId, {
+    type: "assistant-progress",
+    sessionId: active.sessionId,
+    messageId: active.messageId,
+    progressSummary: [...active.progressSummary],
+  });
+}
+
 function persistToolActivity(active: ActiveTurn): {
   summary: string;
   count: number;
+  progressSummary: string[];
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
 } {
   const summary = summarizeToolActions(active.toolActionCounts);
   const count = Math.min(10_000, [...active.toolActionCounts.values()].reduce((sum, value) => sum + value, 0));
   if (count > 0) setAssistantActivitySummary(active.sessionId, active.messageId, summary, count);
+  if (active.progressSummary.length > 0) {
+    setAssistantProgressSummary(active.sessionId, active.messageId, active.progressSummary);
+  }
   if (active.autoCompactionCount > 0 && active.lastAutoCompaction) {
     setAssistantAutoCompaction(
       active.sessionId,
@@ -183,6 +233,7 @@ function persistToolActivity(active: ActiveTurn): {
   return {
     summary,
     count,
+    progressSummary: [...active.progressSummary],
     autoCompactionCount: active.autoCompactionCount,
     ...(active.lastAutoCompaction ? { lastAutoCompaction: active.lastAutoCompaction } : {}),
   };
@@ -191,16 +242,19 @@ function persistToolActivity(active: ActiveTurn): {
 function activityEventFields(activity: {
   summary: string;
   count: number;
+  progressSummary: string[];
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
 }): {
   activitySummary?: string;
   activityCount?: number;
+  progressSummary?: string[];
   autoCompactionCount?: number;
   lastAutoCompaction?: AutoCompactionRecord;
 } {
   return {
     ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+    ...(activity.progressSummary.length > 0 ? { progressSummary: activity.progressSummary } : {}),
     ...(activity.autoCompactionCount > 0
       ? {
         autoCompactionCount: activity.autoCompactionCount,
@@ -474,6 +528,7 @@ function registerHandlers(): void {
         assistantMessageId,
         startedAt,
         text: text.trim(),
+        progressSummary: ["梳理任务目标"],
       });
 
       const active: ActiveTurn = {
@@ -485,6 +540,7 @@ function registerHandlers(): void {
         abortController: new AbortController(),
         stopRequested: false,
         toolActionCounts: new Map(),
+        progressSummary: ["梳理任务目标"],
         autoCompactionCount: 0,
         task: Promise.resolve(),
       };
@@ -603,6 +659,11 @@ async function runTurn(
         abortController: active.abortController,
         ...(isFirstTurn ? { sessionId: active.sessionId } : { resume: active.sessionId }),
         model: settings.model,
+        systemPrompt: {
+          type: "preset",
+          preset: "claude_code",
+          append: "For multi-step tasks, before a major batch of tools, provide one brief, user-facing progress update in the user's language, prefixed with 【进度】. Describe the next action or a confirmed finding in one concise sentence. These updates are status summaries, not hidden chain-of-thought. Never reveal private reasoning, credentials, full tool inputs, or shell commands.",
+        },
         permissionMode: "default",
         canUseTool: makePermissionHandler(active),
         includePartialMessages: true,
@@ -618,6 +679,65 @@ async function runTurn(
     let finalError: string | undefined;
     let finalStopReason: string | null | undefined;
     let awaitingToolResult = false;
+    const progressPrefix = "【进度】";
+    let textRoute: "probing" | "answer" | "progress" | "closed" = "probing";
+    let textProbe = "";
+    let progressText = "";
+    let assistantTextHandled = false;
+    const appendVisibleText = (text: string): void => {
+      if (!text) return;
+      streamedText += text;
+      appendAssistantText(active.sessionId, active.messageId, text);
+      emit(active.senderId, {
+        type: "text-delta",
+        sessionId: active.sessionId,
+        messageId: active.messageId,
+        text,
+      });
+      assistantTextHandled = true;
+    };
+    const finalizeStreamText = (stopReason?: string | null): void => {
+      if (textRoute === "closed") return;
+      if (textRoute === "progress") {
+        const lines = progressText.split(/\r?\n/);
+        const progressLine = lines.shift() ?? "";
+        if (progressLine.trim()) recordProgressSummary(active, progressLine, apiKey);
+        appendVisibleText(lines.join("\n").trim());
+        assistantTextHandled = Boolean(progressLine.trim());
+      } else if (textRoute === "probing") {
+        if (stopReason === "tool_use" && textProbe.trim()) {
+          recordProgressSummary(active, textProbe, apiKey);
+          assistantTextHandled = true;
+        } else {
+          appendVisibleText(textProbe);
+        }
+      }
+      textProbe = "";
+      progressText = "";
+      textRoute = "closed";
+    };
+    const handleTextDelta = (text: string): void => {
+      if (textRoute === "closed") return;
+      if (textRoute === "answer") {
+        appendVisibleText(text);
+        return;
+      }
+      if (textRoute === "progress") {
+        progressText += text;
+        return;
+      }
+      textProbe += text;
+      const candidate = textProbe.trimStart();
+      if (candidate.length < progressPrefix.length && progressPrefix.startsWith(candidate)) return;
+      if (candidate.startsWith(progressPrefix)) {
+        textRoute = "progress";
+        progressText = candidate.slice(progressPrefix.length).replace(/^\s/, "");
+        return;
+      }
+      textRoute = "answer";
+      appendVisibleText(textProbe);
+      textProbe = "";
+    };
     resetIdleTimer(modelIdleTimeoutMs);
     for await (const message of currentQuery) {
       const isToolExecution = message.type === "assistant" &&
@@ -645,6 +765,14 @@ async function runTurn(
             "; delay=" + message.retry_delay_ms + "ms" +
             "; error=" + message.error,
         );
+      } else if (message.type === "system" && message.subtype === "task_progress") {
+        recordProgressSummary(active, message.summary || message.description, apiKey);
+      } else if (message.type === "system" && message.subtype === "task_started" && !message.skip_transcript) {
+        recordProgressSummary(active, `开始${message.description}`, apiKey);
+      } else if (message.type === "system" && message.subtype === "task_notification" && message.summary) {
+        recordProgressSummary(active, message.summary, apiKey);
+      } else if (message.type === "tool_use_summary") {
+        recordProgressSummary(active, message.summary, apiKey);
       } else if (
         message.type === "system" &&
         message.subtype === "status"
@@ -715,25 +843,37 @@ async function runTurn(
       }
       if (message.type === "stream_event") {
         const event = message.event;
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta" &&
-          typeof event.delta.text === "string"
-        ) {
-          streamedText += event.delta.text;
-          appendAssistantText(active.sessionId, active.messageId, event.delta.text);
-          emit(active.senderId, {
-            type: "text-delta",
-            sessionId: active.sessionId,
-            messageId: active.messageId,
-            text: event.delta.text,
-          });
+        if (event.type === "message_start") {
+          textRoute = "probing";
+          textProbe = "";
+          progressText = "";
+          assistantTextHandled = false;
+        } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          handleTextDelta(event.delta.text);
+        } else if (event.type === "message_delta" && event.delta.stop_reason) {
+          finalizeStreamText(event.delta.stop_reason);
+        } else if (event.type === "message_stop") {
+          finalizeStreamText();
         }
       } else if (message.type === "assistant") {
         if (message.error) log("error", "CLI assistant error: " + message.error);
+        const assistantText = message.message.content
+          .filter((block) => block.type === "text")
+          .map((block) => block.type === "text" ? block.text : "")
+          .join("\n")
+          .trim();
+        if (assistantText && !assistantTextHandled) {
+          if (isToolExecution || assistantText.startsWith(progressPrefix)) {
+            recordProgressSummary(active, assistantText, apiKey);
+            assistantTextHandled = true;
+          } else {
+            appendVisibleText(assistantText);
+          }
+        }
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
             const activity = recordToolAction(active, block.name);
+            recordProgressSummary(active, describeToolProgress(block.name), apiKey);
             log("info", `Claude 正在${activity.action} · 已发起 ${activity.total} 项操作`);
             emit(active.senderId, {
               type: "tool-call",
@@ -747,18 +887,12 @@ async function runTurn(
             if (/API Error|Model is unavailable|HTTP\s+[45]\d{2}/i.test(block.text)) {
               log("error", "CLI 模型/API 错误: " + block.text);
             }
-            if (!streamedText) {
-              streamedText = block.text;
-              appendAssistantText(active.sessionId, active.messageId, block.text);
-              emit(active.senderId, {
-                type: "text-delta",
-                sessionId: active.sessionId,
-                messageId: active.messageId,
-                text: block.text,
-              });
-            }
           }
         }
+        textRoute = "closed";
+        textProbe = "";
+        progressText = "";
+        assistantTextHandled = false;
       } else if (message.type === "result") {
         reportedDurationMs = message.duration_ms;
         finalStopReason = message.stop_reason;
@@ -785,7 +919,10 @@ async function runTurn(
       }
     }
     flushStderr();
-    if (!finalError && !active.stopRequested && !idleTimedOut && !finalResult && !streamedText) {
+  if (
+    !finalError && !active.stopRequested && !idleTimedOut &&
+    !removeProgressMarkerLines(finalResult) && !streamedText
+  ) {
       finalResult = "Claude Code CLI 已完成工具操作，但没有返回文字回复。请查看运行日志中的 resultChars 和 stopReason。";
       appendAssistantText(active.sessionId, active.messageId, finalResult);
       log(
@@ -796,6 +933,9 @@ async function runTurn(
     }
     const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
     setAssistantDuration(active.sessionId, active.messageId, durationMs);
+    if (!active.stopRequested && !idleTimedOut && !finalError) {
+      recordProgressSummary(active, "整理结果并回复", apiKey);
+    }
     const activity = persistToolActivity(active);
     await persistSessions();
     if (active.stopRequested) {
@@ -841,7 +981,7 @@ async function runTurn(
       sessionId: active.sessionId,
       messageId: active.messageId,
       durationMs,
-      result: finalResult || streamedText,
+      result: streamedText || removeProgressMarkerLines(finalResult),
       ...activityEventFields(activity),
     });
   } catch (error) {

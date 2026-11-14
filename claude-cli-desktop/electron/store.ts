@@ -10,6 +10,8 @@ const LEGACY_SECRET_FILE = "secrets/deepseek-api-key.bin";
 const MAX_SESSIONS = 80;
 const MAX_MESSAGES_PER_SESSION = 160;
 const MAX_MESSAGE_LENGTH = 60_000;
+const MAX_PROGRESS_SUMMARIES = 6;
+const MAX_PROGRESS_SUMMARY_LENGTH = 220;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: "https://api.deepseek.com/anthropic",
@@ -193,6 +195,21 @@ export function setAssistantActivitySummary(
   if (session) session.updatedAt = new Date().toISOString();
 }
 
+export function setAssistantProgressSummary(
+  sessionId: string,
+  messageId: string,
+  progressSummary: string[],
+): void {
+  const message = getSession(sessionId)?.messages.find((candidate) => candidate.id === messageId);
+  if (!message || message.role !== "assistant" || !Array.isArray(progressSummary)) return;
+  message.progressSummary = progressSummary
+    .filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    .slice(-MAX_PROGRESS_SUMMARIES)
+    .map((entry) => entry.trim().slice(0, MAX_PROGRESS_SUMMARY_LENGTH));
+  const session = getSession(sessionId);
+  if (session) session.updatedAt = new Date().toISOString();
+}
+
 export function setAssistantAutoCompaction(
   sessionId: string,
   messageId: string,
@@ -313,6 +330,14 @@ async function readSessions(): Promise<StoredSession[]> {
             ...(typeof record.activityCount === "number" && Number.isSafeInteger(record.activityCount) &&
                 record.activityCount >= 0 && record.activityCount <= 10_000
               ? { activityCount: record.activityCount }
+              : {}),
+            ...(Array.isArray(record.progressSummary)
+              ? {
+                progressSummary: record.progressSummary
+                  .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+                  .slice(-MAX_PROGRESS_SUMMARIES)
+                  .map((entry) => entry.trim().slice(0, MAX_PROGRESS_SUMMARY_LENGTH)),
+              }
               : {}),
             ...(typeof record.autoCompactionCount === "number" && Number.isSafeInteger(record.autoCompactionCount) &&
                 record.autoCompactionCount > 0 && record.autoCompactionCount <= 10_000

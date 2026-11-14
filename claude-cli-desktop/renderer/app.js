@@ -182,6 +182,33 @@ function renderAssistantActivity(messageId, activity) {
     details.textContent = `${running ? "已发起：" : "操作概览："}${activity.summary}`;
     copy.append(details);
   }
+  const progressSummary = Array.isArray(activity.progressSummary)
+    ? activity.progressSummary.filter((step) => typeof step === "string" && step.trim()).slice(-6)
+    : [];
+  if (progressSummary.length) {
+    const progress = document.createElement("div");
+    progress.className = "assistant-activity-progress";
+    const heading = document.createElement("strong");
+    heading.className = "assistant-activity-progress-title";
+    heading.textContent = "思路进度";
+    const list = document.createElement("ol");
+    list.className = "assistant-activity-progress-list";
+    progressSummary.forEach((step, index) => {
+      const item = document.createElement("li");
+      const marker = document.createElement("span");
+      marker.className = "assistant-activity-progress-marker";
+      const current = running && index === progressSummary.length - 1;
+      const completed = activity.status === "complete" || activity.status === "stored";
+      marker.textContent = current ? "›" : completed ? "✓" : "·";
+      const text = document.createElement("span");
+      text.textContent = step;
+      if (current) item.className = "current";
+      item.append(marker, text);
+      list.append(item);
+    });
+    progress.append(heading, list);
+    copy.append(progress);
+  }
   let compactionText = "";
   if (activity.compactionStatus === "compacting") compactionText = "正在压缩上下文…";
   else if (activity.compactionStatus === "failed") compactionText = "上下文压缩未完成 · 查看运行日志";
@@ -216,6 +243,7 @@ function finishAssistantActivity(event) {
     status,
     summary,
     total,
+    progressSummary: event.progressSummary ?? previous?.progressSummary ?? [],
     autoCompactionCount: event.autoCompactionCount ?? previous?.autoCompactionCount ?? 0,
     lastAutoCompaction: event.lastAutoCompaction ?? previous?.lastAutoCompaction,
   });
@@ -753,11 +781,12 @@ function renderStoredMessage(message) {
     const timing = state.turnTimingsByMessage.get(message.id);
     if (timing) renderMessageDuration(message.id, Date.now() - timing.startedAt, true);
     else if (typeof message.durationMs === "number") renderMessageDuration(message.id, message.durationMs);
-    if (message.activitySummary || message.autoCompactionCount) {
+    if (message.activitySummary || message.progressSummary?.length || message.autoCompactionCount) {
       renderAssistantActivity(message.id, {
         status: "stored",
         summary: message.activitySummary,
         total: message.activityCount ?? 0,
+        progressSummary: message.progressSummary ?? [],
         autoCompactionCount: message.autoCompactionCount ?? 0,
         lastAutoCompaction: message.lastAutoCompaction,
       });
@@ -862,6 +891,7 @@ async function handleAppEvent(event) {
       currentAction: "",
       total: 0,
       summary: "",
+      progressSummary: event.progressSummary ?? ["梳理任务目标"],
       autoCompactionCount: 0,
       compactionStatus: "idle",
     });
@@ -905,6 +935,25 @@ async function handleAppEvent(event) {
       currentAction: event.action,
       total: event.total,
       summary: event.activitySummary,
+      progressSummary: previous?.progressSummary ?? [],
+    };
+    state.activityByMessage.set(event.messageId, activity);
+    if (state.currentSessionId === event.sessionId) {
+      renderAssistantActivity(event.messageId, activity);
+      scrollToBottom();
+    }
+    return;
+  }
+  if (event.type === "assistant-progress") {
+    const previous = state.activityByMessage.get(event.messageId);
+    const activity = {
+      ...previous,
+      sessionId: event.sessionId,
+      status: previous?.status ?? "running",
+      currentAction: previous?.currentAction ?? "",
+      total: previous?.total ?? 0,
+      summary: previous?.summary ?? "",
+      progressSummary: event.progressSummary,
     };
     state.activityByMessage.set(event.messageId, activity);
     if (state.currentSessionId === event.sessionId) {

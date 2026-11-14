@@ -33,8 +33,7 @@ Each request is limited to 40 agentic turns. On macOS, if the model produces no 
 
 The bottom of the conversation view shows in-memory runtime diagnostics for the selected session, including CLI stderr, API retries, tool names, errors, timeouts, final stop reason, and returned text length. Entries are clipped and credential values are redacted before they are sent to the renderer. Logs can be copied or cleared and are not persisted. If the CLI reports success without returning text, Studio displays a visible fallback message instead of leaving an empty assistant response.
 
-Each assistant response displays a live elapsed timer while it is running and retains its final duration in the conversation history.
-When Claude Code automatically compacts the context, the response card shows the compression count and the most recent before/after token counts. This summary is retained with the conversation history.
+Each assistant response displays a live elapsed timer and concise progress steps while it is running. The response card retains its progress summary and final duration in the conversation history. When Claude Code automatically compacts the context, the card also shows the compression count and most recent before/after token counts.
 
 ## Build
 

@@ -23,6 +23,7 @@ export interface ChatMessage {
   durationMs?: number;
   activitySummary?: string;
   activityCount?: number;
+  progressSummary?: string[];
   autoCompactionCount?: number;
   lastAutoCompaction?: AutoCompactionRecord;
 }
@@ -44,14 +45,15 @@ export interface BootstrapData {
 
 export type AppEvent =
   | { type: "diagnostic-log"; sessionId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
-  | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; startedAt: number; text: string }
+  | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; startedAt: number; text: string; progressSummary?: string[] }
   | { type: "text-delta"; sessionId: string; messageId: string; text: string }
   | { type: "tool-call"; sessionId: string; messageId: string; action: string; total: number; activitySummary: string }
+  | { type: "assistant-progress"; sessionId: string; messageId: string; progressSummary: string[] }
   | { type: "context-compaction"; sessionId: string; messageId: string; phase: "starting" | "completed" | "failed"; trigger?: "auto" | "manual"; autoCompactionCount: number; preTokens?: number; postTokens?: number }
   | { type: "permission-request"; sessionId: string; requestId: string; toolUseId: string; toolName: string; inputPreview: string }
-  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
-  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
-  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord };
+  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord };
 
 export interface ClaudeStudioBridge {
   getBootstrap(): Promise<BootstrapData>;
