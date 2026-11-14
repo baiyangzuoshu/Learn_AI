@@ -33,6 +33,11 @@ function workerOutput(job: WorkerJob | null | undefined, jobs: WorkerJob[] = [])
 
 export const workerQueue: HarnessFeature = {
   id: "worker-queue",
+  capability: {
+    id: "teams",
+    title: "Teams",
+    description: "Delegate work to bounded agents, workers, and handoffs.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

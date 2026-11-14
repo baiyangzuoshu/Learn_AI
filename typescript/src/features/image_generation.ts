@@ -29,6 +29,11 @@ const definition: ToolDefinition = {
 
 export const imageGeneration: HarnessFeature = {
   id: "image-generation",
+  capability: {
+    id: "images",
+    title: "Image generation",
+    description: "Generate and edit images with configured providers.",
+  },
   register({ tools, prompts }) {
     tools.register(definition, async (input, context) => {
       const prompt = String(input.prompt ?? "").trim();

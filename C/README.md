@@ -1,9 +1,10 @@
-# C 第 1 课：Agent Loop
+# C 第 2 课：Tool Use
 
-这一课把 `stages/s01_agent_loop` 的最小闭环迁移到 C：
+这一课在第 1 课 Agent Loop 的基础上，把 `stages/s02_tool_use` 的工具注册机制迁移到 C。
+新增工具只需要提供定义和 Handler，Agent 主循环不增加工具条件分支：
 
 ```text
-用户 → DeepSeek → bash tool_call → Shell → tool result → DeepSeek → 最终回答
+用户 → DeepSeek → Tool Registry → Handler → tool result → DeepSeek → 最终回答
 ```
 
 ## 模块结构
@@ -26,6 +27,7 @@ C/
 │   ├── http.h        # libcurl HTTP 传输
 │   ├── messages.h    # 消息和 tool call 模型
 │   ├── shell_tool.h  # Bash 工具
+│   ├── file_tool.h   # read/write/edit 文件工具
 │   └── tool.h        # Tool Registry
 ├── src/
 │   ├── agent.c
@@ -33,6 +35,7 @@ C/
 │   ├── http.c
 │   ├── main.c
 │   ├── messages.c
+│   ├── file_tool.c
 │   ├── shell_tool.c
 │   └── tool.c
 ├── tests/
@@ -58,6 +61,19 @@ C/
 核心代码已经开始使用这些容器：`MessageList` 使用 `Vector` 保存消息指针，`ToolRegistry`
 使用 `HashMap` 做名称查找并用 `Vector` 保留注册顺序，多工具调用使用 `Queue` 顺序执行，
 命令行参数、Shell 命令和 DeepSeek URL 使用 `StringBuilder` 拼接。
+
+## Tool Use
+
+当前 Registry 注册 4 个工具：
+
+- `bash`：在当前工作目录执行 Shell 命令。
+- `read_file`：读取工作区内的 UTF-8 文本文件，可限制行数。
+- `write_file`：写入工作区内的 UTF-8 文本文件，自动创建工作区内的父目录。
+- `edit_file`：只替换唯一匹配的文本片段，匹配 0 次或多次都会返回错误。
+
+文件工具会拒绝绝对路径、`..` 路径穿越和工作区外的符号链接；单次工具输出限制为
+`50,000` 字节，输入文件限制为 `10 MB`。工具失败也会作为 `Error: ...` 结果回填消息历史，
+让模型能够观察并修正失败，而不是破坏 Agent Loop。
 
 ```sh
 make test
@@ -129,4 +145,4 @@ make run QUERY="查看当前目录有哪些文件"
 - `DEEPSEEK_MODEL`，默认 `deepseek-chat`
 - `DEEPSEEK_BASE_URL`，默认 `https://api.deepseek.com`
 
-第 1 课只证明 Agent Loop 的最小闭环。权限审批、取消传播、持久化和更细的预算控制留到后续课程逐步加入。
+第 2 课只增加 Tool Registry 和文件工具；权限审批、Hook、取消传播、持久化和更细的预算控制留到后续课程逐步加入。

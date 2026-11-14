@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>LinkDesk</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header><div class="brand"><span class="logo">↗</span> LinkDesk <small>远程连接，自在协作</small></div><span id="badge" class="badge">未上线</span></header>
+    <main>
+      <section id="setup" class="setup">
+        <div
+          class="intro"><span class="eyebrow">REMOTE DESKTOP / 01</span><h1>让距离，<br>留在屏幕之外。</h1><p>连接另一台电脑，实时查看画面，<br>在对方允许后使用键盘与鼠标。</p></div>
+        <div class="cards">
+          <article><span class="eyebrow">这台设备</span><h2>等待远程连接</h2>
+          <div class="code" id="myCode">— — —</div><div class="password-row"><span>临时密码</span><strong id="myPassword">上线后生成</strong></div>
+          <p class="hint">每次上线生成新密码。每次连接均需要本机确认。</p>
+        </article>
+          <article><span class="eyebrow">另一台设备</span><h2>开始远程连接</h2>
+          <form id="connectForm"><label>设备编号<input id="targetCode" placeholder="输入 9 位设备编号" autocomplete="off" maxlength="11" required></label>
+          <label>临时密码<input id="targetPassword" type="password" placeholder="对方设备显示的临时密码" autocomplete="off" maxlength="64" required></label>
+          <button id="connectButton" disabled>连接设备 <span>↗</span></button></form>
+        </article>
+        </div>
+        <details id="settings" open>
+          <summary>连接设置</summary>
+          <div class="settings-grid">
+            <label>设备名称<input id="deviceName" value="我的电脑" maxlength="60"></label>
+            <label>信令服务<input id="address" value="https://127.0.0.1:9443" placeholder="https://relay.example.com:9443"></label>
+            <label
+              class="wide">证书 SHA-256 指纹<input id="fingerprint" placeholder="自签名证书必填；受信任证书可留空" autocomplete="off" maxlength="120"></label>
+            <label
+              class="wide">跨网络连接设置（可选）<textarea id="ice" rows="2" placeholder='STUN / TURN 配置，例如 [{"urls":"stun:你的服务器:3478"}]'></textarea></label>
+          </div>
+          <div
+            class="settings-actions"><span>两台设备需连接同一个信令服务</span><button id="onlineButton">上线</button><button id="offlineButton" class="secondary" disabled>下线</button></div>
+        </details>
+      </section>
+      <section id="session" hidden>
+        <div
+          class="session-toolbar"><div><strong id="sessionTitle">正在连接</strong><span id="sessionHint">正在建立加密通道</span></div><button id="stopButton" class="danger">断开连接</button></div>
+        <div class="video-stage">
+          <video id="video" autoplay playsinline muted tabindex="0"></video>
+          <div id="videoHint">等待远程画面…</div>
+        </div>
+        <div
+          class="session-foot"><span id="controlHint">查看模式</span><span>结束连接：⌘ / Ctrl + Shift + Esc</span></div>
+      </section>
+      <aside id="request"
+        hidden><span class="eyebrow">收到连接请求</span><h2 id="requestTitle"></h2><p>选择共享的屏幕，并决定是否允许键鼠控制。</p><div id="screens"></div><label class="check"><input id="allowControl" type="checkbox" checked>允许对方使用键盘与鼠标</label><div class="request-actions"><button id="rejectButton" class="secondary">拒绝</button><button id="acceptButton">允许连接</button></div></aside>
+    </main>
+    <footer><span id="status" role="status" aria-live="polite">配置连接服务后上线</span><span>LinkDesk · 原型 0.1</span></footer>
+    <script src="app.js"></script>
+  </body>
+</html>

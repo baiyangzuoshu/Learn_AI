@@ -38,6 +38,11 @@ function compact(record: MemoryRecord): Record<string, unknown> {
 
 export const memoryRag: HarnessFeature = {
   id: "memory-rag",
+  capability: {
+    id: "productivity",
+    title: "Planning and memory",
+    description: "Todos, task graphs, and durable memory tools.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

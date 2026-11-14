@@ -20,6 +20,20 @@ const def = (
   type: "function",
   function: { name, description, parameters: { type: "object", properties, required } },
 });
+const loadedSkillSessions = new Map<string, Set<string>>();
+const SKILL_SESSION_CACHE_LIMIT = 128;
+
+function skillDescription(content: string): string {
+  const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  const frontmatterDescription = frontmatter?.[1]?.match(/^description:\s*(.+)$/mi)?.[1]
+    ?.trim().replace(/^['"]|['"]$/g, "");
+  if (frontmatterDescription) return frontmatterDescription.slice(0, 240);
+  const heading = content.split(/\r?\n/).find((line) => /^#\s+/.test(line));
+  const paragraph = content.split(/\r?\n\s*\r?\n/)
+    .map((block) => block.replace(/\r?\n/g, " ").trim())
+    .find((block) => block && !block.startsWith("#") && !block.startsWith("---"));
+  return (heading?.replace(/^#\s+/, "") || paragraph || "Workspace skill").slice(0, 240);
+}
 //
 async function key(workspace: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(workspace));
@@ -43,6 +57,11 @@ async function writeData(path: string, content: string) {
 //
 export const productivity: HarnessFeature = {
   id: "productivity",
+  capability: {
+    id: "productivity",
+    title: "Planning and memory",
+    description: "Todos, task graphs, and durable memory tools.",
+  },
   register({ tools, prompts }) {
     //todo_write
     tools.register(
@@ -63,6 +82,8 @@ export const productivity: HarnessFeature = {
         return records.map((record) => `- ${record.text}`).join("\n") ||
           "(project memory is empty)";
       },
+      undefined,
+      { deprecated: true },
     );
     //memory_append (deprecated compatibility alias)
     tools.register(
@@ -79,6 +100,8 @@ export const productivity: HarnessFeature = {
         }, context.signal);
         return `[Deprecated] Project memory updated via memory_service (${record.id})`;
       },
+      undefined,
+      { deprecated: true },
     );
     //memory_replace (deprecated compatibility alias)
     tools.register(
@@ -95,6 +118,8 @@ export const productivity: HarnessFeature = {
         }, context.signal);
         return `[Deprecated] Project memory replaced via memory_service (${record.id})`;
       },
+      undefined,
+      { deprecated: true },
     );
     //task_graph_read
     tools.register(
@@ -135,9 +160,13 @@ export const productivity: HarnessFeature = {
     );
     //list_skills
     tools.register(
-      def("list_skills", "List workspace skills without loading them", {}),
+      def(
+        "list_skills",
+        "List workspace skill names and short descriptions without loading full instructions",
+        {},
+      ),
       async (_input, context) => {
-        const names: string[] = [];
+        const skills: Array<{ name: string; description: string }> = [];
         for (const root of ["skills", ".agents/skills", ".codex/skills"]) {
           try {
             for (
@@ -145,9 +174,11 @@ export const productivity: HarnessFeature = {
             ) {
               if (entry.isDirectory()) {
                 try {
-                  if (
-                    (await stat(`${context.workspace}/${root}/${entry.name}/SKILL.md`)).isFile()
-                  ) names.push(entry.name);
+                  const path = `${context.workspace}/${root}/${entry.name}/SKILL.md`;
+                  if ((await stat(path)).isFile()) {
+                    const content = (await readFile(path, "utf8")).slice(0, 8_000);
+                    skills.push({ name: entry.name, description: skillDescription(content) });
+                  }
                 } catch { /* missing */ }
               }
             }
@@ -155,27 +186,53 @@ export const productivity: HarnessFeature = {
             if (!isNotFound(error)) throw error;
           }
         }
-        return [...new Set(names)].sort().join("\n") || "(no workspace skills found)";
+        const unique = new Map(skills.map((skill) => [skill.name, skill]));
+        return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name))
+          .map((skill) => `${skill.name} — ${skill.description}`)
+          .join("\n") || "(no workspace skills found)";
       },
+      undefined,
+      { group: "core" },
     );
     //load_skill
     tools.register(
-      def("load_skill", "Load one workspace SKILL.md", { name: { type: "string" } }, ["name"]),
+      def(
+        "load_skill",
+        "Load a workspace skill's full instructions once per session",
+        { name: { type: "string" } },
+        ["name"],
+      ),
       async (input, context) => {
         const name = String(input.name ?? "");
         if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error("invalid skill name");
+        const cacheKey = `${context.workspace}\0${context.sessionId}`;
+        let loaded = loadedSkillSessions.get(cacheKey);
+        if (!loaded) {
+          loaded = new Set<string>();
+          loadedSkillSessions.set(cacheKey, loaded);
+          while (loadedSkillSessions.size > SKILL_SESSION_CACHE_LIMIT) {
+            loadedSkillSessions.delete(loadedSkillSessions.keys().next().value!);
+          }
+        }
+        if (loaded.has(name)) {
+          return `Skill ${name} is already loaded in this session; reuse the instructions already in context.`;
+        }
         for (const root of ["skills", ".agents/skills", ".codex/skills"]) {
           try {
-            return (await readFile(`${context.workspace}/${root}/${name}/SKILL.md`, "utf8")).slice(
-              0,
-              50_000,
-            );
+            const content = (await readFile(
+              `${context.workspace}/${root}/${name}/SKILL.md`,
+              "utf8",
+            )).slice(0, 50_000);
+            loaded.add(name);
+            return content;
           } catch (error) {
             if (!isNotFound(error)) throw error;
           }
         }
         throw new Error(`skill not found: ${name}`);
       },
+      undefined,
+      { group: "core" },
     );
     //
     prompts.register({

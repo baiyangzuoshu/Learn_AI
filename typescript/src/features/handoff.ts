@@ -42,6 +42,11 @@ function output(record: HandoffRecord | null, records: HandoffRecord[] = []): st
 
 export const handoff: HarnessFeature = {
   id: "handoff",
+  capability: {
+    id: "teams",
+    title: "Teams",
+    description: "Delegate work to bounded agents, workers, and handoffs.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition("handoff_submit", "Submit a tenant-scoped, trace-linked A2A handoff", {

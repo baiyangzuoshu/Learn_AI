@@ -16,12 +16,14 @@ import { memoryRag } from "./features/memory_rag.ts";
 import { research } from "./features/research.ts";
 import { evaluation } from "./features/evaluation.ts";
 import { securityBoundary } from "./features/security_boundary.ts";
+import { toolResults } from "./features/tool_results.ts";
 import type { Message } from "./core/types.ts";
 import type { HarnessEvent, PermissionMode, RunOptions } from "./contracts.ts";
 
 export const harness = new AgentRuntime([
   diagnostics,
   runtimeLimits,
+  toolResults,
   pdfReader,
   coreTools,
   productivity,
@@ -62,9 +64,11 @@ export async function agentLoop(
   providerId?: string,
   budget?: RunOptions["budget"],
   principal?: RunOptions["principal"],
+  sessionId?: RunOptions["sessionId"],
 ): Promise<string> {
   return await harness.run({
     query,
+    sessionId,
     providerId,
     model,
     history,
@@ -96,13 +100,23 @@ export type {
   RunBudget,
   RunBudgetSnapshot,
   RunOptions,
+  TokenInputComponent,
+  TokenUsageSnapshot,
 } from "./contracts.ts";
-export type { ToolPolicy, ToolRisk } from "./contracts.ts";
+export type {
+  CapabilityDefinition,
+  HarnessFeature,
+  ToolPolicy,
+  ToolRegistrationMetadata,
+  ToolRisk,
+} from "./contracts.ts";
+export type { ProviderTokenUsage } from "./core/types.ts";
 export {
   BudgetExceededError,
   DEFAULT_RUN_BUDGET,
   resolveRunBudget,
   RuntimeBudget,
+  RunTokenUsage,
 } from "./contracts.ts";
 export { TraceBook } from "./trace.ts";
 export type { TraceSpan, TraceStatus, TraceSummary } from "./trace.ts";

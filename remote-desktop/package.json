@@ -1,0 +1,20 @@
+{
+  "name": "linkdesk-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Attended remote desktop prototype for macOS and Windows",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "node scripts/run.cjs",
+    "relay": "node server/cli.cjs",
+    "certificate": "node scripts/certificate.cjs",
+    "build": "node scripts/build.cjs",
+    "dist:mac": "node scripts/package.cjs mac",
+    "dist:win": "node scripts/package.cjs win",
+    "test": "node --test test/*.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "37.10.3",
+    "electron-builder": "26.15.3"
+  }
+}

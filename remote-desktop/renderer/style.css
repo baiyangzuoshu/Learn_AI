@@ -1,0 +1,367 @@
+:root {
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+  color: #e8eef8;
+  background: #111827;
+  font-size: 14px;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+textarea {
+  font: inherit;
+}
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 19px;
+  background: #98f4c4;
+  color: #13251b;
+  font-weight: 650;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+button.secondary {
+  background: #293448;
+  color: #d8e2f0;
+}
+.danger {
+  background: #ff6e7f;
+  color: #30111a;
+}
+input,
+textarea {
+  width: 100%;
+  background: #111a29;
+  border: 1px solid #344056;
+  border-radius: 9px;
+  padding: 12px;
+  color: #fff;
+  outline: none;
+}
+input:focus,
+textarea:focus {
+  border-color: #98f4c4;
+}
+label {
+  display: block;
+  color: #aebbd0;
+  font-size: 12px;
+}
+label input,
+label textarea {
+  margin-top: 8px;
+}
+header {
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px;
+  border-bottom: 1px solid #263246;
+}
+.brand {
+  font-size: 21px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand small {
+  font-size: 12px;
+  color: #8191a9;
+  margin-left: 10px;
+  font-weight: 400;
+}
+.logo {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  background: #98f4c4;
+  color: #172a22;
+  border-radius: 11px;
+  font-size: 25px;
+}
+.badge {
+  border: 1px solid #344056;
+  color: #9eaec4;
+  border-radius: 30px;
+  padding: 6px 13px;
+  font-size: 12px;
+}
+.badge.online {
+  color: #98f4c4;
+  border-color: #4b715f;
+}
+main {
+  max-width: 1240px;
+  margin: auto;
+  padding: 30px 36px 70px;
+}
+.intro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 26px;
+  align-items: center;
+}
+.intro .eyebrow {
+  grid-column: 1/-1;
+}
+.eyebrow {
+  font-size: 10px;
+  color: #98f4c4;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+.intro h1 {
+  font-size: 36px;
+  line-height: 1.25;
+  letter-spacing: -1px;
+  font-weight: 600;
+  margin: 14px 0 0;
+}
+.intro p {
+  color: #99aac2;
+  line-height: 1.8;
+  justify-self: end;
+}
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+article {
+  background: #1b2536;
+  border: 1px solid #2d394d;
+  border-radius: 16px;
+  padding: 25px;
+}
+h2 {
+  font-size: 19px;
+  margin: 13px 0 22px;
+}
+.code {
+  font-size: 36px;
+  letter-spacing: 3px;
+  color: #fff;
+  margin: 28px 0 20px;
+  font-weight: 600;
+}
+.password-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 0;
+  border-top: 1px solid #344056;
+  color: #99aac2;
+}
+.password-row strong {
+  font-family: monospace;
+  color: #98f4c4;
+  font-size: 16px;
+  user-select: all;
+}
+.hint {
+  font-size: 12px;
+  color: #8191a9;
+  line-height: 1.8;
+}
+form label + label {
+  margin-top: 14px;
+}
+form button {
+  width: 100%;
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+details {
+  margin-top: 24px;
+  background: #182233;
+  border: 1px solid #2c374b;
+  border-radius: 12px;
+  padding: 15px 20px;
+}
+summary {
+  cursor: pointer;
+  color: #bac7db;
+  font-size: 12px;
+}
+.settings-grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.wide {
+  grid-column: 1/-1;
+}
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+.settings-actions span {
+  font-size: 11px;
+  color: #7e91ab;
+  margin-right: auto;
+}
+.settings-actions button {
+  padding: 9px 17px;
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  height: 38px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111827;
+  border-top: 1px solid #293549;
+  padding: 0 36px;
+  color: #90a2bb;
+  font-size: 11px;
+}
+#status.error {
+  color: #ff9daa;
+}
+.session-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.session-toolbar strong {
+  font-size: 18px;
+}
+.session-toolbar span {
+  display: block;
+  color: #92a5bf;
+  font-size: 12px;
+  margin-top: 7px;
+}
+.video-stage {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 270px);
+  background: #090f19;
+  border: 1px solid #2d3d55;
+  border-radius: 12px;
+  overflow: hidden;
+}
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  outline: 0;
+  cursor: default;
+}
+video:focus {
+  box-shadow: inset 0 0 0 2px #98f4c4;
+}
+#videoHint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #8195b0;
+  pointer-events: none;
+}
+.session-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 13px;
+  font-size: 12px;
+  color: #8ca3bf;
+}
+#request {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  background: #1b283b;
+  border: 1px solid #5a786d;
+  border-radius: 20px;
+  padding: 30px;
+  width: 520px;
+  max-width: 90vw;
+  box-shadow: 0 0 0 100vmax #0009;
+  z-index: 2;
+}
+#request p {
+  color: #93a8c3;
+  font-size: 12px;
+}
+#screens {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  margin: 20px 0;
+}
+.screen-option {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border: 2px solid #394b63;
+  border-radius: 10px;
+  cursor: pointer;
+  min-width: 150px;
+}
+.screen-option img {
+  width: 150px;
+  height: 85px;
+  object-fit: contain;
+}
+.screen-option.selected {
+  border-color: #98f4c4;
+}
+.screen-option input {
+  width: auto;
+  margin: 0;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.check input {
+  width: auto;
+  margin: 0;
+}
+.request-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+[hidden] {
+  display: none!important;
+}
+@media (max-width:850px) {
+  .intro h1 {
+    font-size: 29px;
+  }
+  .brand small {
+    display: none;
+  }
+  main {
+    padding: 24px 24px 70px;
+  }
+  article {
+    padding: 20px;
+  }
+  .code {
+    font-size: 28px;
+  }
+}

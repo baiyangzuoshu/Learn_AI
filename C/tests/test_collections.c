@@ -1,3 +1,4 @@
+#include "file_tool.h"
 #include "list.h"
 #include "hash_map.h"
 #include "json.h"
@@ -14,6 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static int *new_int(int value) {
     int *item = malloc(sizeof(*item));
@@ -146,6 +149,44 @@ static void test_json(void) {
     json_destroy(root);
 }
 
+static void test_file_tools(void) {
+    char workspace[512];
+    snprintf(workspace, sizeof(workspace), "/tmp/c-agent-file-tools-%ld", (long)getpid());
+    assert(mkdir(workspace, 0700) == 0);
+
+    FileTools tools;
+    assert(file_tools_init(&tools, workspace) == 0);
+    ToolDefinition read_definition = file_read_definition(&tools);
+    ToolDefinition write_definition = file_write_definition(&tools);
+    ToolDefinition edit_definition = file_edit_definition(&tools);
+    char output[512];
+
+    assert(write_definition.execute(
+               "{\"path\":\"notes/demo.txt\",\"content\":\"line one\\nline two\\n\"}", output,
+               sizeof(output), write_definition.context) == 0);
+    assert(strstr(output, "Wrote") != NULL);
+    assert(read_definition.execute("{\"path\":\"notes/demo.txt\",\"limit\":1}", output, sizeof(output),
+                                   read_definition.context) == 0);
+    assert(strcmp(output, "line one\n") == 0);
+    assert(edit_definition.execute(
+               "{\"path\":\"notes/demo.txt\",\"old_text\":\"line two\",\"new_text\":\"updated\"}",
+               output, sizeof(output), edit_definition.context) == 0);
+    assert(read_definition.execute("{\"path\":\"notes/demo.txt\"}", output, sizeof(output),
+                                   read_definition.context) == 0);
+    assert(strcmp(output, "line one\nupdated\n") == 0);
+    assert(read_definition.execute("{\"path\":\"../outside.txt\"}", output, sizeof(output),
+                                   read_definition.context) != 0);
+
+    char file_path[512];
+    snprintf(file_path, sizeof(file_path), "%s/notes/demo.txt", workspace);
+    unlink(file_path);
+    char notes_path[512];
+    snprintf(notes_path, sizeof(notes_path), "%s/notes", workspace);
+    rmdir(notes_path);
+    file_tools_free(&tools);
+    rmdir(workspace);
+}
+
 static void test_ring_buffer(void) {
     RingBuffer *buffer = ring_buffer_create(2, free);
     assert(buffer && ring_buffer_is_empty(buffer));
@@ -231,6 +272,7 @@ int main(void) {
     test_hash_map();
     test_string_builder();
     test_json();
+    test_file_tools();
     test_ring_buffer();
     test_priority_queue();
     test_message_list_and_tool_registry();

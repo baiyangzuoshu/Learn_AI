@@ -16,6 +16,12 @@ function definition(
 
 export const securityBoundary: HarnessFeature = {
   id: "security-boundary",
+  capability: {
+    id: "security",
+    title: "Security",
+    description: "Permission and safety constraints.",
+    alwaysAvailable: true,
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

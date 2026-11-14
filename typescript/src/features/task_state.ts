@@ -25,6 +25,11 @@ function taskOutput(task: TaskRecord): string {
 
 export const taskState: HarnessFeature = {
   id: "task-state",
+  capability: {
+    id: "productivity",
+    title: "Planning and memory",
+    description: "Todos, task graphs, and durable memory tools.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition("task_create", "Create a durable task ledger entry", {

@@ -2,6 +2,7 @@
 #define C_AGENT_AGENT_H
 
 #include "deepseek.h"
+#include "file_tool.h"
 #include "messages.h"
 #include "shell_tool.h"
 #include "tool.h"
@@ -29,6 +30,7 @@ typedef struct {
     MessageList messages;
     ToolRegistry tools;
     ShellTool shell_tool;
+    FileTools file_tools;
 } Agent;
 
 int agent_init(Agent *agent, const char *api_key, const char *base_url, const char *model, const char *workspace,

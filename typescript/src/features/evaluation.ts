@@ -43,6 +43,11 @@ function output(record: EvaluationRecord): string {
 
 export const evaluation: HarnessFeature = {
   id: "evaluation-ci",
+  capability: {
+    id: "evaluation",
+    title: "Evaluation",
+    description: "Run evaluation cases and inspect regressions.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

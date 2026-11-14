@@ -7,6 +7,14 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  contextWindowTokens?: number;
+  outputTokenReserve?: number;
+  safetyMarginTokens?: number;
+  compactionTargetRatio?: number;
+  tokenEstimator?: "multilingual-v1" | "conservative-v1";
+  contextSummaryInputTokens?: number;
+  contextSummaryOutputTokens?: number;
+  contextSummaryCallBudget?: number;
 }
 
 export interface ImageGenerationConfig {
@@ -23,5 +31,11 @@ export interface ModelProvider {
     messages: Message[],
     tools: ToolDefinition[],
     signal?: AbortSignal,
+    options?: ProviderRequestOptions,
   ): Promise<ChatResponse>;
+}
+
+/** Per-call controls supported by provider adapters. */
+export interface ProviderRequestOptions {
+  maxOutputTokens?: number;
 }

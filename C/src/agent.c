@@ -23,7 +23,8 @@ int agent_init(Agent *agent, const char *api_key, const char *base_url, const ch
     agent->provider.model = model;
     agent->workspace = copy_string(workspace);
     agent->options = options;
-    if (!agent->workspace || shell_tool_init(&agent->shell_tool, workspace) != 0) {
+    if (!agent->workspace || shell_tool_init(&agent->shell_tool, workspace) != 0 ||
+        file_tools_init(&agent->file_tools, workspace) != 0) {
         agent_free(agent);
         return -1;
     }
@@ -32,7 +33,8 @@ int agent_init(Agent *agent, const char *api_key, const char *base_url, const ch
         return -1;
     }
     static const char *prompt_format =
-        "You are a coding agent working in %s. Use the bash tool to inspect and modify this workspace. "
+        "You are a coding agent working in %s. Use read_file, write_file, and edit_file for precise file operations; "
+        "use bash for commands and inspection. "
         "Keep going until the user's task is complete. Return only the useful final response; do not expose "
         "internal reasoning or planning. Use concise Markdown with short headings, lists, tables, and code "
         "blocks only when they improve readability. Do not include raw tool output or incidental command "
@@ -45,7 +47,10 @@ int agent_init(Agent *agent, const char *api_key, const char *base_url, const ch
     }
     snprintf(prompt, prompt_length, prompt_format, workspace);
     int setup_failed = message_list_push_text(&agent->messages, MESSAGE_SYSTEM, prompt) != 0 ||
-                       tool_registry_add(&agent->tools, shell_tool_definition(&agent->shell_tool)) != 0;
+                       tool_registry_add(&agent->tools, shell_tool_definition(&agent->shell_tool)) != 0 ||
+                       tool_registry_add(&agent->tools, file_read_definition(&agent->file_tools)) != 0 ||
+                       tool_registry_add(&agent->tools, file_write_definition(&agent->file_tools)) != 0 ||
+                       tool_registry_add(&agent->tools, file_edit_definition(&agent->file_tools)) != 0;
     free(prompt);
     if (setup_failed) {
         agent_free(agent);
@@ -58,6 +63,7 @@ void agent_free(Agent *agent) {
     if (!agent) return;
     message_list_free(&agent->messages);
     tool_registry_free(&agent->tools);
+    file_tools_free(&agent->file_tools);
     shell_tool_free(&agent->shell_tool);
     free(agent->workspace);
     memset(agent, 0, sizeof(*agent));

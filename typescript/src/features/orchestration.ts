@@ -23,6 +23,11 @@ const teamContext = new AsyncLocalStorage<TeamContext>(), boards = new Map<strin
 
 export const orchestration: HarnessFeature = {
   id: "orchestration",
+  capability: {
+    id: "teams",
+    title: "Teams",
+    description: "Delegate work to bounded agents, workers, and handoffs.",
+  },
   register({ tools, prompts, run }) {
     //subagent
     tools.register(
@@ -35,6 +40,7 @@ export const orchestration: HarnessFeature = {
           run({
             query: `Complete only this focused task and return concise evidence.\n\n${task}`,
             workspace: context.workspace,
+            sessionId: context.sessionId,
             permissionMode: "ask",
             signal: context.signal,
             budget: context.budget.child({
@@ -107,6 +113,7 @@ export const orchestration: HarnessFeature = {
                       query:
                         `You are ${raw.role}. Work only on: ${raw.task}\nShared objective: ${objective}\nBroadcast important findings with team_send and read team_inbox before finalizing.`,
                       workspace: context.workspace,
+                      sessionId: context.sessionId,
                       permissionMode: "ask",
                       signal: context.signal,
                       budget: context.budget.child({
@@ -161,6 +168,7 @@ export const orchestration: HarnessFeature = {
                   results.join("\n")
                 }\nAct, verify, then emit [AUTONOMY_COMPLETE] only when every criterion is proven.`,
               workspace: context.workspace,
+              sessionId: context.sessionId,
               permissionMode: "ask",
               signal: context.signal,
               budget: context.budget.child({

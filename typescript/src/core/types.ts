@@ -22,17 +22,20 @@ export interface ToolDefinition {
   };
 }
 
+export interface ProviderTokenUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_cache_hit_tokens?: number;
+  prompt_cache_miss_tokens?: number;
+}
+
 export interface ChatResponse {
   choices: Array<{
     message: Message;
     finish_reason: string | null;
   }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    prompt_cache_hit_tokens?: number;
-    prompt_cache_miss_tokens?: number;
+  usage?: ProviderTokenUsage & {
     /** Some OpenAI-compatible gateways return their own computed charge. */
     cost?: number;
     currency?: string;

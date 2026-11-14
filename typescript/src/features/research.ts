@@ -56,6 +56,11 @@ function output(record: ResearchRecord): string {
 
 export const research: HarnessFeature = {
   id: "grounded-research",
+  capability: {
+    id: "research",
+    title: "Research",
+    description: "Collect, evaluate, and synthesize cited sources.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

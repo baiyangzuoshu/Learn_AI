@@ -15,6 +15,7 @@ export type ChatRequest = {
   message?: string;
   providerId?: string;
   model?: string;
+  sessionId?: string;
   permissionMode?: PermissionMode;
   developerMode?: boolean;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
@@ -32,6 +33,9 @@ export async function runChat(body: ChatRequest): Promise<{
   evaluation?: EvaluationRecord;
 }> {
   if (!body.message?.trim()) throw new Error("message is required");
+  if (body.sessionId !== undefined && !/^[A-Za-z0-9-]{8,80}$/.test(body.sessionId)) {
+    throw new Error("sessionId is invalid");
+  }
   const events: AgentEvent[] = [];
   let budget: RunBudgetSnapshot | undefined;
   let trace: TraceSummary | undefined;
@@ -91,6 +95,9 @@ export async function runChat(body: ChatRequest): Promise<{
       }
     },
     body.providerId,
+    undefined,
+    undefined,
+    body.sessionId,
   );
   return { answer, events, budget, trace, task, worker, handoff, research, evaluation };
 }
@@ -98,6 +105,9 @@ export async function runChat(body: ChatRequest): Promise<{
 export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const abortController = new AbortController();
+  if (body.sessionId !== undefined && !/^[A-Za-z0-9-]{8,80}$/.test(body.sessionId)) {
+    throw new Error("sessionId is invalid");
+  }
   let streamClosed = false;
   return new ReadableStream({
     start(controller) {
@@ -181,6 +191,9 @@ export function createChatStream(body: ChatRequest): ReadableStream<Uint8Array> 
           }
         },
         body.providerId,
+        undefined,
+        undefined,
+        body.sessionId,
       ).then((answer) => {
         emit({ type: "status", message: "正在组织答案…" });
         emit({ type: "answer", answer });

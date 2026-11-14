@@ -138,13 +138,15 @@
           role="tabpanel" hidden>
           <div class="runtime-detail-heading">本次运行预算</div>
           <div
-            class="runtime-budget-detail-grid"><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>成本 <b id="runtime-budget-cost">—</b></span></div>
+            class="runtime-budget-detail-grid"><span>轮次 <b id="runtime-budget-iterations">—</b></span><span>工具 <b id="runtime-budget-tools">—</b></span><span>输出 <b id="runtime-budget-output">—</b></span><span>API 请求 <b id="runtime-budget-cost">—</b></span></div>
         </section>
         <section id="runtime-trace-details" class="runtime-detail-view runtime-trace-details"
           data-runtime-view="trace" role="tabpanel" hidden>
           <span id="runtime-trace" hidden>—</span>
           <div
             class="runtime-trace-detail-header"><span>Trace ID <b id="runtime-trace-id">—</b></span><span>状态 <b id="runtime-trace-status">—</b></span><span>根 Span <b id="runtime-trace-root">—</b></span><span>Provider <b id="runtime-trace-provider">0</b></span><span>工具 <b id="runtime-trace-tools">0</b></span><span>错误 <b id="runtime-trace-errors">0</b></span></div>
+          <div id="runtime-token-usage" class="runtime-token-usage"
+            aria-live="polite">Token 用量：—</div>
           <div id="runtime-trace-spans" class="runtime-trace-spans" aria-live="polite"></div>
         </section>
         <section class="runtime-detail-view runtime-task-detail" data-runtime-view="task"
@@ -182,6 +184,22 @@
               <label>Base URL<input id="base-url" type="url" required placeholder="https://api.example.com/v1" /></label>
               <label>模型列表<textarea id="models" rows="4" placeholder="每行一个模型名称"></textarea></label>
               <label>默认模型<select id="default-model"></select></label>
+              <div class="provider-toolbar context-budget-fields">
+                <label>上下文窗口<input id="context-window-tokens" type="number" min="1" step="1" /></label>
+                <label>输出预留<input id="output-token-reserve" type="number" min="1" step="1" /></label>
+                <label>安全余量<input id="safety-margin-tokens" type="number" min="1" step="1" /></label>
+              </div>
+              <div class="provider-toolbar context-budget-fields">
+                <label>压缩目标比例<input id="compaction-target-ratio" type="number" min="0.1" max="0.95" step="0.05" /></label>
+                <label>估算方式<select id="token-estimator"><option value="conservative-v1">保守估算</option><option value="multilingual-v1">中英文估算</option></select></label>
+              </div>
+              <div class="provider-toolbar context-budget-fields">
+                <label>摘要输入预算<input id="context-summary-input-tokens" type="number" min="1" step="1" /></label>
+                <label>摘要输出预算<input id="context-summary-output-tokens" type="number" min="1" step="1" /></label>
+                <label>摘要调用次数<input id="context-summary-call-budget" type="number" min="0" step="1" /></label>
+              </div>
+              <p
+                class="field-hint">预算按供应商配置，适用于该供应商的所有模型。保守估算按字符计数；中英文估算是启发式方法，两者均不是模型专用 tokenizer 的精确结果。</p>
               <p id="key-status" class="key-status"></p>
             </section>
             <section class="settings-panel" data-settings-panel="image">

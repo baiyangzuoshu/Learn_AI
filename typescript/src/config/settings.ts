@@ -15,6 +15,13 @@ const SERVICE = "com.youjunmao.ai-agent";
 const LEGACY_ACCOUNT = "deepseek-api-key";
 const DEFAULT_PROVIDER_ID = "deepseek";
 const DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+const DEFAULT_CONTEXT_WINDOW_TOKENS = 32_768;
+const DEFAULT_OUTPUT_TOKEN_RESERVE = 4_096;
+const DEFAULT_SAFETY_MARGIN_TOKENS = 2_048;
+const DEFAULT_COMPACTION_TARGET_RATIO = 0.75;
+const DEFAULT_CONTEXT_SUMMARY_INPUT_TOKENS = 6_000;
+const DEFAULT_CONTEXT_SUMMARY_OUTPUT_TOKENS = 1_200;
+const DEFAULT_CONTEXT_SUMMARY_CALL_BUDGET = 1;
 const DEFAULT_UPDATE_URL = "https://api.github.com/repos/baiyangzuoshu/Learn_AI/releases/latest";
 const IMAGE_GENERATION_ACCOUNT = "image-generation:volcengine-ark:api-key";
 const DEFAULT_IMAGE_MODEL = "doubao-seedream-4-5-251128";
@@ -30,6 +37,14 @@ export interface PublicProviderSettings {
   defaultModel: string;
   hasApiKey: boolean;
   builtIn?: boolean;
+  contextWindowTokens: number;
+  outputTokenReserve: number;
+  safetyMarginTokens: number;
+  compactionTargetRatio: number;
+  tokenEstimator: "multilingual-v1" | "conservative-v1";
+  contextSummaryInputTokens: number;
+  contextSummaryOutputTokens: number;
+  contextSummaryCallBudget: number;
 }
 
 export interface PublicModelOption {
@@ -71,6 +86,14 @@ interface StoredProviderSettings {
   defaultModel: string;
   builtIn?: boolean;
   apiKeyEnv?: string;
+  contextWindowTokens: number;
+  outputTokenReserve: number;
+  safetyMarginTokens: number;
+  compactionTargetRatio: number;
+  tokenEstimator: "multilingual-v1" | "conservative-v1";
+  contextSummaryInputTokens: number;
+  contextSummaryOutputTokens: number;
+  contextSummaryCallBudget: number;
 }
 
 interface StoredSettings {
@@ -200,6 +223,14 @@ function defaultDeepSeekProvider(): StoredProviderSettings {
     defaultModel: env("DEEPSEEK_MODEL") ?? "deepseek-v4-flash",
     builtIn: true,
     apiKeyEnv: "DEEPSEEK_API_KEY",
+    contextWindowTokens: DEFAULT_CONTEXT_WINDOW_TOKENS,
+    outputTokenReserve: DEFAULT_OUTPUT_TOKEN_RESERVE,
+    safetyMarginTokens: DEFAULT_SAFETY_MARGIN_TOKENS,
+    compactionTargetRatio: DEFAULT_COMPACTION_TARGET_RATIO,
+    tokenEstimator: "conservative-v1",
+    contextSummaryInputTokens: DEFAULT_CONTEXT_SUMMARY_INPUT_TOKENS,
+    contextSummaryOutputTokens: DEFAULT_CONTEXT_SUMMARY_OUTPUT_TOKENS,
+    contextSummaryCallBudget: DEFAULT_CONTEXT_SUMMARY_CALL_BUDGET,
   };
 }
 
@@ -221,6 +252,55 @@ function normalizeStoredProvider(
   const defaultModel = raw.defaultModel && models.includes(raw.defaultModel)
     ? raw.defaultModel
     : models[0];
+  const positiveInteger = (value: unknown, fallback: number, field: string) => {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new Error(`${name} ${field} 必须是正整数`);
+    }
+    return parsed;
+  };
+  const contextWindowTokens = positiveInteger(
+    raw.contextWindowTokens,
+    DEFAULT_CONTEXT_WINDOW_TOKENS,
+    "上下文窗口",
+  );
+  const outputTokenReserve = positiveInteger(
+    raw.outputTokenReserve,
+    DEFAULT_OUTPUT_TOKEN_RESERVE,
+    "输出预留",
+  );
+  const safetyMarginTokens = positiveInteger(
+    raw.safetyMarginTokens,
+    DEFAULT_SAFETY_MARGIN_TOKENS,
+    "安全余量",
+  );
+  const contextSummaryInputTokens = positiveInteger(
+    raw.contextSummaryInputTokens,
+    DEFAULT_CONTEXT_SUMMARY_INPUT_TOKENS,
+    "摘要输入预算",
+  );
+  const contextSummaryOutputTokens = positiveInteger(
+    raw.contextSummaryOutputTokens,
+    DEFAULT_CONTEXT_SUMMARY_OUTPUT_TOKENS,
+    "摘要输出预算",
+  );
+  const rawSummaryCallBudget = Number(
+    raw.contextSummaryCallBudget ?? DEFAULT_CONTEXT_SUMMARY_CALL_BUDGET,
+  );
+  if (!Number.isSafeInteger(rawSummaryCallBudget) || rawSummaryCallBudget < 0) {
+    throw new Error(`${name} 摘要调用次数预算必须是非负整数`);
+  }
+  const contextSummaryCallBudget = rawSummaryCallBudget;
+  if (contextSummaryInputTokens < 256 || contextSummaryOutputTokens < 64) {
+    throw new Error(`${name} 摘要输入与输出预算过小`);
+  }
+  const ratio = Number(raw.compactionTargetRatio ?? DEFAULT_COMPACTION_TARGET_RATIO);
+  if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) {
+    throw new Error(`${name} 压缩目标比例必须在 0 到 1 之间`);
+  }
+  if (outputTokenReserve + safetyMarginTokens >= contextWindowTokens) {
+    throw new Error(`${name} 的输出预留与安全余量必须小于上下文窗口`);
+  }
   return {
     id,
     name,
@@ -231,6 +311,16 @@ function normalizeStoredProvider(
     builtIn: raw.builtIn === true || id === DEFAULT_PROVIDER_ID,
     apiKeyEnv: raw.apiKeyEnv?.trim() ||
       (id === DEFAULT_PROVIDER_ID ? "DEEPSEEK_API_KEY" : undefined),
+    contextWindowTokens,
+    outputTokenReserve,
+    safetyMarginTokens,
+    compactionTargetRatio: ratio,
+    tokenEstimator: raw.tokenEstimator === "multilingual-v1"
+      ? "multilingual-v1"
+      : "conservative-v1",
+    contextSummaryInputTokens,
+    contextSummaryOutputTokens,
+    contextSummaryCallBudget,
   };
 }
 
@@ -352,6 +442,14 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     baseUrl: provider.baseUrl,
     models: provider.models,
     defaultModel: provider.defaultModel,
+    contextWindowTokens: provider.contextWindowTokens,
+    outputTokenReserve: provider.outputTokenReserve,
+    safetyMarginTokens: provider.safetyMarginTokens,
+    compactionTargetRatio: provider.compactionTargetRatio,
+    tokenEstimator: provider.tokenEstimator,
+    contextSummaryInputTokens: provider.contextSummaryInputTokens,
+    contextSummaryOutputTokens: provider.contextSummaryOutputTokens,
+    contextSummaryCallBudget: provider.contextSummaryCallBudget,
     builtIn: provider.builtIn,
     hasApiKey: Boolean(await readProviderKey(provider)),
   })));
@@ -529,6 +627,14 @@ export async function resolveProviderConfig(
     apiKey,
     baseUrl: provider.baseUrl.replace(/\/$/, ""),
     model: selected,
+    contextWindowTokens: provider.contextWindowTokens,
+    outputTokenReserve: provider.outputTokenReserve,
+    safetyMarginTokens: provider.safetyMarginTokens,
+    compactionTargetRatio: provider.compactionTargetRatio,
+    tokenEstimator: provider.tokenEstimator,
+    contextSummaryInputTokens: provider.contextSummaryInputTokens,
+    contextSummaryOutputTokens: provider.contextSummaryOutputTokens,
+    contextSummaryCallBudget: provider.contextSummaryCallBudget,
   };
 }
 

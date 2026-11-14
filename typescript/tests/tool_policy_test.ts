@@ -144,6 +144,9 @@ Deno.test("AgentRuntime enforces tool output policy before model continuation", 
   );
   const toolEvent = events.find((event) => event.type === "tool");
   assert(toolEvent?.output);
-  assertEquals(toolEvent.output.length, 128);
-  assert(events.some((event) => event.name === "ToolOutputTruncated"));
+  assert(toolEvent.output.length <= 128);
+  assert(events.some((event) => event.name === "ToolResultArchive"));
+  const archived = JSON.parse(toolEvent.output) as { status: string; reference: string | null };
+  assert(archived.status === "complete" || archived.status === "truncated");
+  if (archived.status === "truncated") assertEquals(archived.reference, null);
 });

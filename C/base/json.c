@@ -36,12 +36,20 @@ bool json_is_string(const JsonValue *value) {
     return value && cJSON_IsString(value);
 }
 
+bool json_is_number(const JsonValue *value) {
+    return value && cJSON_IsNumber(value);
+}
+
 JsonValue *json_object_get(const JsonValue *object, const char *key) {
     return object && key ? cJSON_GetObjectItemCaseSensitive(object, key) : NULL;
 }
 
 const char *json_string_value(const JsonValue *value) {
     return json_is_string(value) ? value->valuestring : NULL;
+}
+
+double json_number_value(const JsonValue *value) {
+    return json_is_number(value) ? value->valuedouble : 0;
 }
 
 size_t json_array_size(const JsonValue *array) {

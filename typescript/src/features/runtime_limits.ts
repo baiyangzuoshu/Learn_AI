@@ -2,6 +2,12 @@ import type { HarnessFeature } from "../contracts.ts";
 
 export const runtimeLimits: HarnessFeature = {
   id: "runtime-limits",
+  capability: {
+    id: "security",
+    title: "Security",
+    description: "Permission and safety constraints.",
+    alwaysAvailable: true,
+  },
   register({ prompts }) {
     prompts.register({
       id: "runtime-budget",

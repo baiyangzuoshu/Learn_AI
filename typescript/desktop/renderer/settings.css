@@ -217,6 +217,14 @@
   overflow-x: auto;
   white-space: nowrap;
 }
+
+.runtime-token-usage {
+  margin: 8px 0;
+  color: var(--text-muted, #8593a5);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 .runtime-task-state {
   display: flex;
   align-items: center;
@@ -628,6 +636,12 @@ dialog::backdrop {
 }
 .provider-toolbar .secondary {
   white-space: nowrap;
+}
+.context-budget-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.context-budget-fields + .context-budget-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .field-hint {
   display: block;

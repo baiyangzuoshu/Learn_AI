@@ -201,6 +201,11 @@ function limitText(text: string, maxChars: number): { text: string; truncated: b
 
 export const pdfReader: HarnessFeature = {
   id: "pdf-reader",
+  capability: {
+    id: "file-analysis",
+    title: "File analysis",
+    description: "Read and inspect PDF documents.",
+  },
   register({ tools, prompts }) {
     tools.register(
       definition(

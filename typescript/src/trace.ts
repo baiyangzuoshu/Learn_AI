@@ -1,3 +1,5 @@
+import type { TokenUsageSnapshot } from "./contracts.ts";
+
 export type TraceStatus = "ok" | "error" | "cancelled";
 export type TraceSpanKind = "run" | "provider" | "tool";
 
@@ -22,6 +24,7 @@ export interface TraceSummary {
   toolCalls: number;
   errorSpans: number;
   cancelledSpans: number;
+  tokenUsage: TokenUsageSnapshot;
   /**
    * Safe, parameter-free span metadata for the local desktop trace inspector.
    * Prompts, tool arguments, outputs and credentials are intentionally absent.
@@ -54,7 +57,7 @@ export class TraceBook {
     return span;
   }
 
-  summary(root: TraceSpan, status: TraceStatus): TraceSummary {
+  summary(root: TraceSpan, status: TraceStatus, tokenUsage: TokenUsageSnapshot): TraceSummary {
     this.end(root, status);
     const childSpans = this.spans.filter((span) => span.spanId !== root.spanId);
     const errorSpans = childSpans.filter((span) => span.status === "error").length;
@@ -69,6 +72,7 @@ export class TraceBook {
       toolCalls: this.spans.filter((span) => span.kind === "tool").length,
       errorSpans: errorSpans || (status === "error" ? 1 : 0),
       cancelledSpans: cancelledSpans || (status === "cancelled" ? 1 : 0),
+      tokenUsage,
       spans: this.spans.map((span) => ({ ...span })),
     };
   }

@@ -21,6 +21,11 @@ function definition(
 
 export const scheduling: HarnessFeature = {
   id: "scheduling",
+  capability: {
+    id: "scheduling",
+    title: "Scheduling",
+    description: "Create and manage recurring agent runs.",
+  },
   register({ tools, prompts, run }) {
     configureScheduler(run);
     tools.register(

@@ -26,6 +26,7 @@ interface Job {
 //
 const jobs = new Map<string, Job>(),
   worktrees = new Map<string, { id: string; root: string; path: string; branch: string }>();
+const MAX_BACKGROUND_CAPTURE_BYTES_PER_STREAM = 512 * 1024;
 //
 async function git(cwd: string, args: string[]) {
   const result = await runCommand(isWindows ? "git.exe" : "git", args, { cwd });
@@ -91,6 +92,11 @@ function publicMcpServer(server: McpServerConfig): Record<string, unknown> {
 //
 export const integrations: HarnessFeature = {
   id: "integrations",
+  capability: {
+    id: "integrations",
+    title: "Integrations",
+    description: "Background tasks and Git worktree operations.",
+  },
 
   register({ tools, prompts, run }) {
     //background_start
@@ -118,10 +124,29 @@ export const integrations: HarnessFeature = {
           };
         jobs.set(job.id, job);
         const output: Buffer[] = [], errors: Buffer[] = [];
-        process.stdout?.on("data", (chunk: Buffer) => output.push(chunk));
-        process.stderr?.on("data", (chunk: Buffer) => errors.push(chunk));
+        let outputBytes = 0, errorBytes = 0, outputTruncated = false, errorTruncated = false;
+        const capture = (chunks: Buffer[], chunk: Buffer, stream: "stdout" | "stderr") => {
+          const used = stream === "stdout" ? outputBytes : errorBytes;
+          const captured = Math.min(
+            Math.max(0, MAX_BACKGROUND_CAPTURE_BYTES_PER_STREAM - used),
+            chunk.length,
+          );
+          if (captured) chunks.push(chunk.subarray(0, captured));
+          if (stream === "stdout") {
+            outputBytes += captured;
+            if (captured < chunk.length) outputTruncated = true;
+          } else {
+            errorBytes += captured;
+            if (captured < chunk.length) errorTruncated = true;
+          }
+        };
+        process.stdout?.on("data", (chunk: Buffer) => capture(output, chunk, "stdout"));
+        process.stderr?.on("data", (chunk: Buffer) => capture(errors, chunk, "stderr"));
         process.once("close", (code) => {
-          job.output = Buffer.concat([...output, ...errors]).toString("utf8").slice(0, 50_000);
+          const notice = outputTruncated || errorTruncated
+            ? `\n[background command capture capped at ${MAX_BACKGROUND_CAPTURE_BYTES_PER_STREAM} bytes per stream]`
+            : "";
+          job.output = `${Buffer.concat([...output, ...errors]).toString("utf8")}${notice}`;
           job.status = code === 0 ? "completed" : "failed";
         });
         return JSON.stringify({ id: job.id, status: job.status, command });
@@ -182,6 +207,7 @@ export const integrations: HarnessFeature = {
         return await run({
           query: String(input.task),
           workspace: item.path,
+          sessionId: context.sessionId,
           permissionMode: "ask",
           signal: context.signal,
           budget: context.budget.child({

@@ -2,6 +2,11 @@ import type { HarnessFeature } from "../contracts.ts";
 import { platformVersion } from "../platform.ts";
 export const diagnostics: HarnessFeature = {
   id: "diagnostics",
+  capability: {
+    id: "diagnostics",
+    title: "Diagnostics",
+    description: "Inspect runtime and tool configuration.",
+  },
   register({ tools, prompts }) {
     tools.register({
       type: "function",

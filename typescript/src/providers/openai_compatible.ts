@@ -1,8 +1,10 @@
 import type { ChatResponse, Message, ToolDefinition } from "../core/types.ts";
-import type { ModelProvider, ProviderConfig } from "./contracts.ts";
+import type { ModelProvider, ProviderConfig, ProviderRequestOptions } from "./contracts.ts";
 
 const telemetry = {
   calls: 0,
+  failedCalls: 0,
+  usageResponses: 0,
   promptTokens: 0,
   completionTokens: 0,
   totalTokens: 0,
@@ -103,9 +105,34 @@ export class ProviderError extends Error {
     readonly status: number,
     readonly retryable: boolean,
     readonly retryAfterMs?: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ProviderError";
+  }
+}
+
+export function isContextWindowExceeded(error: unknown): error is ProviderError {
+  if (!(error instanceof ProviderError)) return false;
+  const code = error.code?.toLowerCase() ?? "";
+  if (["context_length_exceeded", "prompt_too_long", "max_tokens_exceeded"].includes(code)) {
+    return true;
+  }
+  if (![400, 413, 422].includes(error.status)) return false;
+  return /context[_ -]length[_ -]exceeded|maximum context(?: length)?|context window|prompt (?:is )?too long|too many tokens/i
+    .test(error.message);
+}
+
+function providerErrorCode(detail: string): string | undefined {
+  try {
+    const parsed = JSON.parse(detail) as {
+      error?: { code?: unknown; type?: unknown };
+      code?: unknown;
+    };
+    const code = parsed.error?.code ?? parsed.error?.type ?? parsed.code;
+    return typeof code === "string" ? code : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -114,29 +141,46 @@ export async function createOpenAICompatibleCompletion(
   messages: Message[],
   tools: ToolDefinition[],
   signal?: AbortSignal,
+  options?: ProviderRequestOptions,
 ): Promise<ChatResponse> {
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "authorization": `Bearer ${config.apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ model: config.model, messages, tools, temperature: 0 }),
-    signal,
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 2_000);
-    const retryAfter = Number(response.headers.get("retry-after"));
-    throw new ProviderError(
-      `${config.name} API ${response.status}: ${detail}`,
-      response.status,
-      response.status === 408 || response.status === 429 || response.status >= 500,
-      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined,
-    );
+  telemetry.calls++;
+  let payload: ChatResponse;
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${config.apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages,
+        tools,
+        temperature: 0,
+        ...((options?.maxOutputTokens ?? config.outputTokenReserve)
+          ? { max_tokens: options?.maxOutputTokens ?? config.outputTokenReserve }
+          : {}),
+      }),
+      signal,
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 2_000);
+      const retryAfter = Number(response.headers.get("retry-after"));
+      throw new ProviderError(
+        `${config.name} API ${response.status}: ${detail}`,
+        response.status,
+        response.status === 408 || response.status === 429 || response.status >= 500,
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : undefined,
+        providerErrorCode(detail),
+      );
+    }
+    payload = await response.json() as ChatResponse;
+  } catch (error) {
+    telemetry.failedCalls++;
+    throw error;
   }
-  const payload = await response.json() as ChatResponse;
   if (payload.usage) {
-    telemetry.calls++;
+    telemetry.usageResponses++;
     telemetry.promptTokens += payload.usage.prompt_tokens ?? 0;
     telemetry.completionTokens += payload.usage.completion_tokens ?? 0;
     telemetry.totalTokens += payload.usage.total_tokens ?? 0;

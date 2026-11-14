@@ -98,15 +98,15 @@ function formatBudgetUsage(usage, compact = false) {
       formatBudgetNumber(used.toolCalls)
     }/${formatBudgetNumber(limit.toolCalls)}工具 · ${formatBudgetNumber(used.outputChars)}/${
       formatBudgetNumber(limit.outputChars)
-    }字 · ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}成本`;
+    }字 · ${formatBudgetNumber(used.cost)}/${formatBudgetNumber(limit.cost)}次 API 请求`;
   }
   return `迭代 ${formatBudgetNumber(used.iterations)}/${
     formatBudgetNumber(limit.iterations)
   } · 工具 ${formatBudgetNumber(used.toolCalls)}/${formatBudgetNumber(limit.toolCalls)}\n输出 ${
     formatBudgetNumber(used.outputChars)
-  }/${formatBudgetNumber(limit.outputChars)} 字符 · 成本 ${formatBudgetNumber(used.cost)}/${
+  }/${formatBudgetNumber(limit.outputChars)} 字符 · API 请求 ${formatBudgetNumber(used.cost)}/${
     formatBudgetNumber(limit.cost)
-  } 单位`;
+  } 次`;
 }
 function renderBudgetUsage(usage) {
   lastBudgetUsage = usage;
@@ -122,7 +122,7 @@ function renderBudgetUsage(usage) {
   }`;
   $("#runtime-budget-cost").textContent = `${formatBudgetNumber(used.cost)}/${
     formatBudgetNumber(limit.cost)
-  }`;
+  } 次`;
 }
 function appendBudgetResult(container = messages) {
   if (!lastBudgetUsage) return;
@@ -612,6 +612,14 @@ function syncActiveProviderDraft() {
   provider.baseUrl = $("#base-url").value.trim();
   provider.models = modelsInput.value.split("\n").map((item) => item.trim()).filter(Boolean);
   provider.defaultModel = defaultModel.value || provider.models[0] || "";
+  provider.contextWindowTokens = Number($("#context-window-tokens").value);
+  provider.outputTokenReserve = Number($("#output-token-reserve").value);
+  provider.safetyMarginTokens = Number($("#safety-margin-tokens").value);
+  provider.compactionTargetRatio = Number($("#compaction-target-ratio").value);
+  provider.tokenEstimator = $("#token-estimator").value;
+  provider.contextSummaryInputTokens = Number($("#context-summary-input-tokens").value);
+  provider.contextSummaryOutputTokens = Number($("#context-summary-output-tokens").value);
+  provider.contextSummaryCallBudget = Number($("#context-summary-call-budget").value);
   provider.protocol = "openai";
   providerApiKeys[provider.id] = $("#api-key").value.trim();
   settings.providers = providers;
@@ -630,6 +638,14 @@ function renderProviderEditor() {
   $("#base-url").value = provider?.baseUrl || "";
   modelsInput.value = providerModels(provider).join("\n");
   fillDefaultModel(provider);
+  $("#context-window-tokens").value = provider?.contextWindowTokens || 32768;
+  $("#output-token-reserve").value = provider?.outputTokenReserve || 4096;
+  $("#safety-margin-tokens").value = provider?.safetyMarginTokens || 2048;
+  $("#compaction-target-ratio").value = provider?.compactionTargetRatio || 0.75;
+  $("#token-estimator").value = provider?.tokenEstimator || "conservative-v1";
+  $("#context-summary-input-tokens").value = provider?.contextSummaryInputTokens ?? 6000;
+  $("#context-summary-output-tokens").value = provider?.contextSummaryOutputTokens ?? 1200;
+  $("#context-summary-call-budget").value = provider?.contextSummaryCallBudget ?? 1;
   $("#api-key").value = providerApiKeys[provider?.id] || "";
   $("#key-status").textContent = provider?.hasApiKey || providerApiKeys[provider?.id]
     ? `✓ ${provider.name} 已配置 API Key`
@@ -645,6 +661,14 @@ function collectProvidersForSave() {
     baseUrl: provider.baseUrl,
     models: provider.models || [],
     defaultModel: provider.defaultModel,
+    contextWindowTokens: provider.contextWindowTokens || 32768,
+    outputTokenReserve: provider.outputTokenReserve || 4096,
+    safetyMarginTokens: provider.safetyMarginTokens || 2048,
+    compactionTargetRatio: provider.compactionTargetRatio || 0.75,
+    tokenEstimator: provider.tokenEstimator || "conservative-v1",
+    contextSummaryInputTokens: provider.contextSummaryInputTokens ?? 6000,
+    contextSummaryOutputTokens: provider.contextSummaryOutputTokens ?? 1200,
+    contextSummaryCallBudget: provider.contextSummaryCallBudget ?? 1,
     builtIn: provider.builtIn,
     apiKey: providerApiKeys[provider.id] || "",
   }));
@@ -919,6 +943,57 @@ function renderTraceDetails(summary) {
   $("#runtime-trace-provider").textContent = formatBudgetNumber(summary.providerCalls);
   $("#runtime-trace-tools").textContent = formatBudgetNumber(summary.toolCalls);
   $("#runtime-trace-errors").textContent = formatBudgetNumber(summary.errorSpans);
+  const usage = summary.tokenUsage;
+  const estimate = usage?.estimatedInput;
+  const actual = usage?.actual;
+  const componentNames = {
+    systemPrompt: "系统提示",
+    toolDefinitions: "工具定义",
+    conversation: "对话历史",
+    toolResults: "工具结果",
+  };
+  if (usage && estimate) {
+    const largest = estimate.largestComponent;
+    const providerCacheTotal = (actual?.cacheHitTokens || 0) + (actual?.cacheMissTokens || 0);
+    const providerCacheRate = providerCacheTotal
+      ? Math.round((actual.cacheHitTokens || 0) / providerCacheTotal * 100)
+      : 0;
+    const actualText = actual?.available
+      ? "API 实际输入 " + formatBudgetNumber(actual.inputTokens) + " / 输出 " +
+        formatBudgetNumber(actual.outputTokens) + " / 合计 " +
+        formatBudgetNumber(actual.totalTokens) + " token · Provider 缓存命中/未命中 " +
+        formatBudgetNumber(actual.cacheHitTokens) + "/" +
+        formatBudgetNumber(actual.cacheMissTokens) + "（命中率 " + providerCacheRate + "%）"
+      : "API 实际用量未提供";
+    const componentBreakdown = Object.entries(estimate.byComponent || {}).map(([key, value]) =>
+      (componentNames[key] || key) + " " + formatBudgetNumber(value.tokens) + " token"
+    ).join(" · ");
+    const contextBudget = usage.contextBudget;
+    const budgetText = contextBudget
+      ? " · 上下文预算 " + formatBudgetNumber(contextBudget.inputBudgetTokens) +
+        " token，压缩目标 " +
+        formatBudgetNumber(contextBudget.compactionTargetTokens) + "，已压缩 " +
+        formatBudgetNumber(contextBudget.compactions) + " 次"
+      : "";
+    const estimateText = "请求估算输入 " + formatBudgetNumber(estimate.tokens) + " token（" +
+      formatBudgetNumber(estimate.chars) + " 字符）";
+    const reduction = usage.contextReduction;
+    const reductionText = reduction
+      ? " · 上下文缩减估算 " + formatBudgetNumber(reduction.totalTokens) + " token（本次 " +
+        formatBudgetNumber(reduction.lastTokens) + "）"
+      : "";
+    const output = usage.output;
+    const outputText = output?.truncatedResponses
+      ? " · 输出截断 " + formatBudgetNumber(output.truncatedResponses) + " 次（" +
+        output.lastTruncation?.requestType + ": " + output.lastTruncation?.finishReason + "）"
+      : "";
+    $("#runtime-token-usage").textContent = "Token 用量：" + usage.requests +
+      " 次请求（失败 " + usage.failedRequests + "） · " + estimateText + " · " +
+      actualText + " · 最大来源：" + (componentNames[largest] || "无") + " · " +
+      componentBreakdown + budgetText + reductionText + outputText;
+  } else {
+    $("#runtime-token-usage").textContent = "Token 用量：—";
+  }
   runtimeTraceSpans.innerHTML = spans.length
     ? spans.map((span, index) => {
       const startedAt = Number(span.startedAt);
@@ -959,6 +1034,7 @@ function renderTraceSummary(summary) {
     renderResearchState(null);
     renderEvaluationState(null);
     setRuntimeDetailTab(null);
+    $("#runtime-token-usage").textContent = "Token 用量：—";
     return;
   }
   const traceId = String(summary.traceId || "");
@@ -1562,6 +1638,7 @@ form.addEventListener("submit", async (event) => {
         message: prompt,
         providerId: chosenModel.providerId,
         model: chosenModel.model,
+        sessionId: activeSessionId,
         permissionMode: permissionMode.value,
         developerMode: $("#developer-mode").checked,
         history,

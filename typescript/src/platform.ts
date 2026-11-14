@@ -8,6 +8,8 @@ export type CommandResult = {
   code: number | null;
   stdout: string;
   stderr: string;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
 };
 
 export type SecretStore = {
@@ -102,12 +104,30 @@ export async function runCommand(
   command: string,
   args: string[],
   options: SpawnOptions = {},
+  maxOutputBytes = 1024 * 1024,
 ): Promise<CommandResult> {
+  if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 0) {
+    throw new Error("command output limit must be a non-negative integer");
+  }
   const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
   const stdout: Buffer[] = [];
   const stderr: Buffer[] = [];
-  child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
-  child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
+  let stdoutBytes = 0, stderrBytes = 0, stdoutTruncated = false, stderrTruncated = false;
+  const capture = (chunks: Buffer[], chunk: Buffer, stream: "stdout" | "stderr") => {
+    const currentBytes = stream === "stdout" ? stdoutBytes : stderrBytes;
+    const remaining = Math.max(0, maxOutputBytes - currentBytes);
+    const captured = Math.min(remaining, chunk.length);
+    if (captured) chunks.push(chunk.subarray(0, captured));
+    if (stream === "stdout") {
+      stdoutBytes += captured;
+      if (captured < chunk.length) stdoutTruncated = true;
+    } else {
+      stderrBytes += captured;
+      if (captured < chunk.length) stderrTruncated = true;
+    }
+  };
+  child.stdout?.on("data", (chunk: Buffer) => capture(stdout, chunk, "stdout"));
+  child.stderr?.on("data", (chunk: Buffer) => capture(stderr, chunk, "stderr"));
   return await new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code) =>
@@ -116,6 +136,8 @@ export async function runCommand(
         code,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
+        stdoutTruncated,
+        stderrTruncated,
       }));
   });
 }
