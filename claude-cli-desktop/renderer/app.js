@@ -168,8 +168,17 @@ function renderAssistantActivity(messageId, activity) {
   title.className = "assistant-activity-title";
   const count = Number.isSafeInteger(activity.total) ? activity.total : 0;
   const autoCompactionCount = Number.isSafeInteger(activity.autoCompactionCount) ? activity.autoCompactionCount : 0;
+  const progressSummary = Array.isArray(activity.progressSummary)
+    ? activity.progressSummary.filter((step) => typeof step === "string" && step.trim()).slice(-6)
+    : [];
+  const currentProgress = progressSummary[progressSummary.length - 1];
   if (running && activity.compactionStatus === "compacting") title.textContent = "正在压缩上下文";
-  else if (running) title.textContent = activity.currentAction ? `正在${activity.currentAction}` : "正在分析任务";
+  else if (running && currentProgress) {
+    const progressTitle = /^(正在|已确认|已完成|接下来)/.test(currentProgress)
+      ? currentProgress
+      : `正在${currentProgress}`;
+    title.textContent = progressTitle.slice(0, 120);
+  } else if (running) title.textContent = activity.currentAction ? `正在${activity.currentAction}` : "正在分析任务";
   else if (activity.status === "complete") title.textContent = count ? `本轮已完成 · ${count} 项操作` : "本轮已完成";
   else if (activity.status === "stopped") title.textContent = count ? `已停止 · ${count} 项操作` : "已停止";
   else if (activity.status === "error") title.textContent = count ? `遇到问题 · ${count} 项操作` : "遇到问题";
@@ -182,10 +191,8 @@ function renderAssistantActivity(messageId, activity) {
     details.textContent = `${running ? "已发起：" : "操作概览："}${activity.summary}`;
     copy.append(details);
   }
-  const progressSummary = Array.isArray(activity.progressSummary)
-    ? activity.progressSummary.filter((step) => typeof step === "string" && step.trim()).slice(-6)
-    : [];
-  if (progressSummary.length) {
+  const visibleProgress = running ? progressSummary.slice(0, -1) : progressSummary;
+  if (visibleProgress.length) {
     const progress = document.createElement("div");
     progress.className = "assistant-activity-progress";
     const heading = document.createElement("strong");
@@ -193,16 +200,14 @@ function renderAssistantActivity(messageId, activity) {
     heading.textContent = "思路进度";
     const list = document.createElement("ol");
     list.className = "assistant-activity-progress-list";
-    progressSummary.forEach((step, index) => {
+    visibleProgress.forEach((step, index) => {
       const item = document.createElement("li");
       const marker = document.createElement("span");
       marker.className = "assistant-activity-progress-marker";
-      const current = running && index === progressSummary.length - 1;
       const completed = activity.status === "complete" || activity.status === "stored";
-      marker.textContent = current ? "›" : completed ? "✓" : "·";
+      marker.textContent = completed ? "✓" : "·";
       const text = document.createElement("span");
       text.textContent = step;
-      if (current) item.className = "current";
       item.append(marker, text);
       list.append(item);
     });

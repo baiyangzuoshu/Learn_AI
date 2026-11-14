@@ -142,7 +142,7 @@ function previewInput(input: Record<string, unknown>): string {
 
 function describeToolAction(toolName: string): string {
   switch (toolName) {
-    case "Bash": return "运行命令";
+    case "Bash": return "核对项目";
     case "Read": return "读取文件";
     case "Glob": return "搜索文件";
     case "Grep": return "搜索代码";
@@ -167,17 +167,79 @@ function recordToolAction(active: ActiveTurn, toolName: string): { action: strin
   return { action, total, summary: summarizeToolActions(active.toolActionCounts) };
 }
 
-function describeToolProgress(toolName: string): string {
+function readToolInputString(input: Record<string, unknown>, key: string): string | undefined {
+  const value = input[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function progressSnippet(value: string, apiKey?: string): string {
+  return sanitizeDiagnosticText(value, apiKey).replace(/\s+/g, " ").trim().slice(0, 90);
+}
+
+function basenameForProgress(value: string, apiKey?: string): string {
+  const safePath = sanitizeDiagnosticText(value, apiKey).replace(/[\\/]+$/, "");
+  const segments = safePath.split(/[\\/]/).filter(Boolean);
+  return segments[segments.length - 1]?.slice(0, 90) ?? "相关文件";
+}
+
+function summarizeBashDescription(description: string, apiKey?: string): string {
+  const lower = description.toLowerCase();
+  const fileNames = description.match(/\b[\w.-]+\.(?:ts|tsx|js|css|html|json|go|md)\b/gi) ?? [];
+  const topics: string[] = [];
+  if (/uimain(?:uictrl)?/.test(lower)) topics.push("UIMain 启动逻辑");
+  if (/(uiroot|startup|bootstrap)/.test(lower)) topics.push("应用启动入口");
+  if (/(login|auth|profile)/.test(lower)) topics.push("登录与鉴权流程");
+  if (/(cloud|warm.?up|preload|loading)/.test(lower)) topics.push("资源预热与加载状态");
+  if (/(failure|error|fallback|retry)/.test(lower)) topics.push("失败后的恢复分支");
+  if (/(root repo stats|repo stats|repository stats|project stats)/.test(lower)) topics.push("仓库规模");
+  if (/(largest tracked files|largest files|large files)/.test(lower)) topics.push("体积较大的文件");
+  if (/(server configs|server config|configuration files|config files)/.test(lower)) topics.push("服务端配置");
+  if (/(tracked files|git status|working tree|worktree|commit history)/.test(lower)) topics.push("Git 工作区");
+  if (/(call site|references|usage|dependency)/.test(lower)) topics.push("调用关系");
+  if (/(test|check|lint|typecheck|type check)/.test(lower)) topics.push("检查结果");
+  if (/(build|compile|package|packaging)/.test(lower)) topics.push("构建产物");
+  for (const fileName of fileNames.slice(0, 2)) topics.push(progressSnippet(fileName, apiKey));
+  const action = /\b(search|find|locate)\b/.test(lower)
+    ? "定位"
+    : /\b(read|open|show|list)\b/.test(lower)
+    ? "查看"
+    : /\b(analy[sz]e|inspect|review|trace|understand)\b/.test(lower)
+    ? "分析"
+    : /\b(test|check|verify|validate)\b/.test(lower)
+    ? "核对"
+    : "处理";
+  if (topics.length) return `${action}：${[...new Set(topics)].join("、")}`;
+  return `${action}：${progressSnippet(description, apiKey)}`;
+}
+
+function describeToolProgress(toolName: string, rawInput: unknown, apiKey?: string): string {
+  const input = rawInput && typeof rawInput === "object" ? rawInput as Record<string, unknown> : {};
+  const description = readToolInputString(input, "description");
   switch (toolName) {
     case "Glob":
-    case "LS": return "定位相关文件";
-    case "Read": return "阅读相关实现";
-    case "Grep": return "检索调用关系";
-    case "Bash": return "核对项目状态";
+      return `定位文件：${progressSnippet(readToolInputString(input, "pattern") ?? description ?? "相关实现", apiKey)}`;
+    case "LS":
+      return `浏览目录：${basenameForProgress(readToolInputString(input, "path") ?? "项目目录", apiKey)}`;
+    case "Read":
+      return `阅读实现：${basenameForProgress(readToolInputString(input, "file_path") ?? description ?? "相关文件", apiKey)}`;
+    case "Grep":
+      return `检索代码：${progressSnippet(readToolInputString(input, "pattern") ?? description ?? "相关调用", apiKey)}`;
+    case "Bash": {
+      if (description) return summarizeBashDescription(description, apiKey);
+      const command = readToolInputString(input, "command")?.toLowerCase() ?? "";
+      if (/\b(tsc|deno\s+check|npm\s+run\s+(typecheck|check))\b/.test(command)) return "运行类型检查";
+      if (/\b(npm|npx|deno)\b.*\b(build|test|lint|check)\b/.test(command)) return "运行项目检查";
+      if (/\bgit\s+(status|diff|log|ls-files)\b/.test(command)) return "核对 Git 工作区";
+      if (/\b(rg|grep|find|select-string)\b/.test(command)) return "检索相关代码";
+      if (/\b(cat|type|get-content|sed|head|tail)\b/.test(command)) return "查看相关配置与实现";
+      return "核对项目状态";
+    }
     case "Edit":
     case "Write":
-    case "NotebookEdit": return "落实代码修改";
+    case "NotebookEdit":
+      return `修改文件：${basenameForProgress(readToolInputString(input, "file_path") ?? description ?? "项目文件", apiKey)}`;
     case "WebSearch":
+      return `查阅资料：${progressSnippet(readToolInputString(input, "query") ?? description ?? "相关文档", apiKey)}`;
     case "WebFetch": return "查阅相关资料";
     default: return "继续核查任务";
   }
@@ -662,7 +724,7 @@ async function runTurn(
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
-          append: "For multi-step tasks, before a major batch of tools, provide one brief, user-facing progress update in the user's language, prefixed with 【进度】. Describe the next action or a confirmed finding in one concise sentence. These updates are status summaries, not hidden chain-of-thought. Never reveal private reasoning, credentials, full tool inputs, or shell commands.",
+          append: "多步骤任务开始前，以及每完成一组重要工作后，用【进度】输出一句简短的中文状态。请写清当前检查的文件、函数、调用关系或问题点，并说明下一步；例如：‘正在追踪 UIMainUICtrl 的登录入口，接着核对云层预热失败后的加载状态。’ 状态应是面向用户的工作摘要，不是隐藏思维链。不要展示内部推理、凭据、完整工具参数或命令正文。调用工具时请填写简短的中文 description，说明检查目的，不要复述命令。",
         },
         permissionMode: "default",
         canUseTool: makePermissionHandler(active),
@@ -873,7 +935,7 @@ async function runTurn(
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
             const activity = recordToolAction(active, block.name);
-            recordProgressSummary(active, describeToolProgress(block.name), apiKey);
+            recordProgressSummary(active, describeToolProgress(block.name, block.input, apiKey), apiKey);
             log("info", `Claude 正在${activity.action} · 已发起 ${activity.total} 项操作`);
             emit(active.senderId, {
               type: "tool-call",
