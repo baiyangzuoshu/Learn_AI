@@ -1,10 +1,11 @@
 import { createRequire } from "node:module";
 import { stat } from "node:fs/promises";
-import { delimiter, dirname, join } from "node:path";
+import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import type { AppEvent, AppSettings, ChatMessage } from "./contracts.js";
 import { inspectClaudeCli } from "./claude-cli.js";
+import { desktopPlatform } from "./platform.js";
 import {
   addMessage,
   appendAssistantText,
@@ -34,11 +35,7 @@ const MAX_CONCURRENT_TURNS = 1;
 const MAX_PROMPT_LENGTH = 30_000;
 const MAX_PERMISSION_PREVIEW = 5_000;
 const MAX_AGENTIC_TURNS = 40;
-const MODEL_IDLE_TIMEOUT_MS = 90_000;
-const WINDOWS_MODEL_IDLE_TIMEOUT_MS = 10 * 60_000;
 const TOOL_IDLE_TIMEOUT_MS = 10 * 60_000;
-const IDLE_TIMEOUT_MESSAGE = "连续 90 秒没有收到模型进展，本次请求已自动停止。请检查网络或 DeepSeek 服务状态后重试。";
-const WINDOWS_IDLE_TIMEOUT_MESSAGE = "Claude Code CLI 连续 10 分钟没有模型进展，本次请求已自动停止。请检查 Studio 设置中的 API 地址、模型和网络连接后重试。";
 const appDataDirectory = join(app.getPath("appData"), "Claude CLI Studio");
 
 interface ActiveTurn {
@@ -130,16 +127,6 @@ function previewInput(input: Record<string, unknown>): string {
   } catch {
     return "无法显示工具参数";
   }
-}
-
-function addSystemPath(environment: NodeJS.ProcessEnv, additionalPaths: string[] = []): string {
-  const extras = process.platform === "darwin"
-    ? ["/opt/homebrew/bin", "/usr/local/bin", join(app.getPath("home"), ".local/bin"), "/usr/bin", "/bin"]
-    : process.platform === "win32"
-    ? [join(app.getPath("home"), ".local", "bin")]
-    : [join(app.getPath("home"), ".local/bin"), "/usr/local/bin", "/usr/bin", "/bin"];
-  return [...new Set([...(environment.PATH ?? "").split(delimiter), ...extras, ...additionalPaths].filter(Boolean))]
-    .join(delimiter);
 }
 
 function assertIpcSender(senderId: number): void {
@@ -456,13 +443,8 @@ async function runTurn(
 ): Promise<void> {
   const currentSession = getSession(active.sessionId);
   if (!currentSession) return;
-  const isWindows = process.platform === "win32";
-  const modelIdleTimeoutMs = isWindows
-    ? WINDOWS_MODEL_IDLE_TIMEOUT_MS
-    : MODEL_IDLE_TIMEOUT_MS;
-  const idleTimeoutMessage = isWindows
-    ? WINDOWS_IDLE_TIMEOUT_MESSAGE
-    : IDLE_TIMEOUT_MESSAGE;
+  const modelIdleTimeoutMs = desktopPlatform.modelIdleTimeoutMs;
+  const idleTimeoutMessage = desktopPlatform.idleTimeoutMessage;
   const log = (
     level: "info" | "warn" | "error",
     message: string,
@@ -498,7 +480,11 @@ async function runTurn(
   };
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
-    PATH: addSystemPath(process.env, [dirname(cliPath)]),
+    PATH: desktopPlatform.buildSystemPath(
+      process.env,
+      app.getPath("home"),
+      cliPath,
+    ),
     ANTHROPIC_BASE_URL: settings.baseUrl,
     ANTHROPIC_AUTH_TOKEN: apiKey ?? "",
     ANTHROPIC_API_KEY: "",
@@ -767,5 +753,5 @@ app.on("before-quit", (event) => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (desktopPlatform.quitWhenWindowsClosed) app.quit();
 });

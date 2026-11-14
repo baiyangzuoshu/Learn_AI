@@ -1,6 +1,7 @@
-import { access, chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AppSettings, ChatMessage, PermissionMode, SessionSummary } from "./contracts.js";
+import { desktopPlatform } from "./platform.js";
 
 const SETTINGS_FILE = "settings.json";
 const SESSIONS_FILE = "sessions.json";
@@ -68,8 +69,7 @@ export async function hasLegacyApiKey(): Promise<boolean> {
 
 export async function writeApiKey(apiKey: string): Promise<void> {
   const secretDirectory = join(dataDirectory, "secrets");
-  await mkdir(secretDirectory, { recursive: true, mode: 0o700 });
-  await chmod(secretDirectory, 0o700);
+  await desktopPlatform.prepareSecretDirectory(secretDirectory);
   await atomicWrite(join(dataDirectory, SECRET_FILE), apiKey.trim());
   await unlink(join(dataDirectory, LEGACY_SECRET_FILE)).catch((error) => {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

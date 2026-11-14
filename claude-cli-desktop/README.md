@@ -13,6 +13,8 @@ npm run dev
 
 On Windows, the app looks for the Claude Code CLI executable (`claude.exe`) on `PATH`, in `~/.local/bin`, and in the standard Claude Code and WinGet install locations. It runs this CLI locally and supplies the API URL, model, and key saved in Studio Settings; the app does not use the CLI's `~/.claude/settings.json`. The WinGet lookup is independent of the desktop process's inherited `PATH`. On macOS, the app looks for `claude` on `PATH` and in standard Homebrew and native install directories, and can route the CLI through the same Anthropic-compatible API settings.
 
+Platform-specific CLI discovery, environment `PATH`, idle timeouts, app-close behavior, and secret-directory permissions are implemented separately in `electron/platform/windows.ts` and `electron/platform/macos.ts`. `electron/platform.ts` selects the adapter used by the shared Electron code.
+
 ## Projects and sessions
 
 Add a project by choosing a folder; the app starts its first conversation in that folder. Each project directory can contain multiple independent conversations. Click a project row to expand or collapse them, and use the `+` action on that row to start another conversation in the same directory. Double-click a conversation to rename it, or use its visible `×` button to delete it. Use the project row's `×` action to remove that project and all of its conversations from Studio. Deletion requires confirmation and removes local conversation history only; the project directory and code remain on disk. A running session must be stopped before its conversation or project can be removed.
