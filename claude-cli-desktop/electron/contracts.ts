@@ -24,6 +24,7 @@ export interface ChatMessage {
   activitySummary?: string;
   activityCount?: number;
   progressSummary?: string[];
+  tokenUsage?: TokenUsageSummary;
   autoCompactionCount?: number;
   lastAutoCompaction?: AutoCompactionRecord;
 }
@@ -31,6 +32,14 @@ export interface ChatMessage {
 export interface AutoCompactionRecord {
   preTokens: number;
   postTokens?: number;
+}
+
+export interface TokenUsageSummary {
+  totalTokens: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
 }
 
 export interface BootstrapData {
@@ -49,11 +58,12 @@ export type AppEvent =
   | { type: "text-delta"; sessionId: string; messageId: string; text: string }
   | { type: "tool-call"; sessionId: string; messageId: string; action: string; total: number; activitySummary: string }
   | { type: "assistant-progress"; sessionId: string; messageId: string; progressSummary: string[] }
+  | { type: "token-usage"; sessionId: string; messageId: string; tokenUsage: TokenUsageSummary; phase: "running" | "complete" }
   | { type: "context-compaction"; sessionId: string; messageId: string; phase: "starting" | "completed" | "failed"; trigger?: "auto" | "manual"; autoCompactionCount: number; preTokens?: number; postTokens?: number }
   | { type: "permission-request"; sessionId: string; requestId: string; toolUseId: string; toolName: string; inputPreview: string }
-  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
-  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
-  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number; progressSummary?: string[]; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord };
+  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; tokenUsage?: TokenUsageSummary; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number; progressSummary?: string[]; tokenUsage?: TokenUsageSummary; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number; progressSummary?: string[]; tokenUsage?: TokenUsageSummary; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord };
 
 export interface ClaudeStudioBridge {
   getBootstrap(): Promise<BootstrapData>;

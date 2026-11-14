@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AppSettings, AutoCompactionRecord, ChatMessage, PermissionMode, SessionSummary } from "./contracts.js";
+import type { AppSettings, AutoCompactionRecord, ChatMessage, PermissionMode, SessionSummary, TokenUsageSummary } from "./contracts.js";
 import { desktopPlatform } from "./platform.js";
 
 const SETTINGS_FILE = "settings.json";
@@ -12,6 +12,7 @@ const MAX_MESSAGES_PER_SESSION = 160;
 const MAX_MESSAGE_LENGTH = 60_000;
 const MAX_PROGRESS_SUMMARIES = 6;
 const MAX_PROGRESS_SUMMARY_LENGTH = 220;
+const MAX_TOKEN_COUNT = 1_000_000_000_000;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: "https://api.deepseek.com/anthropic",
@@ -151,6 +152,7 @@ export async function addMessage(sessionId: string, message: ChatMessage): Promi
   const safeMessage: ChatMessage = {
     ...message,
     text: message.text.slice(0, MAX_MESSAGE_LENGTH),
+    tokenUsage: validateTokenUsage(message.tokenUsage),
   };
   session.messages.push(safeMessage);
   if (safeMessage.role === "user" && !session.titleIsCustom && session.title === "新对话") {
@@ -206,6 +208,19 @@ export function setAssistantProgressSummary(
     .filter((entry) => typeof entry === "string" && entry.trim().length > 0)
     .slice(-MAX_PROGRESS_SUMMARIES)
     .map((entry) => entry.trim().slice(0, MAX_PROGRESS_SUMMARY_LENGTH));
+  const session = getSession(sessionId);
+  if (session) session.updatedAt = new Date().toISOString();
+}
+
+export function setAssistantTokenUsage(
+  sessionId: string,
+  messageId: string,
+  tokenUsage: TokenUsageSummary,
+): void {
+  const message = getSession(sessionId)?.messages.find((candidate) => candidate.id === messageId);
+  const safeTokenUsage = validateTokenUsage(tokenUsage);
+  if (!message || message.role !== "assistant" || !safeTokenUsage) return;
+  message.tokenUsage = safeTokenUsage;
   const session = getSession(sessionId);
   if (session) session.updatedAt = new Date().toISOString();
 }
@@ -339,6 +354,7 @@ async function readSessions(): Promise<StoredSession[]> {
                   .map((entry) => entry.trim().slice(0, MAX_PROGRESS_SUMMARY_LENGTH)),
               }
               : {}),
+            ...(validateTokenUsage(record.tokenUsage) ? { tokenUsage: validateTokenUsage(record.tokenUsage) } : {}),
             ...(typeof record.autoCompactionCount === "number" && Number.isSafeInteger(record.autoCompactionCount) &&
                 record.autoCompactionCount > 0 && record.autoCompactionCount <= 10_000
               ? { autoCompactionCount: record.autoCompactionCount }
@@ -371,6 +387,25 @@ async function readSessions(): Promise<StoredSession[]> {
       messages,
     }];
   }).slice(0, MAX_SESSIONS);
+}
+
+function validateTokenUsage(value: unknown): TokenUsageSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const isValidCount = (count: unknown): count is number =>
+    typeof count === "number" && Number.isSafeInteger(count) && count >= 0 && count <= MAX_TOKEN_COUNT;
+  if (!isValidCount(record.totalTokens)) return undefined;
+  const optionalKeys = ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"] as const;
+  if (optionalKeys.some((key) => record[key] !== undefined && !isValidCount(record[key]))) return undefined;
+  return {
+    totalTokens: record.totalTokens,
+    ...(isValidCount(record.inputTokens) ? { inputTokens: record.inputTokens } : {}),
+    ...(isValidCount(record.outputTokens) ? { outputTokens: record.outputTokens } : {}),
+    ...(isValidCount(record.cacheReadInputTokens) ? { cacheReadInputTokens: record.cacheReadInputTokens } : {}),
+    ...(isValidCount(record.cacheCreationInputTokens)
+      ? { cacheCreationInputTokens: record.cacheCreationInputTokens }
+      : {}),
+  };
 }
 
 function summaryOf(session: StoredSession): SessionSummary {

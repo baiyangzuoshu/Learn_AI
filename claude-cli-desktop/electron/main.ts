@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
-import type { AppEvent, AppSettings, AutoCompactionRecord, ChatMessage } from "./contracts.js";
+import type { AppEvent, AppSettings, AutoCompactionRecord, ChatMessage, TokenUsageSummary } from "./contracts.js";
 import { inspectClaudeCli } from "./claude-cli.js";
 import { desktopPlatform } from "./platform.js";
 import {
@@ -25,6 +25,7 @@ import {
   setAssistantAutoCompaction,
   setAssistantActivitySummary,
   setAssistantProgressSummary,
+  setAssistantTokenUsage,
   setAssistantDuration,
   validateSettings,
   writeApiKey,
@@ -42,6 +43,7 @@ const MAX_AGENTIC_TURNS = 40;
 const TOOL_IDLE_TIMEOUT_MS = 10 * 60_000;
 const MAX_PROGRESS_SUMMARIES = 6;
 const MAX_PROGRESS_SUMMARY_LENGTH = 220;
+const MAX_TOKEN_COUNT = 1_000_000_000_000;
 const appDataDirectory = join(app.getPath("appData"), "Claude CLI Studio");
 
 interface ActiveTurn {
@@ -55,6 +57,7 @@ interface ActiveTurn {
   stopRequested: boolean;
   toolActionCounts: Map<string, number>;
   progressSummary: string[];
+  tokenUsage?: TokenUsageSummary;
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
   task: Promise<void>;
@@ -112,6 +115,93 @@ function describeEndpoint(endpoint: string): string {
   } catch {
     return "[无效的 API 地址]";
   }
+}
+
+function readTokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_TOKEN_COUNT
+    ? value
+    : undefined;
+}
+
+function parseTokenUsage(value: unknown): TokenUsageSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const reportedTotal = readTokenCount(record.total_tokens) ?? readTokenCount(record.totalTokens);
+  const baseInputTokens = readTokenCount(record.input_tokens) ?? readTokenCount(record.inputTokens);
+  const outputTokens = readTokenCount(record.output_tokens) ?? readTokenCount(record.outputTokens);
+  const cacheReadInputTokens = readTokenCount(record.cache_read_input_tokens) ??
+    readTokenCount(record.cacheReadInputTokens);
+  const cacheCreationInputTokens = readTokenCount(record.cache_creation_input_tokens) ??
+    readTokenCount(record.cacheCreationInputTokens);
+  const hasInputUsage = baseInputTokens !== undefined || cacheReadInputTokens !== undefined ||
+    cacheCreationInputTokens !== undefined;
+  const inputTokens = hasInputUsage
+    ? (baseInputTokens ?? 0) + (cacheReadInputTokens ?? 0) + (cacheCreationInputTokens ?? 0)
+    : undefined;
+  const totalTokens = reportedTotal ?? (inputTokens !== undefined || outputTokens !== undefined
+    ? (inputTokens ?? 0) + (outputTokens ?? 0)
+    : undefined);
+  if (totalTokens === undefined || readTokenCount(totalTokens) === undefined) return undefined;
+  return {
+    totalTokens,
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+    ...(cacheReadInputTokens !== undefined ? { cacheReadInputTokens } : {}),
+    ...(cacheCreationInputTokens !== undefined ? { cacheCreationInputTokens } : {}),
+  };
+}
+
+function sumModelTokenUsage(value: unknown): TokenUsageSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadInputTokens = 0;
+  let cacheCreationInputTokens = 0;
+  let foundUsage = false;
+  for (const modelUsage of Object.values(value as Record<string, unknown>)) {
+    if (!modelUsage || typeof modelUsage !== "object") continue;
+    const usage = modelUsage as Record<string, unknown>;
+    const input = readTokenCount(usage.inputTokens);
+    const output = readTokenCount(usage.outputTokens);
+    const cacheRead = readTokenCount(usage.cacheReadInputTokens);
+    const cacheCreation = readTokenCount(usage.cacheCreationInputTokens);
+    if (input === undefined && output === undefined && cacheRead === undefined && cacheCreation === undefined) continue;
+    foundUsage = true;
+    inputTokens += input ?? 0;
+    outputTokens += output ?? 0;
+    cacheReadInputTokens += cacheRead ?? 0;
+    cacheCreationInputTokens += cacheCreation ?? 0;
+  }
+  if (!foundUsage) return undefined;
+  const totalTokens = inputTokens + outputTokens + cacheReadInputTokens + cacheCreationInputTokens;
+  if (readTokenCount(totalTokens) === undefined) return undefined;
+  return {
+    totalTokens,
+    inputTokens: inputTokens + cacheReadInputTokens + cacheCreationInputTokens,
+    outputTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+  };
+}
+
+function recordTokenUsage(
+  active: ActiveTurn,
+  tokenUsage: TokenUsageSummary | undefined,
+  phase: "running" | "complete",
+): void {
+  if (!tokenUsage) return;
+  if (phase === "running" && active.tokenUsage && tokenUsage.totalTokens < active.tokenUsage.totalTokens) return;
+  const isUnchanged = active.tokenUsage && JSON.stringify(active.tokenUsage) === JSON.stringify(tokenUsage);
+  active.tokenUsage = tokenUsage;
+  setAssistantTokenUsage(active.sessionId, active.messageId, tokenUsage);
+  if (isUnchanged && phase === "running") return;
+  emit(active.senderId, {
+    type: "token-usage",
+    sessionId: active.sessionId,
+    messageId: active.messageId,
+    tokenUsage,
+    phase,
+  });
 }
 
 function emitDiagnostic(
@@ -275,6 +365,7 @@ function persistToolActivity(active: ActiveTurn): {
   summary: string;
   count: number;
   progressSummary: string[];
+  tokenUsage?: TokenUsageSummary;
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
 } {
@@ -284,6 +375,7 @@ function persistToolActivity(active: ActiveTurn): {
   if (active.progressSummary.length > 0) {
     setAssistantProgressSummary(active.sessionId, active.messageId, active.progressSummary);
   }
+  if (active.tokenUsage) setAssistantTokenUsage(active.sessionId, active.messageId, active.tokenUsage);
   if (active.autoCompactionCount > 0 && active.lastAutoCompaction) {
     setAssistantAutoCompaction(
       active.sessionId,
@@ -296,6 +388,7 @@ function persistToolActivity(active: ActiveTurn): {
     summary,
     count,
     progressSummary: [...active.progressSummary],
+    ...(active.tokenUsage ? { tokenUsage: active.tokenUsage } : {}),
     autoCompactionCount: active.autoCompactionCount,
     ...(active.lastAutoCompaction ? { lastAutoCompaction: active.lastAutoCompaction } : {}),
   };
@@ -305,18 +398,21 @@ function activityEventFields(activity: {
   summary: string;
   count: number;
   progressSummary: string[];
+  tokenUsage?: TokenUsageSummary;
   autoCompactionCount: number;
   lastAutoCompaction?: AutoCompactionRecord;
 }): {
   activitySummary?: string;
   activityCount?: number;
   progressSummary?: string[];
+  tokenUsage?: TokenUsageSummary;
   autoCompactionCount?: number;
   lastAutoCompaction?: AutoCompactionRecord;
 } {
   return {
     ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
     ...(activity.progressSummary.length > 0 ? { progressSummary: activity.progressSummary } : {}),
+    ...(activity.tokenUsage ? { tokenUsage: activity.tokenUsage } : {}),
     ...(activity.autoCompactionCount > 0
       ? {
         autoCompactionCount: activity.autoCompactionCount,
@@ -829,6 +925,7 @@ async function runTurn(
         );
       } else if (message.type === "system" && message.subtype === "task_progress") {
         recordProgressSummary(active, message.summary || message.description, apiKey);
+        recordTokenUsage(active, parseTokenUsage(message.usage), "running");
       } else if (message.type === "system" && message.subtype === "task_started" && !message.skip_transcript) {
         recordProgressSummary(active, `开始${message.description}`, apiKey);
       } else if (message.type === "system" && message.subtype === "task_notification" && message.summary) {
@@ -958,6 +1055,11 @@ async function runTurn(
       } else if (message.type === "result") {
         reportedDurationMs = message.duration_ms;
         finalStopReason = message.stop_reason;
+        recordTokenUsage(
+          active,
+          parseTokenUsage(message.usage) ?? sumModelTokenUsage(message.modelUsage),
+          "complete",
+        );
         if (message.subtype === "success") {
           finalResult = message.result;
           log(

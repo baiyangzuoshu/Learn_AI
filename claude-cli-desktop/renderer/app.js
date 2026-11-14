@@ -107,6 +107,30 @@ function renderMessageDuration(messageId, durationMs, running = false) {
   duration.classList.toggle("running", running);
 }
 
+function renderMessageTokenUsage(messageId, tokenUsage, running = false) {
+  const usage = state.messageElements.get(messageId)?.querySelector(".message-token-usage");
+  if (!usage) return;
+  if (!tokenUsage || !Number.isSafeInteger(tokenUsage.totalTokens) || tokenUsage.totalTokens < 0) {
+    usage.textContent = "";
+    usage.title = "";
+    usage.classList.remove("running");
+    return;
+  }
+  const details = [];
+  const cacheTokens = (Number.isSafeInteger(tokenUsage.cacheReadInputTokens) ? tokenUsage.cacheReadInputTokens : 0) +
+    (Number.isSafeInteger(tokenUsage.cacheCreationInputTokens) ? tokenUsage.cacheCreationInputTokens : 0);
+  if (Number.isSafeInteger(tokenUsage.inputTokens) && Number.isSafeInteger(tokenUsage.outputTokens)) {
+    const inputText = `输入 ${formatTokenCount(tokenUsage.inputTokens)}` +
+      (cacheTokens > 0 ? `（缓存 ${formatTokenCount(cacheTokens)}）` : "");
+    details.push(`${inputText} / 输出 ${formatTokenCount(tokenUsage.outputTokens)}`);
+  }
+  if (cacheTokens > 0 && details.length === 0) details.push(`缓存 ${formatTokenCount(cacheTokens)}`);
+  usage.textContent = `${running ? "本轮已消耗" : "本轮消耗"} ${formatTokenCount(tokenUsage.totalTokens)} tokens` +
+    (details.length ? ` · ${details.join(" · ")}` : "");
+  usage.title = usage.textContent;
+  usage.classList.toggle("running", running);
+}
+
 function refreshTurnTimings() {
   let hasRunningTurn = false;
   for (const [messageId, timing] of state.turnTimingsByMessage) {
@@ -765,7 +789,10 @@ function addMessageShell(role, messageId, timestamp = new Date().toISOString()) 
     const duration = document.createElement("span");
     duration.className = "message-duration";
     duration.setAttribute("aria-live", "off");
-    label.append(duration);
+    const tokenUsage = document.createElement("span");
+    tokenUsage.className = "message-token-usage";
+    tokenUsage.setAttribute("aria-live", "off");
+    label.append(duration, tokenUsage);
   }
   const text = document.createElement("div");
   text.className = role === "assistant" ? "message-text markdown-body" : "message-text";
@@ -786,6 +813,7 @@ function renderStoredMessage(message) {
     const timing = state.turnTimingsByMessage.get(message.id);
     if (timing) renderMessageDuration(message.id, Date.now() - timing.startedAt, true);
     else if (typeof message.durationMs === "number") renderMessageDuration(message.id, message.durationMs);
+    if (message.tokenUsage) renderMessageTokenUsage(message.id, message.tokenUsage);
     if (message.activitySummary || message.progressSummary?.length || message.autoCompactionCount) {
       renderAssistantActivity(message.id, {
         status: "stored",
@@ -928,8 +956,15 @@ async function handleAppEvent(event) {
   if (event.type === "turn-complete" || event.type === "turn-error" || event.type === "turn-stopped") {
     finishTurnTiming(event.sessionId, event.messageId, event.durationMs);
     finishAssistantActivity(event);
+    if (event.tokenUsage) renderMessageTokenUsage(event.messageId, event.tokenUsage);
     if (state.activeSessionId === event.sessionId) state.activeSessionId = undefined;
     updateControls();
+  }
+  if (event.type === "token-usage") {
+    if (state.currentSessionId === event.sessionId) {
+      renderMessageTokenUsage(event.messageId, event.tokenUsage, event.phase === "running");
+    }
+    return;
   }
   if (event.type === "tool-call") {
     const previous = state.activityByMessage.get(event.messageId);
