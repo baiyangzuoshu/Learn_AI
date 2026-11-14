@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { stat } from "node:fs/promises";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import type { AppEvent, AppSettings, ChatMessage } from "./contracts.js";
@@ -33,10 +33,12 @@ type BrowserWindowInstance = import("electron").BrowserWindow;
 const MAX_CONCURRENT_TURNS = 1;
 const MAX_PROMPT_LENGTH = 30_000;
 const MAX_PERMISSION_PREVIEW = 5_000;
-const MAX_AGENTIC_TURNS = 12;
+const MAX_AGENTIC_TURNS = 40;
 const MODEL_IDLE_TIMEOUT_MS = 90_000;
+const WINDOWS_MODEL_IDLE_TIMEOUT_MS = 10 * 60_000;
 const TOOL_IDLE_TIMEOUT_MS = 10 * 60_000;
 const IDLE_TIMEOUT_MESSAGE = "连续 90 秒没有收到模型进展，本次请求已自动停止。请检查网络或 DeepSeek 服务状态后重试。";
+const WINDOWS_IDLE_TIMEOUT_MESSAGE = "Claude Code CLI 连续 10 分钟没有模型进展，本次请求已自动停止。请检查 Studio 设置中的 API 地址、模型和网络连接后重试。";
 const appDataDirectory = join(app.getPath("appData"), "Claude CLI Studio");
 
 interface ActiveTurn {
@@ -86,6 +88,42 @@ function sanitizeError(error: unknown, apiKey?: string): string {
   return safe.slice(0, 800) || "发生了未知错误";
 }
 
+function sanitizeDiagnosticText(value: unknown, apiKey?: string): string {
+  return sanitizeError(value, apiKey)
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\b(Bearer)\s+[^\s,;]+/gi, "$1 [已隐藏]")
+    .replace(/\b(ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|x-api-key|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "$1=[已隐藏]")
+    .replace(/\s+/g, " ")
+    .slice(0, 800);
+}
+
+function describeEndpoint(endpoint: string): string {
+  try {
+    const url = new URL(endpoint);
+    return url.origin + url.pathname;
+  } catch {
+    return "[无效的 API 地址]";
+  }
+}
+
+function emitDiagnostic(
+  senderId: number,
+  sessionId: string,
+  level: "info" | "warn" | "error",
+  message: string,
+  apiKey?: string,
+): void {
+  const safeMessage = sanitizeDiagnosticText(message, apiKey);
+  if (!safeMessage) return;
+  emit(senderId, {
+    type: "diagnostic-log",
+    sessionId,
+    timestamp: new Date().toISOString(),
+    level,
+    message: safeMessage,
+  });
+}
+
 function previewInput(input: Record<string, unknown>): string {
   try {
     return JSON.stringify(input, null, 2).slice(0, MAX_PERMISSION_PREVIEW);
@@ -94,11 +132,14 @@ function previewInput(input: Record<string, unknown>): string {
   }
 }
 
-function addSystemPath(environment: NodeJS.ProcessEnv): string {
+function addSystemPath(environment: NodeJS.ProcessEnv, additionalPaths: string[] = []): string {
   const extras = process.platform === "darwin"
     ? ["/opt/homebrew/bin", "/usr/local/bin", join(app.getPath("home"), ".local/bin"), "/usr/bin", "/bin"]
+    : process.platform === "win32"
+    ? [join(app.getPath("home"), ".local", "bin")]
     : [join(app.getPath("home"), ".local/bin"), "/usr/local/bin", "/usr/bin", "/bin"];
-  return [...new Set([...(environment.PATH ?? "").split(delimiter), ...extras].filter(Boolean))].join(delimiter);
+  return [...new Set([...(environment.PATH ?? "").split(delimiter), ...extras, ...additionalPaths].filter(Boolean))]
+    .join(delimiter);
 }
 
 function assertIpcSender(senderId: number): void {
@@ -333,7 +374,9 @@ function registerHandlers(): void {
       const workspace = await stat(session.cwd).catch(() => undefined);
       if (!workspace?.isDirectory()) throw new Error("项目文件夹已不存在，请新建会话并重新选择目录");
       const apiKey = await readApiKey();
-      if (!apiKey) throw new Error("请先在设置中保存 DeepSeek API Key");
+      if (!apiKey) {
+        throw new Error("请先在设置中保存 DeepSeek API Key");
+      }
       const settings = await readSettings();
       const cli = await inspectClaudeCli();
       if (!cli) throw new Error("没有找到 Claude Code CLI。请先安装 Claude Code。");
@@ -387,6 +430,7 @@ function registerHandlers(): void {
     const active = activeTurns.get(sessionId);
     if (!active || active.senderId !== event.sender.id) return;
     active.stopRequested = true;
+    emitDiagnostic(event.sender.id, sessionId, "warn", "用户停止了当前 CLI 请求");
     closeActiveQuery(active);
   });
 
@@ -407,11 +451,42 @@ async function runTurn(
   active: ActiveTurn,
   prompt: string,
   settings: AppSettings,
-  apiKey: string,
+  apiKey: string | undefined,
   cliPath: string,
 ): Promise<void> {
   const currentSession = getSession(active.sessionId);
   if (!currentSession) return;
+  const isWindows = process.platform === "win32";
+  const modelIdleTimeoutMs = isWindows
+    ? WINDOWS_MODEL_IDLE_TIMEOUT_MS
+    : MODEL_IDLE_TIMEOUT_MS;
+  const idleTimeoutMessage = isWindows
+    ? WINDOWS_IDLE_TIMEOUT_MESSAGE
+    : IDLE_TIMEOUT_MESSAGE;
+  const log = (
+    level: "info" | "warn" | "error",
+    message: string,
+  ): void => emitDiagnostic(
+    active.senderId,
+    active.sessionId,
+    level,
+    message,
+    apiKey,
+  );
+  let stderrBuffer = "";
+  const flushStderr = (): void => {
+    const line = stderrBuffer.trim();
+    stderrBuffer = "";
+    if (line) log("warn", "CLI stderr: " + line);
+  };
+  const captureStderr = (data: string): void => {
+    const lines = (stderrBuffer + data.replace(/\0/g, "")).split(/\r?\n/);
+    stderrBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.trim()) log("warn", "CLI stderr: " + line);
+    }
+    if (stderrBuffer.length > 1200) flushStderr();
+  };
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   let idleTimedOut = false;
   const resetIdleTimer = (timeoutMs: number): void => {
@@ -423,9 +498,9 @@ async function runTurn(
   };
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
-    PATH: addSystemPath(process.env),
+    PATH: addSystemPath(process.env, [dirname(cliPath)]),
     ANTHROPIC_BASE_URL: settings.baseUrl,
-    ANTHROPIC_AUTH_TOKEN: apiKey,
+    ANTHROPIC_AUTH_TOKEN: apiKey ?? "",
     ANTHROPIC_API_KEY: "",
     CLAUDE_CODE_OAUTH_TOKEN: "",
     ANTHROPIC_MODEL: settings.model,
@@ -436,6 +511,15 @@ async function runTurn(
     CLAUDE_CODE_AGENT_SDK_CLIENT_APP: "claude-cli-studio",
   };
   try {
+    log("info", "启动 Claude Code CLI: " + cliPath);
+    log("info", "工作区: " + currentSession.cwd);
+    log(
+      "info",
+      "Studio 请求配置: model=" + settings.model +
+        "; endpoint=" + describeEndpoint(settings.baseUrl) +
+        "; permissionMode=" + active.permissionMode +
+        "; maxTurns=" + MAX_AGENTIC_TURNS,
+    );
     const previousMessages = getHistory(active.sessionId);
     const isFirstTurn = previousMessages.filter((message) => message.role === "user").length <= 1;
     const currentQuery = query({
@@ -451,6 +535,7 @@ async function runTurn(
         includePartialMessages: true,
         maxTurns: MAX_AGENTIC_TURNS,
         env: environment,
+        stderr: captureStderr,
       },
     });
     active.query = currentQuery;
@@ -458,15 +543,42 @@ async function runTurn(
     let streamedText = "";
     let finalResult = "";
     let finalError: string | undefined;
+    let finalStopReason: string | null | undefined;
     let awaitingToolResult = false;
-    resetIdleTimer(MODEL_IDLE_TIMEOUT_MS);
+    resetIdleTimer(modelIdleTimeoutMs);
     for await (const message of currentQuery) {
       const isToolExecution = message.type === "assistant" &&
         message.message.content.some((block) => block.type === "tool_use");
       if (message.type === "assistant") awaitingToolResult = isToolExecution;
-      else if (message.type === "user" && awaitingToolResult) awaitingToolResult = false;
+      else if (message.type === "user" && awaitingToolResult) {
+        awaitingToolResult = false;
+        log("info", "工具执行已返回，CLI 正在继续处理");
+      }
       if (isToolExecution || awaitingToolResult) resetIdleTimer(TOOL_IDLE_TIMEOUT_MS);
-      else resetIdleTimer(MODEL_IDLE_TIMEOUT_MS);
+      else resetIdleTimer(modelIdleTimeoutMs);
+      if (message.type === "system" && message.subtype === "init") {
+        log(
+          "info",
+          "CLI 初始化完成: version=" + message.claude_code_version +
+            "; model=" + message.model +
+            "; cliAuthSource=" + message.apiKeySource +
+            "; studioApiKeyProvided=" + Boolean(apiKey),
+        );
+      } else if (message.type === "system" && message.subtype === "api_retry") {
+        log(
+          "warn",
+          "API 重试 " + message.attempt + "/" + message.max_retries +
+            "; status=" + (message.error_status ?? "network") +
+            "; delay=" + message.retry_delay_ms + "ms" +
+            "; error=" + message.error,
+        );
+      } else if (
+        message.type === "system" &&
+        message.subtype === "status" &&
+        message.status
+      ) {
+        log("info", "CLI 状态: " + message.status);
+      }
       if (message.type === "stream_event") {
         const event = message.event;
         if (
@@ -484,8 +596,10 @@ async function runTurn(
           });
         }
       } else if (message.type === "assistant") {
+        if (message.error) log("error", "CLI assistant error: " + message.error);
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
+            log("info", "工具调用: " + block.name);
             const inputPreview = previewInput(block.input as Record<string, unknown>);
             await addMessage(active.sessionId, {
               id: crypto.randomUUID(),
@@ -500,21 +614,55 @@ async function runTurn(
               toolName: block.name.slice(0, 120),
               inputPreview,
             });
-          } else if (block.type === "text" && !streamedText) {
-            streamedText = block.text;
-            appendAssistantText(active.sessionId, active.messageId, block.text);
-            emit(active.senderId, {
-              type: "text-delta",
-              sessionId: active.sessionId,
-              messageId: active.messageId,
-              text: block.text,
-            });
+          } else if (block.type === "text") {
+            if (/API Error|Model is unavailable|HTTP\s+[45]\d{2}/i.test(block.text)) {
+              log("error", "CLI 模型/API 错误: " + block.text);
+            }
+            if (!streamedText) {
+              streamedText = block.text;
+              appendAssistantText(active.sessionId, active.messageId, block.text);
+              emit(active.senderId, {
+                type: "text-delta",
+                sessionId: active.sessionId,
+                messageId: active.messageId,
+                text: block.text,
+              });
+            }
           }
         }
       } else if (message.type === "result") {
-        if (message.subtype === "success") finalResult = message.result;
-        else finalError = message.errors.join("\n") || "Claude CLI 执行失败";
+        finalStopReason = message.stop_reason;
+        if (message.subtype === "success") {
+          finalResult = message.result;
+          log(
+            "info",
+            "CLI 请求完成: turns=" + message.num_turns +
+              "; duration=" + message.duration_ms + "ms" +
+              "; stopReason=" + (message.stop_reason ?? "none") +
+              "; resultChars=" + message.result.length +
+              "; streamedTextChars=" + streamedText.length,
+          );
+        } else {
+          finalError = message.errors.join("\n") || "Claude CLI 执行失败";
+          log(
+            "error",
+            "CLI 返回错误 (" + message.subtype + "): turns=" + message.num_turns +
+              "; duration=" + message.duration_ms + "ms" +
+              "; stopReason=" + (message.stop_reason ?? "none") +
+              "; " + finalError,
+          );
+        }
       }
+    }
+    flushStderr();
+    if (!finalError && !active.stopRequested && !idleTimedOut && !finalResult && !streamedText) {
+      finalResult = "Claude Code CLI 已完成工具操作，但没有返回文字回复。请查看运行日志中的 resultChars 和 stopReason。";
+      appendAssistantText(active.sessionId, active.messageId, finalResult);
+      log(
+        "warn",
+        "CLI 成功结束但没有最终文本: resultChars=0; streamedTextChars=0; stopReason=" +
+          (finalStopReason ?? "none"),
+      );
     }
     await persistSessions();
     if (active.stopRequested) {
@@ -526,23 +674,29 @@ async function runTurn(
       return;
     }
     if (idleTimedOut) {
+      log("error", idleTimeoutMessage);
       emit(active.senderId, {
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
-        message: IDLE_TIMEOUT_MESSAGE,
+        message: idleTimeoutMessage,
       });
       return;
     }
     if (finalError) {
+      const maxTurnsMatch = finalError.match(/maximum number of turns \((\d+)\)/i);
+      const userMessage = maxTurnsMatch
+        ? `本次请求达到 ${maxTurnsMatch[1]} 轮工具处理上限，模型尚未生成最终回复。请拆分任务后重试。`
+        : sanitizeError(finalError, apiKey);
       emit(active.senderId, {
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
-        message: sanitizeError(finalError, apiKey),
+        message: userMessage,
       });
       return;
     }
+    log("info", "本轮运行结束");
     emit(active.senderId, {
       type: "turn-complete",
       sessionId: active.sessionId,
@@ -558,14 +712,16 @@ async function runTurn(
         messageId: active.messageId,
       });
     } else if (idleTimedOut) {
+      log("error", idleTimeoutMessage);
       emit(active.senderId, {
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
-        message: IDLE_TIMEOUT_MESSAGE,
+        message: idleTimeoutMessage,
       });
     } else {
       const message = sanitizeError(error, apiKey);
+      log("error", "运行异常: " + message);
       emit(active.senderId, {
         type: "turn-error",
         sessionId: active.sessionId,
@@ -574,6 +730,7 @@ async function runTurn(
       });
     }
   } finally {
+    flushStderr();
     if (idleTimer) clearTimeout(idleTimer);
   }
 }

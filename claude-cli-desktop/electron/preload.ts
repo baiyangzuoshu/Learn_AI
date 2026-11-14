@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { AppEvent, AppSettings, BootstrapData, ChatMessage, ClaudeDesktopBridge, SessionSummary } from "./contracts.js";
+import type { AppEvent, AppSettings, BootstrapData, ChatMessage, ClaudeStudioBridge, SessionSummary } from "./contracts.js";
 
-const bridge: ClaudeDesktopBridge = {
+const bridge: ClaudeStudioBridge = {
   getBootstrap: () => ipcRenderer.invoke("app:bootstrap") as Promise<BootstrapData>,
   createSession: () => ipcRenderer.invoke("session:create") as Promise<SessionSummary | undefined>,
   createSessionInWorkspace: (sessionId) =>
@@ -23,4 +23,4 @@ const bridge: ClaudeDesktopBridge = {
   },
 };
 
-contextBridge.exposeInMainWorld("claudeDesktop", bridge);
+contextBridge.exposeInMainWorld("claudeStudio", bridge);

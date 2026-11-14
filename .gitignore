@@ -11,3 +11,5 @@ graphify-out/
 
 # Keep offline Electron Builder archives, ignore extracted/cache directories.
 tools/*/
+typescript/tools/*/
+typescript/electron/.cache/

@@ -13,6 +13,8 @@ const state = {
   collapsedProjects: new Set(),
   messageElements: new Map(),
   messageRawText: new Map(),
+  diagnosticLogsBySession: new Map(),
+  diagnosticExpanded: true,
   settings: undefined,
   hasApiKey: false,
   clearApiKey: false,
@@ -20,7 +22,7 @@ const state = {
   toastTimer: undefined,
 };
 
-const bridge = window.claudeDesktop;
+const bridge = window.claudeStudio;
 const sessionList = $("#session-list");
 const welcomeState = $("#welcome-state");
 const messageList = $("#message-list");
@@ -40,6 +42,83 @@ function showToast(message) {
   state.toastTimer = setTimeout(() => toast.classList.remove("show"), 3600);
 }
 
+function renderDiagnosticLogs(scrollToLatest = false) {
+  const list = $("#diagnostic-list");
+  const logs = state.currentSessionId
+    ? state.diagnosticLogsBySession.get(state.currentSessionId) ?? []
+    : [];
+  const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+  $("#diagnostic-count").textContent = String(logs.length);
+  $("#diagnostic-toggle-label").textContent = state.diagnosticExpanded ? "收起" : "展开";
+  $("#diagnostic-toggle").setAttribute("aria-expanded", String(state.diagnosticExpanded));
+  list.hidden = !state.diagnosticExpanded;
+  if (!logs.length) {
+    const empty = document.createElement("div");
+    empty.className = "diagnostic-empty";
+    empty.textContent = "发送消息后，CLI 和模型请求日志会显示在这里。";
+    list.replaceChildren(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const entry of logs) {
+    const row = document.createElement("div");
+    row.className = "diagnostic-log-entry " + entry.level;
+    const time = document.createElement("time");
+    time.className = "diagnostic-time";
+    time.dateTime = entry.timestamp;
+    const parsedTime = new Date(entry.timestamp);
+    time.textContent = Number.isNaN(parsedTime.getTime())
+      ? "--:--:--"
+      : parsedTime.toLocaleTimeString();
+    const level = document.createElement("span");
+    level.className = "diagnostic-level";
+    level.textContent = entry.level.toUpperCase();
+    const message = document.createElement("span");
+    message.className = "diagnostic-message";
+    message.textContent = entry.message;
+    row.append(time, level, message);
+    fragment.append(row);
+  }
+  list.replaceChildren(fragment);
+  if (scrollToLatest || wasAtBottom) list.scrollTop = list.scrollHeight;
+}
+
+function appendDiagnosticLog(entry) {
+  let logs = state.diagnosticLogsBySession.get(entry.sessionId);
+  if (!logs) {
+    logs = [];
+    state.diagnosticLogsBySession.set(entry.sessionId, logs);
+  }
+  logs.push(entry);
+  if (logs.length > 250) logs.splice(0, logs.length - 250);
+  if (state.currentSessionId === entry.sessionId) renderDiagnosticLogs();
+}
+
+async function copyDiagnosticLogs() {
+  const logs = state.currentSessionId
+    ? state.diagnosticLogsBySession.get(state.currentSessionId) ?? []
+    : [];
+  if (!logs.length) {
+    showToast("当前没有运行日志");
+    return;
+  }
+  const text = logs.map((entry) => {
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    return time + " " + entry.level.toUpperCase() + " " + entry.message;
+  }).join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("运行日志已复制");
+  } catch {
+    showToast("无法访问剪贴板，请在日志区域选择并复制");
+  }
+}
+
+function hasProviderAuth() {
+  return state.hasApiKey;
+}
+
 function setStatus() {
   const bootstrap = state.bootstrap;
   if (!bootstrap) return;
@@ -52,11 +131,15 @@ function setStatus() {
   $("#cli-version-detail").textContent = hasCli
     ? `${bootstrap.cliVersion} · ${bootstrap.cliPath}`
     : bootstrap.cliError ?? "没有检测到 Claude Code CLI";
+  $("#provider-name").textContent = "DeepSeek API";
+  $("#provider-icon").textContent = "D";
   $("#key-state").textContent = state.hasApiKey ? "密钥已保存在本机" : "尚未配置密钥";
   $("#provider-dot").classList.toggle("ready", state.hasApiKey);
   $("#key-saved-state").textContent = state.hasApiKey ? "密钥已保存" : "尚未保存";
   $("#key-saved-state").classList.toggle("saved", state.hasApiKey);
   $("#model-chip span:last-child").textContent = state.settings?.model || "DeepSeek";
+  $("#settings-description").textContent = "配置 Claude Code CLI 使用的 Anthropic 兼容接口。密钥以明文本地文件保存，仅当前用户可读写，不使用钥匙串。";
+  $("#welcome-description").textContent = "选择一个项目文件夹，Claude Code 会在本机读取与修改文件。DeepSeek API Key 只保存在本机。";
   renderPermissionMode();
   $("#composer-context").textContent = hasCli ? "Claude Code CLI · 本机运行" : "等待安装 Claude Code CLI";
   updateControls();
@@ -93,7 +176,7 @@ function renderPermissionMode() {
 
 function updateControls() {
   const hasSession = Boolean(state.currentSessionId);
-  const ready = Boolean(state.bootstrap?.cliPath && state.hasApiKey);
+  const ready = Boolean(state.bootstrap?.cliPath && hasProviderAuth());
   const isRunning = Boolean(state.activeSessionId);
   promptInput.disabled = !hasSession || !ready || isRunning;
   sendButton.disabled = !hasSession || !ready || isRunning || !promptInput.value.trim();
@@ -103,7 +186,7 @@ function updateControls() {
     : state.bootstrap?.cliPath ? "Claude Code CLI · 本机运行" : "等待安装 Claude Code CLI";
   if (!hasSession) promptInput.placeholder = "先选择一个项目文件夹…";
   else if (!state.bootstrap?.cliPath) promptInput.placeholder = "请先安装 Claude Code CLI…";
-  else if (!state.hasApiKey) promptInput.placeholder = "先在设置中保存 DeepSeek API Key…";
+  else if (!hasProviderAuth()) promptInput.placeholder = "先在设置中保存 DeepSeek API Key…";
   else promptInput.placeholder = "描述你想完成的改动…";
 }
 
@@ -470,6 +553,7 @@ function setActiveSession(session) {
   welcomeState.hidden = Boolean(session);
   messageList.hidden = !session;
   if (!session) messageList.replaceChildren();
+  renderDiagnosticLogs(true);
   renderSessions();
   updateControls();
 }
@@ -605,6 +689,10 @@ function renderPermissionRequest(event) {
 }
 
 async function handleAppEvent(event) {
+  if (event.type === "diagnostic-log") {
+    appendDiagnosticLog(event);
+    return;
+  }
   if (event.type === "permission-request") {
     if (state.currentSessionId !== event.sessionId) {
       const session = state.sessions.find((item) => item.id === event.sessionId);
@@ -732,7 +820,7 @@ async function activateCreatedSession(session) {
   state.renamingSessionId = undefined;
   await selectSession(session.id);
   promptInput.focus();
-  if (!state.hasApiKey) {
+  if (!hasProviderAuth()) {
     showToast("先在设置中保存 DeepSeek API Key，再开始对话");
     openSettings();
   } else if (!state.bootstrap?.cliPath) {
@@ -743,7 +831,7 @@ async function activateCreatedSession(session) {
 function openSettings() {
   const settings = state.settings ?? {
     baseUrl: "https://api.deepseek.com/anthropic",
-    model: "deepseek-flash[1m]",
+    model: "deepseek-flash",
     permissionMode: "default",
   };
   $("#base-url").value = settings.baseUrl;
@@ -880,7 +968,7 @@ function closeFullAccessDialog() {
 async function persistPermissionMode(mode) {
   const current = state.settings ?? {
     baseUrl: "https://api.deepseek.com/anthropic",
-    model: "deepseek-flash[1m]",
+    model: "deepseek-flash",
     permissionMode: "default",
   };
   try {
@@ -920,6 +1008,15 @@ $("#confirm-full-access").addEventListener("click", () => {
   closeFullAccessDialog();
   if (mode === "bypassPermissions") void persistPermissionMode(mode);
 });
+$("#diagnostic-toggle").addEventListener("click", () => {
+  state.diagnosticExpanded = !state.diagnosticExpanded;
+  renderDiagnosticLogs();
+});
+$("#diagnostic-clear").addEventListener("click", () => {
+  if (state.currentSessionId) state.diagnosticLogsBySession.delete(state.currentSessionId);
+  renderDiagnosticLogs();
+});
+$("#diagnostic-copy").addEventListener("click", () => void copyDiagnosticLogs());
 $("#composer-form").addEventListener("submit", (event) => void sendPrompt(event));
 promptInput.addEventListener("input", resizePrompt);
 promptInput.addEventListener("keydown", (event) => {
@@ -966,7 +1063,7 @@ async function initialize() {
     setStatus();
     renderSessions();
     if (state.sessions.length) await selectSession(state.sessions[0].id);
-    if (!state.hasApiKey) {
+    if (!hasProviderAuth()) {
       showToast(bootstrap.legacyApiKeyPresent
         ? "旧版密钥需要重新输入一次；新版只保存在本机文件"
         : "保存 DeepSeek API Key 后即可开始");

@@ -33,6 +33,7 @@ export interface BootstrapData {
 }
 
 export type AppEvent =
+  | { type: "diagnostic-log"; sessionId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
   | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; text: string }
   | { type: "text-delta"; sessionId: string; messageId: string; text: string }
   | { type: "tool-call"; sessionId: string; toolName: string; inputPreview: string }
@@ -41,7 +42,7 @@ export type AppEvent =
   | { type: "turn-error"; sessionId: string; messageId: string; message: string }
   | { type: "turn-stopped"; sessionId: string; messageId: string };
 
-export interface ClaudeDesktopBridge {
+export interface ClaudeStudioBridge {
   getBootstrap(): Promise<BootstrapData>;
   createSession(): Promise<SessionSummary | undefined>;
   createSessionInWorkspace(sessionId: string): Promise<SessionSummary>;
@@ -62,6 +63,6 @@ export interface ClaudeDesktopBridge {
 
 declare global {
   interface Window {
-    claudeDesktop: ClaudeDesktopBridge;
+    claudeStudio: ClaudeStudioBridge;
   }
 }

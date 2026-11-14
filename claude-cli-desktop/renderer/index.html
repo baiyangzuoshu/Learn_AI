@@ -36,9 +36,9 @@
 
         <div class="sidebar-bottom">
           <div class="provider-card">
-            <div class="provider-icon">D</div>
+            <div class="provider-icon" id="provider-icon">D</div>
             <div class="provider-copy">
-              <strong>DeepSeek API</strong>
+              <strong id="provider-name">DeepSeek API</strong>
               <span id="key-state">尚未配置密钥</span>
             </div>
             <span class="status-dot" id="provider-dot"></span>
@@ -71,7 +71,7 @@
             <div class="welcome-orbit"><span>C</span></div>
             <p class="eyebrow">CLAUDE CODE · 本地运行</p>
             <h1>让代码工作<br /><span>从一个想法开始。</span></h1>
-            <p class="welcome-description">选择一个项目文件夹，Claude Code 会在本机读取与修改文件。DeepSeek API Key 只保存在这台 Mac 上。</p>
+            <p class="welcome-description" id="welcome-description">选择一个项目文件夹，Claude Code 会在本机读取与修改文件。</p>
             <button class="primary-button welcome-cta" id="welcome-new-session">选择项目文件夹 <span>→</span></button>
             <div class="welcome-meta"><span class="mini-shield">◆</span>本机 CLI · 本地密钥文件 · 权限模式可切换</div>
           </div>
@@ -118,6 +118,22 @@
             </div>
           </form>
           <p class="composer-footer" id="composer-note">Claude CLI 会在所选目录中工作。请审阅文件改动与命令权限请求。</p>
+          <section class="diagnostic-panel" aria-label="CLI 运行日志">
+            <div class="diagnostic-header">
+              <button type="button" class="diagnostic-toggle" id="diagnostic-toggle" aria-expanded="true" aria-controls="diagnostic-list">
+                <span>运行日志</span>
+                <span class="diagnostic-count" id="diagnostic-count">0</span>
+                <span class="diagnostic-toggle-label" id="diagnostic-toggle-label">收起</span>
+              </button>
+              <div class="diagnostic-actions">
+                <button type="button" id="diagnostic-copy">复制</button>
+                <button type="button" id="diagnostic-clear">清空</button>
+              </div>
+            </div>
+            <div class="diagnostic-list" id="diagnostic-list" role="log" aria-live="polite" aria-relevant="additions">
+              <div class="diagnostic-empty">发送消息后，CLI 和模型请求日志会显示在这里。</div>
+            </div>
+          </section>
         </div>
       </main>
     </div>
@@ -131,25 +147,26 @@
           </div>
           <button class="icon-button modal-close" id="close-settings" aria-label="关闭设置">×</button>
         </div>
-        <p class="modal-description">配置 Claude Code CLI 使用的 Anthropic 兼容接口。密钥以明文本地文件保存，仅当前用户可读写，不使用钥匙串。</p>
+        <p class="modal-description" id="settings-description">配置 Claude Code CLI 使用的 Anthropic 兼容接口。密钥以明文本地文件保存，仅当前用户可读写，不使用钥匙串。</p>
 
         <form id="settings-form">
-          <label class="field-label" for="base-url">API 地址</label>
-          <input id="base-url" name="baseUrl" type="url" value="https://api.deepseek.com/anthropic" autocomplete="url" required />
+          <div id="api-provider-settings">
+            <label class="field-label" for="base-url">API 地址</label>
+            <input id="base-url" name="baseUrl" type="url" value="https://api.deepseek.com/anthropic" autocomplete="url" required />
 
-          <label class="field-label" for="model-name">模型</label>
-          <input id="model-name" name="model" type="text" value="deepseek-flash[1m]" autocomplete="off" required />
+            <label class="field-label" for="model-name">模型</label>
+            <input id="model-name" name="model" type="text" value="deepseek-flash" autocomplete="off" required />
 
-          <div class="key-label-row">
-            <label class="field-label" for="api-key">DeepSeek API Key</label>
-            <span class="key-saved-state" id="key-saved-state">本机文件存储</span>
+            <div class="key-label-row">
+              <label class="field-label" for="api-key">DeepSeek API Key</label>
+              <span class="key-saved-state" id="key-saved-state">本机文件存储</span>
+            </div>
+            <input id="api-key" name="apiKey" type="password" placeholder="输入 sk-...；保存后会清空此栏" autocomplete="new-password" spellcheck="false" />
+            <div class="key-controls">
+              <span class="field-hint" id="key-hint">新密钥以明文保存在本机权限受限文件中，不写入项目仓库或钥匙串。</span>
+              <button type="button" class="text-button" id="clear-key">清除密钥</button>
+            </div>
           </div>
-          <input id="api-key" name="apiKey" type="password" placeholder="输入 sk-...；保存后会清空此栏" autocomplete="new-password" spellcheck="false" />
-          <div class="key-controls">
-            <span class="field-hint" id="key-hint">新密钥以明文保存在本机权限受限文件中，不写入项目仓库或钥匙串。</span>
-            <button type="button" class="text-button" id="clear-key">清除密钥</button>
-          </div>
-
           <div class="settings-error" id="settings-error" role="alert" hidden></div>
           <div class="modal-footer">
             <button type="button" class="secondary-button" id="cancel-settings">取消</button>

@@ -16,7 +16,7 @@ const state = {
   toastTimer: undefined,
 };
 
-const bridge = window.claudeDesktop;
+const bridge = window.claudeStudio;
 const sessionList = $("#session-list");
 const welcomeState = $("#welcome-state");
 const messageList = $("#message-list");
@@ -580,7 +580,7 @@ async function activateCreatedSession(session) {
 function openSettings() {
   const settings = state.settings ?? {
     baseUrl: "https://api.deepseek.com/anthropic",
-    model: "deepseek-flash[1m]",
+    model: "deepseek-flash",
     permissionMode: "default",
   };
   $("#base-url").value = settings.baseUrl;
@@ -705,7 +705,7 @@ function closeFullAccessDialog() {
 async function persistPermissionMode(mode) {
   const current = state.settings ?? {
     baseUrl: "https://api.deepseek.com/anthropic",
-    model: "deepseek-flash[1m]",
+    model: "deepseek-flash",
     permissionMode: "default",
   };
   try {

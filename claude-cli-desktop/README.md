@@ -4,14 +4,14 @@ An independent Electron desktop client that runs Claude Code locally and can rou
 
 ## Development
 
-Requirements: macOS, Node.js 22+ for development, and Claude Code CLI installed locally.
+Requirements: Windows 10/11 or macOS, Node.js 22+ for development, and Claude Code CLI installed locally.
 
 ```sh
 npm install
 npm run dev
 ```
 
-The app looks for `claude` on `PATH` and in standard macOS install directories, so common Homebrew and native Claude Code installations can be found when Electron is started from Finder.
+On Windows, the app looks for the Claude Code CLI executable (`claude.exe`) on `PATH`, in `~/.local/bin`, and in the standard Claude Code and WinGet install locations. It runs this CLI locally and supplies the API URL, model, and key saved in Studio Settings; the app does not use the CLI's `~/.claude/settings.json`. The WinGet lookup is independent of the desktop process's inherited `PATH`. On macOS, the app looks for `claude` on `PATH` and in standard Homebrew and native install directories, and can route the CLI through the same Anthropic-compatible API settings.
 
 ## Projects and sessions
 
@@ -19,7 +19,7 @@ Add a project by choosing a folder; the app starts its first conversation in tha
 
 ## API key storage
 
-The DeepSeek API key is stored as a plaintext local file at `~/Library/Application Support/Claude CLI Studio/secrets/deepseek-api-key`. The file is owner-readable and writable (`0600`), and the `secrets` directory is owner-only (`0700`). The app does not use macOS Keychain for API keys. The key is not written to this repository, `.env` files, settings JSON, renderer storage, logs, or Git. The repository `.gitignore` excludes `secrets/` and build output.
+The DeepSeek API key is stored as a plaintext local file at `~/Library/Application Support/Claude CLI Studio/secrets/deepseek-api-key` on macOS or `%APPDATA%/Claude CLI Studio/secrets/deepseek-api-key` on Windows. On macOS, the file is owner-readable and writable (`0600`), and the `secrets` directory is owner-only (`0700`). The app does not use macOS Keychain for API keys. The key is not written to this repository, `.env` files, settings JSON, renderer storage, logs, or Git.
 
 Older releases stored an encrypted `deepseek-api-key.bin` file. This version does not access Keychain to decrypt it; the old file stays in place until a new key is saved in Settings. Saving a new key writes the local file and then removes the old encrypted file.
 
@@ -27,7 +27,9 @@ The repository `.gitignore` also excludes build output, local data, secrets, and
 
 ## Run limits
 
-Each request is limited to 12 agentic turns. If the model produces no progress for 90 seconds, the app closes the CLI process and shows a timeout message. A tool execution can run for up to 10 minutes without an SDK event before the same watchdog stops it. The Stop button also aborts the SDK request and closes its CLI process.
+Each request is limited to 40 agentic turns. On macOS, if the model produces no progress for 90 seconds, the app closes the CLI process and shows a timeout message; on Windows the model idle timeout is 10 minutes to accommodate longer CLI requests. A tool execution can run for up to 10 minutes without an SDK event before the watchdog stops it. The Stop button also aborts the SDK request and closes its CLI process.
+
+The bottom of the conversation view shows in-memory runtime diagnostics for the selected session, including CLI stderr, API retries, tool names, errors, timeouts, final stop reason, and returned text length. Entries are clipped and credential values are redacted before they are sent to the renderer. Logs can be copied or cleared and are not persisted. If the CLI reports success without returning text, Studio displays a visible fallback message instead of leaving an empty assistant response.
 
 ## Build
 

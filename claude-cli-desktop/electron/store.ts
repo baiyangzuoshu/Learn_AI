@@ -12,7 +12,7 @@ const MAX_MESSAGE_LENGTH = 60_000;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: "https://api.deepseek.com/anthropic",
-  model: "deepseek-flash[1m]",
+  model: "deepseek-flash",
   permissionMode: "default",
 };
 
@@ -34,11 +34,14 @@ export async function initializeStore(directory: string): Promise<void> {
 export async function readSettings(): Promise<AppSettings> {
   const stored = await readJson<Record<string, unknown>>(join(dataDirectory, SETTINGS_FILE));
   if (!stored) return { ...DEFAULT_SETTINGS };
-  return {
+  const storedModel = validateModel(stored.model, DEFAULT_SETTINGS.model);
+  const settings = {
     baseUrl: validateBaseUrl(stored.baseUrl, DEFAULT_SETTINGS.baseUrl),
-    model: validateModel(stored.model, DEFAULT_SETTINGS.model),
+    model: storedModel === "deepseek-flash[1m]" ? DEFAULT_SETTINGS.model : storedModel,
     permissionMode: validatePermissionMode(stored.permissionMode),
   };
+  if (settings.model !== storedModel) await writeSettings(settings);
+  return settings;
 }
 
 export async function writeSettings(settings: AppSettings): Promise<void> {
