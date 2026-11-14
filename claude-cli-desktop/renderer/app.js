@@ -142,6 +142,10 @@ function finishTurnTiming(sessionId, messageId, durationMs) {
   refreshTurnTimings();
 }
 
+function formatTokenCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : "未知";
+}
+
 function renderAssistantActivity(messageId, activity) {
   if (!activity) return;
   const article = state.messageElements.get(messageId);
@@ -163,16 +167,38 @@ function renderAssistantActivity(messageId, activity) {
   const title = document.createElement("strong");
   title.className = "assistant-activity-title";
   const count = Number.isSafeInteger(activity.total) ? activity.total : 0;
-  if (running) title.textContent = activity.currentAction ? `正在${activity.currentAction}` : "正在分析任务";
+  const autoCompactionCount = Number.isSafeInteger(activity.autoCompactionCount) ? activity.autoCompactionCount : 0;
+  if (running && activity.compactionStatus === "compacting") title.textContent = "正在压缩上下文";
+  else if (running) title.textContent = activity.currentAction ? `正在${activity.currentAction}` : "正在分析任务";
   else if (activity.status === "complete") title.textContent = count ? `本轮已完成 · ${count} 项操作` : "本轮已完成";
   else if (activity.status === "stopped") title.textContent = count ? `已停止 · ${count} 项操作` : "已停止";
   else if (activity.status === "error") title.textContent = count ? `遇到问题 · ${count} 项操作` : "遇到问题";
+  else if (activity.status === "stored" && autoCompactionCount > 0 && count === 0) title.textContent = "上下文压缩记录";
   else title.textContent = count ? `本轮操作 · ${count} 项` : "本轮操作";
   copy.append(title);
   if (activity.summary) {
     const details = document.createElement("span");
     details.className = "assistant-activity-details";
     details.textContent = `${running ? "已发起：" : "操作概览："}${activity.summary}`;
+    copy.append(details);
+  }
+  let compactionText = "";
+  if (activity.compactionStatus === "compacting") compactionText = "正在压缩上下文…";
+  else if (activity.compactionStatus === "failed") compactionText = "上下文压缩未完成 · 查看运行日志";
+  else if (autoCompactionCount > 0) {
+    const last = activity.lastAutoCompaction;
+    compactionText = `自动压缩 ${autoCompactionCount} 次`;
+    if (last) {
+      const postTokens = Number.isSafeInteger(last.postTokens) ? formatTokenCount(last.postTokens) : "未知";
+      compactionText += ` · 最近一次 ${formatTokenCount(last.preTokens)} → ${postTokens} tokens`;
+    }
+  } else if (activity.compactionStatus === "completed" && activity.compactionTrigger === "manual") {
+    compactionText = "手动压缩已完成";
+  }
+  if (compactionText) {
+    const details = document.createElement("span");
+    details.className = `assistant-activity-details assistant-activity-compaction${activity.compactionStatus === "failed" ? " failed" : ""}`;
+    details.textContent = compactionText;
     copy.append(details);
   }
   row.className = `assistant-activity ${running ? "running" : activity.status}`;
@@ -185,7 +211,14 @@ function finishAssistantActivity(event) {
   const total = event.activityCount ?? previous?.total ?? 0;
   const status = event.type === "turn-complete" ? "complete" : event.type === "turn-stopped" ? "stopped" : "error";
   state.activityByMessage.delete(event.messageId);
-  renderAssistantActivity(event.messageId, { status, summary, total });
+  renderAssistantActivity(event.messageId, {
+    ...previous,
+    status,
+    summary,
+    total,
+    autoCompactionCount: event.autoCompactionCount ?? previous?.autoCompactionCount ?? 0,
+    lastAutoCompaction: event.lastAutoCompaction ?? previous?.lastAutoCompaction,
+  });
 }
 
 function appendDiagnosticLog(entry) {
@@ -720,11 +753,13 @@ function renderStoredMessage(message) {
     const timing = state.turnTimingsByMessage.get(message.id);
     if (timing) renderMessageDuration(message.id, Date.now() - timing.startedAt, true);
     else if (typeof message.durationMs === "number") renderMessageDuration(message.id, message.durationMs);
-    if (message.activitySummary) {
+    if (message.activitySummary || message.autoCompactionCount) {
       renderAssistantActivity(message.id, {
         status: "stored",
         summary: message.activitySummary,
         total: message.activityCount ?? 0,
+        autoCompactionCount: message.autoCompactionCount ?? 0,
+        lastAutoCompaction: message.lastAutoCompaction,
       });
     }
   } else {
@@ -827,6 +862,8 @@ async function handleAppEvent(event) {
       currentAction: "",
       total: 0,
       summary: "",
+      autoCompactionCount: 0,
+      compactionStatus: "idle",
     });
     const session = state.sessions.find((item) => item.id === event.sessionId);
     if (session && state.currentSessionId !== session.id) await selectSession(session.id);
@@ -860,12 +897,40 @@ async function handleAppEvent(event) {
     updateControls();
   }
   if (event.type === "tool-call") {
+    const previous = state.activityByMessage.get(event.messageId);
     const activity = {
+      ...previous,
       sessionId: event.sessionId,
       status: "running",
       currentAction: event.action,
       total: event.total,
       summary: event.activitySummary,
+    };
+    state.activityByMessage.set(event.messageId, activity);
+    if (state.currentSessionId === event.sessionId) {
+      renderAssistantActivity(event.messageId, activity);
+      scrollToBottom();
+    }
+    return;
+  }
+  if (event.type === "context-compaction") {
+    const previous = state.activityByMessage.get(event.messageId);
+    const activity = {
+      ...previous,
+      sessionId: event.sessionId,
+      status: previous?.status ?? "running",
+      currentAction: previous?.currentAction ?? "",
+      total: previous?.total ?? 0,
+      summary: previous?.summary ?? "",
+      autoCompactionCount: event.autoCompactionCount,
+      compactionStatus: event.phase === "starting" ? "compacting" : event.phase,
+      compactionTrigger: event.trigger ?? previous?.compactionTrigger,
+      lastAutoCompaction: event.phase === "completed" && event.trigger === "auto"
+        ? {
+          preTokens: event.preTokens,
+          ...(typeof event.postTokens === "number" ? { postTokens: event.postTokens } : {}),
+        }
+        : previous?.lastAutoCompaction,
     };
     state.activityByMessage.set(event.messageId, activity);
     if (state.currentSessionId === event.sessionId) {

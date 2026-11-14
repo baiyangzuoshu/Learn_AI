@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
-import type { AppEvent, AppSettings, ChatMessage } from "./contracts.js";
+import type { AppEvent, AppSettings, AutoCompactionRecord, ChatMessage } from "./contracts.js";
 import { inspectClaudeCli } from "./claude-cli.js";
 import { desktopPlatform } from "./platform.js";
 import {
@@ -22,6 +22,7 @@ import {
   readApiKey,
   readSettings,
   renameSession,
+  setAssistantAutoCompaction,
   setAssistantActivitySummary,
   setAssistantDuration,
   validateSettings,
@@ -50,6 +51,8 @@ interface ActiveTurn {
   query?: ReturnType<typeof query>;
   stopRequested: boolean;
   toolActionCounts: Map<string, number>;
+  autoCompactionCount: number;
+  lastAutoCompaction?: AutoCompactionRecord;
   task: Promise<void>;
 }
 
@@ -160,11 +163,51 @@ function recordToolAction(active: ActiveTurn, toolName: string): { action: strin
   return { action, total, summary: summarizeToolActions(active.toolActionCounts) };
 }
 
-function persistToolActivity(active: ActiveTurn): { summary: string; count: number } {
+function persistToolActivity(active: ActiveTurn): {
+  summary: string;
+  count: number;
+  autoCompactionCount: number;
+  lastAutoCompaction?: AutoCompactionRecord;
+} {
   const summary = summarizeToolActions(active.toolActionCounts);
   const count = Math.min(10_000, [...active.toolActionCounts.values()].reduce((sum, value) => sum + value, 0));
   if (count > 0) setAssistantActivitySummary(active.sessionId, active.messageId, summary, count);
-  return { summary, count };
+  if (active.autoCompactionCount > 0 && active.lastAutoCompaction) {
+    setAssistantAutoCompaction(
+      active.sessionId,
+      active.messageId,
+      active.autoCompactionCount,
+      active.lastAutoCompaction,
+    );
+  }
+  return {
+    summary,
+    count,
+    autoCompactionCount: active.autoCompactionCount,
+    ...(active.lastAutoCompaction ? { lastAutoCompaction: active.lastAutoCompaction } : {}),
+  };
+}
+
+function activityEventFields(activity: {
+  summary: string;
+  count: number;
+  autoCompactionCount: number;
+  lastAutoCompaction?: AutoCompactionRecord;
+}): {
+  activitySummary?: string;
+  activityCount?: number;
+  autoCompactionCount?: number;
+  lastAutoCompaction?: AutoCompactionRecord;
+} {
+  return {
+    ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+    ...(activity.autoCompactionCount > 0
+      ? {
+        autoCompactionCount: activity.autoCompactionCount,
+        ...(activity.lastAutoCompaction ? { lastAutoCompaction: activity.lastAutoCompaction } : {}),
+      }
+      : {}),
+  };
 }
 
 function assertIpcSender(senderId: number): void {
@@ -442,6 +485,7 @@ function registerHandlers(): void {
         abortController: new AbortController(),
         stopRequested: false,
         toolActionCounts: new Map(),
+        autoCompactionCount: 0,
         task: Promise.resolve(),
       };
       activeTurns.set(sessionId, active);
@@ -603,10 +647,71 @@ async function runTurn(
         );
       } else if (
         message.type === "system" &&
-        message.subtype === "status" &&
-        message.status
+        message.subtype === "status"
       ) {
-        log("info", "CLI 状态: " + message.status);
+        if (message.status) log("info", "CLI 状态: " + message.status);
+        if (message.status === "compacting") {
+          log("info", "Claude 正在压缩上下文");
+          emit(active.senderId, {
+            type: "context-compaction",
+            sessionId: active.sessionId,
+            messageId: active.messageId,
+            phase: "starting",
+            autoCompactionCount: active.autoCompactionCount,
+          });
+        }
+        if (message.compact_result === "failed") {
+          log("warn", "Claude 上下文压缩未完成" + (message.compact_error ? ": " + message.compact_error : ""));
+          emit(active.senderId, {
+            type: "context-compaction",
+            sessionId: active.sessionId,
+            messageId: active.messageId,
+            phase: "failed",
+            autoCompactionCount: active.autoCompactionCount,
+          });
+        }
+      }
+      if (message.type === "system" && message.subtype === "compact_boundary") {
+        const metadata = message.compact_metadata;
+        if (metadata.trigger === "auto") {
+          active.autoCompactionCount = Math.min(10_000, active.autoCompactionCount + 1);
+          active.lastAutoCompaction = {
+            preTokens: metadata.pre_tokens,
+            ...(typeof metadata.post_tokens === "number" ? { postTokens: metadata.post_tokens } : {}),
+          };
+          setAssistantAutoCompaction(
+            active.sessionId,
+            active.messageId,
+            active.autoCompactionCount,
+            active.lastAutoCompaction,
+          );
+          log(
+            "info",
+            `Claude 自动压缩完成: count=${active.autoCompactionCount}; preTokens=${metadata.pre_tokens}; postTokens=${metadata.post_tokens ?? "unknown"}`,
+          );
+          emit(active.senderId, {
+            type: "context-compaction",
+            sessionId: active.sessionId,
+            messageId: active.messageId,
+            phase: "completed",
+            trigger: "auto",
+            autoCompactionCount: active.autoCompactionCount,
+            preTokens: metadata.pre_tokens,
+            ...(typeof metadata.post_tokens === "number" ? { postTokens: metadata.post_tokens } : {}),
+          });
+          await persistSessions().catch((error) => {
+            log("warn", "无法保存自动压缩记录: " + sanitizeError(error, apiKey));
+          });
+        } else {
+          emit(active.senderId, {
+            type: "context-compaction",
+            sessionId: active.sessionId,
+            messageId: active.messageId,
+            phase: "completed",
+            trigger: "manual",
+            autoCompactionCount: active.autoCompactionCount,
+          });
+        }
       }
       if (message.type === "stream_event") {
         const event = message.event;
@@ -699,7 +804,7 @@ async function runTurn(
         sessionId: active.sessionId,
         messageId: active.messageId,
         durationMs,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
       return;
     }
@@ -711,7 +816,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: idleTimeoutMessage,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
       return;
     }
@@ -726,7 +831,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: userMessage,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
       return;
     }
@@ -737,7 +842,7 @@ async function runTurn(
       messageId: active.messageId,
       durationMs,
       result: finalResult || streamedText,
-      ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+      ...activityEventFields(activity),
     });
   } catch (error) {
     const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
@@ -750,7 +855,7 @@ async function runTurn(
         sessionId: active.sessionId,
         messageId: active.messageId,
         durationMs,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
     } else if (idleTimedOut) {
       log("error", idleTimeoutMessage);
@@ -760,7 +865,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: idleTimeoutMessage,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
     } else {
       const message = sanitizeError(error, apiKey);
@@ -771,7 +876,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message,
-        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
+        ...activityEventFields(activity),
       });
     }
   } finally {

@@ -23,6 +23,13 @@ export interface ChatMessage {
   durationMs?: number;
   activitySummary?: string;
   activityCount?: number;
+  autoCompactionCount?: number;
+  lastAutoCompaction?: AutoCompactionRecord;
+}
+
+export interface AutoCompactionRecord {
+  preTokens: number;
+  postTokens?: number;
 }
 
 export interface BootstrapData {
@@ -40,10 +47,11 @@ export type AppEvent =
   | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; startedAt: number; text: string }
   | { type: "text-delta"; sessionId: string; messageId: string; text: string }
   | { type: "tool-call"; sessionId: string; messageId: string; action: string; total: number; activitySummary: string }
+  | { type: "context-compaction"; sessionId: string; messageId: string; phase: "starting" | "completed" | "failed"; trigger?: "auto" | "manual"; autoCompactionCount: number; preTokens?: number; postTokens?: number }
   | { type: "permission-request"; sessionId: string; requestId: string; toolUseId: string; toolName: string; inputPreview: string }
-  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number }
-  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number }
-  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number };
+  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord }
+  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number; activitySummary?: string; activityCount?: number; autoCompactionCount?: number; lastAutoCompaction?: AutoCompactionRecord };
 
 export interface ClaudeStudioBridge {
   getBootstrap(): Promise<BootstrapData>;

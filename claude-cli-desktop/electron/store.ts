@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AppSettings, ChatMessage, PermissionMode, SessionSummary } from "./contracts.js";
+import type { AppSettings, AutoCompactionRecord, ChatMessage, PermissionMode, SessionSummary } from "./contracts.js";
 import { desktopPlatform } from "./platform.js";
 
 const SETTINGS_FILE = "settings.json";
@@ -193,6 +193,28 @@ export function setAssistantActivitySummary(
   if (session) session.updatedAt = new Date().toISOString();
 }
 
+export function setAssistantAutoCompaction(
+  sessionId: string,
+  messageId: string,
+  count: number,
+  lastCompaction: AutoCompactionRecord,
+): void {
+  const message = getSession(sessionId)?.messages.find((candidate) => candidate.id === messageId);
+  if (
+    !message || message.role !== "assistant" || !Number.isSafeInteger(count) || count < 1 ||
+    !Number.isSafeInteger(lastCompaction.preTokens) || lastCompaction.preTokens < 0 ||
+    (lastCompaction.postTokens !== undefined &&
+      (!Number.isSafeInteger(lastCompaction.postTokens) || lastCompaction.postTokens < 0))
+  ) return;
+  message.autoCompactionCount = Math.min(count, 10_000);
+  message.lastAutoCompaction = {
+    preTokens: lastCompaction.preTokens,
+    ...(lastCompaction.postTokens !== undefined ? { postTokens: lastCompaction.postTokens } : {}),
+  };
+  const session = getSession(sessionId);
+  if (session) session.updatedAt = new Date().toISOString();
+}
+
 export async function persistSessions(): Promise<void> {
   const snapshot = JSON.stringify(sessions, null, 2);
   writeQueue = writeQueue.catch(() => undefined).then(() => atomicWrite(join(dataDirectory, SESSIONS_FILE), snapshot));
@@ -291,6 +313,25 @@ async function readSessions(): Promise<StoredSession[]> {
             ...(typeof record.activityCount === "number" && Number.isSafeInteger(record.activityCount) &&
                 record.activityCount >= 0 && record.activityCount <= 10_000
               ? { activityCount: record.activityCount }
+              : {}),
+            ...(typeof record.autoCompactionCount === "number" && Number.isSafeInteger(record.autoCompactionCount) &&
+                record.autoCompactionCount > 0 && record.autoCompactionCount <= 10_000
+              ? { autoCompactionCount: record.autoCompactionCount }
+              : {}),
+            ...(record.lastAutoCompaction && typeof record.lastAutoCompaction === "object" &&
+                Number.isSafeInteger((record.lastAutoCompaction as Record<string, unknown>).preTokens) &&
+                ((record.lastAutoCompaction as Record<string, number>).preTokens >= 0) &&
+                ((record.lastAutoCompaction as Record<string, unknown>).postTokens === undefined ||
+                  (Number.isSafeInteger((record.lastAutoCompaction as Record<string, unknown>).postTokens) &&
+                    (record.lastAutoCompaction as Record<string, number>).postTokens >= 0))
+              ? {
+                lastAutoCompaction: {
+                  preTokens: (record.lastAutoCompaction as Record<string, number>).preTokens,
+                  ...((record.lastAutoCompaction as Record<string, unknown>).postTokens !== undefined
+                    ? { postTokens: (record.lastAutoCompaction as Record<string, number>).postTokens }
+                    : {}),
+                },
+              }
               : {}),
           }];
         }).slice(-MAX_MESSAGES_PER_SESSION)
