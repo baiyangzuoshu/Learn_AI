@@ -179,6 +179,20 @@ export function setAssistantDuration(
   if (session) session.updatedAt = new Date().toISOString();
 }
 
+export function setAssistantActivitySummary(
+  sessionId: string,
+  messageId: string,
+  summary: string,
+  count: number,
+): void {
+  const message = getSession(sessionId)?.messages.find((candidate) => candidate.id === messageId);
+  if (!message || message.role !== "assistant" || !Number.isSafeInteger(count) || count < 0) return;
+  message.activitySummary = summary.slice(0, 500);
+  message.activityCount = Math.min(count, 10_000);
+  const session = getSession(sessionId);
+  if (session) session.updatedAt = new Date().toISOString();
+}
+
 export async function persistSessions(): Promise<void> {
   const snapshot = JSON.stringify(sessions, null, 2);
   writeQueue = writeQueue.catch(() => undefined).then(() => atomicWrite(join(dataDirectory, SESSIONS_FILE), snapshot));
@@ -270,6 +284,13 @@ async function readSessions(): Promise<StoredSession[]> {
             ...(typeof record.durationMs === "number" && Number.isFinite(record.durationMs) &&
                 record.durationMs >= 0 && record.durationMs <= 24 * 60 * 60_000
               ? { durationMs: record.durationMs }
+              : {}),
+            ...(typeof record.activitySummary === "string" && record.activitySummary.length <= 500
+              ? { activitySummary: record.activitySummary }
+              : {}),
+            ...(typeof record.activityCount === "number" && Number.isSafeInteger(record.activityCount) &&
+                record.activityCount >= 0 && record.activityCount <= 10_000
+              ? { activityCount: record.activityCount }
               : {}),
           }];
         }).slice(-MAX_MESSAGES_PER_SESSION)

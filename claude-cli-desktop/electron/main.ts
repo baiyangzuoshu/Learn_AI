@@ -22,6 +22,7 @@ import {
   readApiKey,
   readSettings,
   renameSession,
+  setAssistantActivitySummary,
   setAssistantDuration,
   validateSettings,
   writeApiKey,
@@ -48,6 +49,7 @@ interface ActiveTurn {
   abortController: AbortController;
   query?: ReturnType<typeof query>;
   stopRequested: boolean;
+  toolActionCounts: Map<string, number>;
   task: Promise<void>;
 }
 
@@ -129,6 +131,40 @@ function previewInput(input: Record<string, unknown>): string {
   } catch {
     return "无法显示工具参数";
   }
+}
+
+function describeToolAction(toolName: string): string {
+  switch (toolName) {
+    case "Bash": return "运行命令";
+    case "Read": return "读取文件";
+    case "Glob": return "搜索文件";
+    case "Grep": return "搜索代码";
+    case "Edit": return "修改文件";
+    case "Write": return "写入文件";
+    case "NotebookEdit": return "编辑笔记本";
+    case "WebSearch": return "搜索网页";
+    case "WebFetch": return "读取网页";
+    case "LS": return "查看目录";
+    default: return "执行操作";
+  }
+}
+
+function summarizeToolActions(counts: Map<string, number>): string {
+  return [...counts].map(([action, count]) => `${action} ${count}`).join(" · ").slice(0, 500);
+}
+
+function recordToolAction(active: ActiveTurn, toolName: string): { action: string; total: number; summary: string } {
+  const action = describeToolAction(toolName);
+  active.toolActionCounts.set(action, (active.toolActionCounts.get(action) ?? 0) + 1);
+  const total = [...active.toolActionCounts.values()].reduce((sum, count) => sum + count, 0);
+  return { action, total, summary: summarizeToolActions(active.toolActionCounts) };
+}
+
+function persistToolActivity(active: ActiveTurn): { summary: string; count: number } {
+  const summary = summarizeToolActions(active.toolActionCounts);
+  const count = Math.min(10_000, [...active.toolActionCounts.values()].reduce((sum, value) => sum + value, 0));
+  if (count > 0) setAssistantActivitySummary(active.sessionId, active.messageId, summary, count);
+  return { summary, count };
 }
 
 function assertIpcSender(senderId: number): void {
@@ -405,6 +441,7 @@ function registerHandlers(): void {
         permissionMode: settings.permissionMode,
         abortController: new AbortController(),
         stopRequested: false,
+        toolActionCounts: new Map(),
         task: Promise.resolve(),
       };
       activeTurns.set(sessionId, active);
@@ -591,20 +628,15 @@ async function runTurn(
         if (message.error) log("error", "CLI assistant error: " + message.error);
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
-            log("info", "工具调用: " + block.name);
-            const inputPreview = previewInput(block.input as Record<string, unknown>);
-            await addMessage(active.sessionId, {
-              id: crypto.randomUUID(),
-              role: "tool",
-              toolName: block.name,
-              text: inputPreview,
-              createdAt: new Date().toISOString(),
-            });
+            const activity = recordToolAction(active, block.name);
+            log("info", `Claude 正在${activity.action} · 已发起 ${activity.total} 项操作`);
             emit(active.senderId, {
               type: "tool-call",
               sessionId: active.sessionId,
-              toolName: block.name.slice(0, 120),
-              inputPreview,
+              messageId: active.messageId,
+              action: activity.action,
+              total: activity.total,
+              activitySummary: activity.summary,
             });
           } else if (block.type === "text") {
             if (/API Error|Model is unavailable|HTTP\s+[45]\d{2}/i.test(block.text)) {
@@ -659,6 +691,7 @@ async function runTurn(
     }
     const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
     setAssistantDuration(active.sessionId, active.messageId, durationMs);
+    const activity = persistToolActivity(active);
     await persistSessions();
     if (active.stopRequested) {
       emit(active.senderId, {
@@ -666,6 +699,7 @@ async function runTurn(
         sessionId: active.sessionId,
         messageId: active.messageId,
         durationMs,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
       return;
     }
@@ -677,6 +711,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: idleTimeoutMessage,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
       return;
     }
@@ -691,6 +726,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: userMessage,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
       return;
     }
@@ -701,10 +737,12 @@ async function runTurn(
       messageId: active.messageId,
       durationMs,
       result: finalResult || streamedText,
+      ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
     });
   } catch (error) {
     const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
     setAssistantDuration(active.sessionId, active.messageId, durationMs);
+    const activity = persistToolActivity(active);
     await persistSessions().catch(() => undefined);
     if (active.stopRequested) {
       emit(active.senderId, {
@@ -712,6 +750,7 @@ async function runTurn(
         sessionId: active.sessionId,
         messageId: active.messageId,
         durationMs,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
     } else if (idleTimedOut) {
       log("error", idleTimeoutMessage);
@@ -721,6 +760,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message: idleTimeoutMessage,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
     } else {
       const message = sanitizeError(error, apiKey);
@@ -731,6 +771,7 @@ async function runTurn(
         messageId: active.messageId,
         durationMs,
         message,
+        ...(activity.count > 0 ? { activitySummary: activity.summary, activityCount: activity.count } : {}),
       });
     }
   } finally {

@@ -7,6 +7,7 @@ const state = {
   activeSessionId: undefined,
   turnTimingsByMessage: new Map(),
   turnTimingInterval: undefined,
+  activityByMessage: new Map(),
   renamingSessionId: undefined,
   pendingDeleteSessionId: undefined,
   deletingSessionId: undefined,
@@ -139,6 +140,52 @@ function finishTurnTiming(sessionId, messageId, durationMs) {
   if (elapsedMs !== undefined) renderMessageDuration(messageId, elapsedMs);
   state.turnTimingsByMessage.delete(messageId);
   refreshTurnTimings();
+}
+
+function renderAssistantActivity(messageId, activity) {
+  if (!activity) return;
+  const article = state.messageElements.get(messageId);
+  const content = article?.querySelector(".message-content");
+  if (!content) return;
+  let row = content.querySelector(".assistant-activity");
+  if (!row) {
+    row = document.createElement("div");
+    row.className = "assistant-activity";
+    const text = content.querySelector(".message-text");
+    if (text) content.insertBefore(row, text);
+    else content.append(row);
+  }
+  const running = activity.status === "running";
+  const indicator = document.createElement("span");
+  indicator.className = "assistant-activity-indicator";
+  const copy = document.createElement("span");
+  copy.className = "assistant-activity-copy";
+  const title = document.createElement("strong");
+  title.className = "assistant-activity-title";
+  const count = Number.isSafeInteger(activity.total) ? activity.total : 0;
+  if (running) title.textContent = activity.currentAction ? `正在${activity.currentAction}` : "正在分析任务";
+  else if (activity.status === "complete") title.textContent = count ? `本轮已完成 · ${count} 项操作` : "本轮已完成";
+  else if (activity.status === "stopped") title.textContent = count ? `已停止 · ${count} 项操作` : "已停止";
+  else if (activity.status === "error") title.textContent = count ? `遇到问题 · ${count} 项操作` : "遇到问题";
+  else title.textContent = count ? `本轮操作 · ${count} 项` : "本轮操作";
+  copy.append(title);
+  if (activity.summary) {
+    const details = document.createElement("span");
+    details.className = "assistant-activity-details";
+    details.textContent = `${running ? "已发起：" : "操作概览："}${activity.summary}`;
+    copy.append(details);
+  }
+  row.className = `assistant-activity ${running ? "running" : activity.status}`;
+  row.replaceChildren(indicator, copy);
+}
+
+function finishAssistantActivity(event) {
+  const previous = state.activityByMessage.get(event.messageId);
+  const summary = event.activitySummary ?? previous?.summary ?? "";
+  const total = event.activityCount ?? previous?.total ?? 0;
+  const status = event.type === "turn-complete" ? "complete" : event.type === "turn-stopped" ? "stopped" : "error";
+  state.activityByMessage.delete(event.messageId);
+  renderAssistantActivity(event.messageId, { status, summary, total });
 }
 
 function appendDiagnosticLog(entry) {
@@ -626,6 +673,9 @@ async function selectSession(sessionId) {
     const history = await bridge.loadHistory(sessionId);
     if (state.currentSessionId !== sessionId) return;
     for (const message of history) renderStoredMessage(message);
+    for (const [messageId, activity] of state.activityByMessage) {
+      if (activity.sessionId === sessionId) renderAssistantActivity(messageId, activity);
+    }
     scrollToBottom();
   } catch (error) {
     showToast(error.message || "无法载入会话");
@@ -662,10 +712,7 @@ function addMessageShell(role, messageId, timestamp = new Date().toISOString()) 
 }
 
 function renderStoredMessage(message) {
-  if (message.role === "tool") {
-    renderToolMessage(message.toolName ?? "工具调用", message.text, message.id, message.createdAt);
-    return;
-  }
+  if (message.role === "tool") return;
   const { article, text } = addMessageShell(message.role, message.id, message.createdAt);
   if (message.role === "assistant") {
     state.messageRawText.set(message.id, message.text);
@@ -673,6 +720,13 @@ function renderStoredMessage(message) {
     const timing = state.turnTimingsByMessage.get(message.id);
     if (timing) renderMessageDuration(message.id, Date.now() - timing.startedAt, true);
     else if (typeof message.durationMs === "number") renderMessageDuration(message.id, message.durationMs);
+    if (message.activitySummary) {
+      renderAssistantActivity(message.id, {
+        status: "stored",
+        summary: message.activitySummary,
+        total: message.activityCount ?? 0,
+      });
+    }
   } else {
     text.textContent = message.text;
   }
@@ -687,27 +741,20 @@ function addTypingIndicator(container) {
   container.append(dots);
 }
 
-function renderToolMessage(name, input, id = crypto.randomUUID(), timestamp) {
-  const { article, text } = addMessageShell("tool", id, timestamp);
-  article.querySelector(".message-role")?.remove();
-  const details = document.createElement("details");
-  details.className = "tool-details";
-  const summary = document.createElement("summary");
-  const icon = document.createElement("span");
-  icon.className = "tool-summary-icon";
-  icon.textContent = "↳";
-  const toolName = document.createElement("strong");
-  toolName.textContent = name;
-  const hint = document.createElement("span");
-  hint.className = "tool-summary-hint";
-  hint.textContent = "查看调用详情";
-  summary.append(icon, toolName, hint);
-  const preview = document.createElement("pre");
-  preview.textContent = input;
-  details.append(summary, preview);
-  text.remove();
-  article.querySelector(".message-content").append(details);
-  return article;
+function toolActionLabel(toolName) {
+  switch (toolName) {
+    case "Bash": return "运行命令";
+    case "Read": return "读取文件";
+    case "Glob": return "搜索文件";
+    case "Grep": return "搜索代码";
+    case "Edit": return "修改文件";
+    case "Write": return "写入文件";
+    case "NotebookEdit": return "编辑笔记本";
+    case "WebSearch": return "搜索网页";
+    case "WebFetch": return "读取网页";
+    case "LS": return "查看目录";
+    default: return "执行操作";
+  }
 }
 
 function renderPermissionRequest(event) {
@@ -723,7 +770,7 @@ function renderPermissionRequest(event) {
   const copy = document.createElement("div");
   const title = document.createElement("div");
   title.className = "permission-title";
-  title.textContent = `允许 Claude 使用 ${event.toolName}？`;
+  title.textContent = `允许 Claude ${toolActionLabel(event.toolName)}？`;
   const subtitle = document.createElement("div");
   subtitle.className = "permission-subtitle";
   subtitle.textContent = "此请求只对当前工具调用生效";
@@ -774,6 +821,13 @@ async function handleAppEvent(event) {
   if (event.type === "turn-start") {
     state.activeSessionId = event.sessionId;
     startTurnTiming(event.sessionId, event.assistantMessageId, event.startedAt);
+    state.activityByMessage.set(event.assistantMessageId, {
+      sessionId: event.sessionId,
+      status: "running",
+      currentAction: "",
+      total: 0,
+      summary: "",
+    });
     const session = state.sessions.find((item) => item.id === event.sessionId);
     if (session && state.currentSessionId !== session.id) await selectSession(session.id);
     if (state.currentSessionId !== event.sessionId) {
@@ -787,6 +841,7 @@ async function handleAppEvent(event) {
     if (!assistant) {
       assistant = addMessageShell("assistant", event.assistantMessageId).article;
     }
+    renderAssistantActivity(event.assistantMessageId, state.activityByMessage.get(event.assistantMessageId));
     const text = assistant.querySelector(".message-text");
     renderMessageDuration(
       event.assistantMessageId,
@@ -800,8 +855,24 @@ async function handleAppEvent(event) {
   }
   if (event.type === "turn-complete" || event.type === "turn-error" || event.type === "turn-stopped") {
     finishTurnTiming(event.sessionId, event.messageId, event.durationMs);
+    finishAssistantActivity(event);
     if (state.activeSessionId === event.sessionId) state.activeSessionId = undefined;
     updateControls();
+  }
+  if (event.type === "tool-call") {
+    const activity = {
+      sessionId: event.sessionId,
+      status: "running",
+      currentAction: event.action,
+      total: event.total,
+      summary: event.activitySummary,
+    };
+    state.activityByMessage.set(event.messageId, activity);
+    if (state.currentSessionId === event.sessionId) {
+      renderAssistantActivity(event.messageId, activity);
+      scrollToBottom();
+    }
+    return;
   }
   if (state.currentSessionId !== event.sessionId) return;
   if (event.type === "text-delta") {
@@ -812,11 +883,6 @@ async function handleAppEvent(event) {
     const source = (state.messageRawText.get(event.messageId) ?? "") + event.text;
     state.messageRawText.set(event.messageId, source);
     window.claudeMarkdown.render(text, source);
-    scrollToBottom();
-    return;
-  }
-  if (event.type === "tool-call") {
-    renderToolMessage(event.toolName, event.inputPreview);
     scrollToBottom();
     return;
   }

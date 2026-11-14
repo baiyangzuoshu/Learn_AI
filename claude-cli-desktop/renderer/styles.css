@@ -144,16 +144,15 @@ kbd { display: inline-block; border: 1px solid rgba(142,154,149,.22); border-rad
 .message.user .message-text { max-width: min(100%, 620px); border: 1px solid #dce9d8; border-radius: 13px 13px 4px 13px; padding: 11px 15px; color: #2f4335; background: #eaf4e7; white-space: pre-wrap; }
 .message.assistant .message-text { padding: 0 2px; }
 .message.error .message-text { border-left: 2px solid #d06d59; padding-left: 10px; color: #994d40; }
-.message.tool { margin: 0 0 9px 40px; }
-.message.tool .message-avatar { width: 22px; height: 22px; border: 0; border-radius: 7px; color: #7b7864; background: #efeee6; font-size: 11px; }
-.message.tool .message-content { justify-content: center; }
-.tool-details { width: min(100%, 820px); overflow: hidden; border: 1px solid #e4e7df; border-radius: 9px; background: rgba(255,255,255,.64); }
-.tool-details summary { display: flex; min-height: 35px; align-items: center; gap: 8px; padding: 0 11px; color: #65736a; cursor: pointer; list-style: none; font-size: 10px; }
-.tool-details summary::-webkit-details-marker { display: none; }
-.tool-summary-icon { color: #849185; font: 13px "DM Mono", monospace; }
-.tool-summary-hint { margin-left: auto; color: #a0aaa2; font-size: 9px; }
-.tool-details[open] summary { border-bottom: 1px solid #ebece8; }
-.tool-details pre { max-width: 100%; max-height: 260px; overflow: auto; margin: 0; padding: 10px 12px; color: #637069; background: #fafbf9; font: 10px/1.6 "DM Mono", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant-activity { display: flex; width: min(100%, 820px); align-items: flex-start; gap: 8px; margin: 0 0 9px 2px; color: #718174; font-size: 10px; line-height: 1.55; }
+.assistant-activity-indicator { width: 6px; height: 6px; flex: 0 0 6px; margin: 5px 1px 0; border-radius: 50%; background: #aab5aa; }
+.assistant-activity.running .assistant-activity-indicator { background: #76a77b; box-shadow: 0 0 0 3px rgba(118,167,123,.12); animation: activity-pulse 1.5s infinite ease-in-out; }
+.assistant-activity.stopped .assistant-activity-indicator { background: #d09a58; }
+.assistant-activity.error .assistant-activity-indicator { background: #c87968; }
+.assistant-activity-copy { display: grid; min-width: 0; gap: 2px; }
+.assistant-activity-title { color: #68786b; font-size: 10px; font-weight: 650; }
+.assistant-activity-details { color: #9aa49c; font-size: 9px; overflow-wrap: anywhere; }
+@keyframes activity-pulse { 50% { opacity: .45; box-shadow: 0 0 0 5px rgba(118,167,123,.06); } }
 .markdown-body > :first-child { margin-top: 0; }
 .markdown-body > :last-child { margin-bottom: 0; }
 .markdown-body p { margin: 0 0 13px; }
