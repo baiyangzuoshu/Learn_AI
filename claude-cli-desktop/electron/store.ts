@@ -167,6 +167,18 @@ export function appendAssistantText(sessionId: string, messageId: string, text: 
   if (session) session.updatedAt = new Date().toISOString();
 }
 
+export function setAssistantDuration(
+  sessionId: string,
+  messageId: string,
+  durationMs: number,
+): void {
+  const message = getSession(sessionId)?.messages.find((candidate) => candidate.id === messageId);
+  if (!message || message.role !== "assistant" || !Number.isFinite(durationMs)) return;
+  message.durationMs = Math.max(0, Math.min(durationMs, 24 * 60 * 60_000));
+  const session = getSession(sessionId);
+  if (session) session.updatedAt = new Date().toISOString();
+}
+
 export async function persistSessions(): Promise<void> {
   const snapshot = JSON.stringify(sessions, null, 2);
   writeQueue = writeQueue.catch(() => undefined).then(() => atomicWrite(join(dataDirectory, SESSIONS_FILE), snapshot));
@@ -255,6 +267,10 @@ async function readSessions(): Promise<StoredSession[]> {
             text: record.text.slice(0, MAX_MESSAGE_LENGTH),
             createdAt: record.createdAt,
             ...(typeof record.toolName === "string" ? { toolName: record.toolName.slice(0, 120) } : {}),
+            ...(typeof record.durationMs === "number" && Number.isFinite(record.durationMs) &&
+                record.durationMs >= 0 && record.durationMs <= 24 * 60 * 60_000
+              ? { durationMs: record.durationMs }
+              : {}),
           }];
         }).slice(-MAX_MESSAGES_PER_SESSION)
       : [];

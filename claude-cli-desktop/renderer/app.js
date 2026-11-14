@@ -5,6 +5,8 @@ const state = {
   sessions: [],
   currentSessionId: undefined,
   activeSessionId: undefined,
+  turnTimingsByMessage: new Map(),
+  turnTimingInterval: undefined,
   renamingSessionId: undefined,
   pendingDeleteSessionId: undefined,
   deletingSessionId: undefined,
@@ -82,6 +84,61 @@ function renderDiagnosticLogs(scrollToLatest = false) {
   }
   list.replaceChildren(fragment);
   if (scrollToLatest || wasAtBottom) list.scrollTop = list.scrollHeight;
+}
+
+function formatTurnDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours > 0) return `${hours}小时${minutes ? `${minutes}分` : ""}`;
+  if (totalMinutes > 0) return seconds ? `${totalMinutes}分${seconds}秒` : `${totalMinutes}分钟`;
+  return `${seconds}秒`;
+}
+
+function renderMessageDuration(messageId, durationMs, running = false) {
+  const duration = state.messageElements.get(messageId)?.querySelector(".message-duration");
+  if (!duration) return;
+  duration.textContent = running
+    ? `进行中 · ${formatTurnDuration(durationMs)}`
+    : `用时 ${formatTurnDuration(durationMs)}`;
+  duration.classList.toggle("running", running);
+}
+
+function refreshTurnTimings() {
+  let hasRunningTurn = false;
+  for (const [messageId, timing] of state.turnTimingsByMessage) {
+    hasRunningTurn = true;
+    renderMessageDuration(messageId, Date.now() - timing.startedAt, true);
+  }
+  if (!hasRunningTurn && state.turnTimingInterval) {
+    window.clearInterval(state.turnTimingInterval);
+    state.turnTimingInterval = undefined;
+  }
+}
+
+function startTurnTiming(sessionId, messageId, startedAt) {
+  state.turnTimingsByMessage.set(messageId, {
+    sessionId,
+    startedAt: Number.isFinite(startedAt) ? startedAt : Date.now(),
+  });
+  refreshTurnTimings();
+  if (!state.turnTimingInterval) {
+    state.turnTimingInterval = window.setInterval(refreshTurnTimings, 1000);
+  }
+}
+
+function finishTurnTiming(sessionId, messageId, durationMs) {
+  const timing = state.turnTimingsByMessage.get(messageId);
+  const elapsedMs = typeof durationMs === "number" && Number.isFinite(durationMs)
+    ? Math.max(0, durationMs)
+    : timing && timing.sessionId === sessionId
+    ? Math.max(0, Date.now() - timing.startedAt)
+    : undefined;
+  if (elapsedMs !== undefined) renderMessageDuration(messageId, elapsedMs);
+  state.turnTimingsByMessage.delete(messageId);
+  refreshTurnTimings();
 }
 
 function appendDiagnosticLog(entry) {
@@ -588,6 +645,12 @@ function addMessageShell(role, messageId, timestamp = new Date().toISOString()) 
   const label = document.createElement("div");
   label.className = "message-role";
   label.textContent = role === "user" ? "你" : role === "tool" ? "本地工具" : "Claude";
+  if (role === "assistant") {
+    const duration = document.createElement("span");
+    duration.className = "message-duration";
+    duration.setAttribute("aria-live", "off");
+    label.append(duration);
+  }
   const text = document.createElement("div");
   text.className = role === "assistant" ? "message-text markdown-body" : "message-text";
   content.append(label, text);
@@ -607,6 +670,9 @@ function renderStoredMessage(message) {
   if (message.role === "assistant") {
     state.messageRawText.set(message.id, message.text);
     window.claudeMarkdown.render(text, message.text);
+    const timing = state.turnTimingsByMessage.get(message.id);
+    if (timing) renderMessageDuration(message.id, Date.now() - timing.startedAt, true);
+    else if (typeof message.durationMs === "number") renderMessageDuration(message.id, message.durationMs);
   } else {
     text.textContent = message.text;
   }
@@ -707,6 +773,7 @@ async function handleAppEvent(event) {
   }
   if (event.type === "turn-start") {
     state.activeSessionId = event.sessionId;
+    startTurnTiming(event.sessionId, event.assistantMessageId, event.startedAt);
     const session = state.sessions.find((item) => item.id === event.sessionId);
     if (session && state.currentSessionId !== session.id) await selectSession(session.id);
     if (state.currentSessionId !== event.sessionId) {
@@ -721,12 +788,18 @@ async function handleAppEvent(event) {
       assistant = addMessageShell("assistant", event.assistantMessageId).article;
     }
     const text = assistant.querySelector(".message-text");
+    renderMessageDuration(
+      event.assistantMessageId,
+      Date.now() - (state.turnTimingsByMessage.get(event.assistantMessageId)?.startedAt ?? Date.now()),
+      true,
+    );
     if (text && !text.textContent) addTypingIndicator(text);
     updateControls();
     scrollToBottom();
     return;
   }
   if (event.type === "turn-complete" || event.type === "turn-error" || event.type === "turn-stopped") {
+    finishTurnTiming(event.sessionId, event.messageId, event.durationMs);
     if (state.activeSessionId === event.sessionId) state.activeSessionId = undefined;
     updateControls();
   }

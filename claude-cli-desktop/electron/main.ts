@@ -22,6 +22,7 @@ import {
   readApiKey,
   readSettings,
   renameSession,
+  setAssistantDuration,
   validateSettings,
   writeApiKey,
   writeSettings,
@@ -41,6 +42,7 @@ const appDataDirectory = join(app.getPath("appData"), "Claude CLI Studio");
 interface ActiveTurn {
   sessionId: string;
   messageId: string;
+  startedAt: number;
   senderId: number;
   permissionMode: AppSettings["permissionMode"];
   abortController: AbortController;
@@ -385,17 +387,20 @@ function registerHandlers(): void {
         text: "",
         createdAt: new Date().toISOString(),
       });
+      const startedAt = Date.now();
       emit(event.sender.id, {
         type: "turn-start",
         sessionId,
         userMessageId,
         assistantMessageId,
+        startedAt,
         text: text.trim(),
       });
 
       const active: ActiveTurn = {
         sessionId,
         messageId: assistantMessageId,
+        startedAt,
         senderId: event.sender.id,
         permissionMode: settings.permissionMode,
         abortController: new AbortController(),
@@ -469,6 +474,7 @@ async function runTurn(
     }
     if (stderrBuffer.length > 1200) flushStderr();
   };
+  let reportedDurationMs: number | undefined;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   let idleTimedOut = false;
   const resetIdleTimer = (timeoutMs: number): void => {
@@ -617,6 +623,7 @@ async function runTurn(
           }
         }
       } else if (message.type === "result") {
+        reportedDurationMs = message.duration_ms;
         finalStopReason = message.stop_reason;
         if (message.subtype === "success") {
           finalResult = message.result;
@@ -650,12 +657,15 @@ async function runTurn(
           (finalStopReason ?? "none"),
       );
     }
+    const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
+    setAssistantDuration(active.sessionId, active.messageId, durationMs);
     await persistSessions();
     if (active.stopRequested) {
       emit(active.senderId, {
         type: "turn-stopped",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
       });
       return;
     }
@@ -665,6 +675,7 @@ async function runTurn(
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
         message: idleTimeoutMessage,
       });
       return;
@@ -678,6 +689,7 @@ async function runTurn(
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
         message: userMessage,
       });
       return;
@@ -687,15 +699,19 @@ async function runTurn(
       type: "turn-complete",
       sessionId: active.sessionId,
       messageId: active.messageId,
+      durationMs,
       result: finalResult || streamedText,
     });
   } catch (error) {
+    const durationMs = reportedDurationMs ?? Math.max(0, Date.now() - active.startedAt);
+    setAssistantDuration(active.sessionId, active.messageId, durationMs);
     await persistSessions().catch(() => undefined);
     if (active.stopRequested) {
       emit(active.senderId, {
         type: "turn-stopped",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
       });
     } else if (idleTimedOut) {
       log("error", idleTimeoutMessage);
@@ -703,6 +719,7 @@ async function runTurn(
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
         message: idleTimeoutMessage,
       });
     } else {
@@ -712,6 +729,7 @@ async function runTurn(
         type: "turn-error",
         sessionId: active.sessionId,
         messageId: active.messageId,
+        durationMs,
         message,
       });
     }

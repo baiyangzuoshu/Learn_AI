@@ -20,6 +20,7 @@ export interface ChatMessage {
   text: string;
   createdAt: string;
   toolName?: string;
+  durationMs?: number;
 }
 
 export interface BootstrapData {
@@ -34,13 +35,13 @@ export interface BootstrapData {
 
 export type AppEvent =
   | { type: "diagnostic-log"; sessionId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
-  | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; text: string }
+  | { type: "turn-start"; sessionId: string; userMessageId: string; assistantMessageId: string; startedAt: number; text: string }
   | { type: "text-delta"; sessionId: string; messageId: string; text: string }
   | { type: "tool-call"; sessionId: string; toolName: string; inputPreview: string }
   | { type: "permission-request"; sessionId: string; requestId: string; toolUseId: string; toolName: string; inputPreview: string }
-  | { type: "turn-complete"; sessionId: string; messageId: string; result: string }
-  | { type: "turn-error"; sessionId: string; messageId: string; message: string }
-  | { type: "turn-stopped"; sessionId: string; messageId: string };
+  | { type: "turn-complete"; sessionId: string; messageId: string; durationMs: number; result: string }
+  | { type: "turn-error"; sessionId: string; messageId: string; durationMs: number; message: string }
+  | { type: "turn-stopped"; sessionId: string; messageId: string; durationMs: number };
 
 export interface ClaudeStudioBridge {
   getBootstrap(): Promise<BootstrapData>;
