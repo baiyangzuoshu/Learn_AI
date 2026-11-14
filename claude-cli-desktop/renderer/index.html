@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+    <title>Claude CLI Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-row">
+          <div class="brand-mark">C</div>
+          <div class="brand-copy">
+            <strong>Claude Studio</strong>
+            <span>本地代码工作台</span>
+          </div>
+        </div>
+
+        <button class="new-session-button" id="new-session">
+          <span class="project-picker-icon">+</span>
+          <span class="project-picker-copy">
+            <strong>新增项目</strong>
+            <small>选择文件夹并创建首个会话</small>
+          </span>
+          <kbd>⌘ K</kbd>
+        </button>
+
+        <div class="sidebar-section-heading">
+          <span>最近项目</span>
+          <span class="session-count" id="session-count">0</span>
+        </div>
+        <nav class="session-list" id="session-list" aria-label="最近项目与会话"></nav>
+
+        <div class="sidebar-bottom">
+          <div class="provider-card">
+            <div class="provider-icon">D</div>
+            <div class="provider-copy">
+              <strong>DeepSeek API</strong>
+              <span id="key-state">尚未配置密钥</span>
+            </div>
+            <span class="status-dot" id="provider-dot"></span>
+          </div>
+          <button class="sidebar-settings" id="open-settings-bottom">
+            <span class="settings-glyph">⚙</span>
+            <span>设置</span>
+            <span class="shortcut-label">⌘ ,</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-pane">
+        <header class="topbar">
+          <div class="project-heading">
+            <div class="project-icon">⌘</div>
+            <div class="project-copy">
+              <strong id="project-title">选择一个项目</strong>
+              <span id="project-path">Claude CLI 在本机运行</span>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <div class="model-chip" id="model-chip"><span class="model-dot"></span><span>DeepSeek</span></div>
+            <div class="cli-indicator" id="cli-indicator"><span class="indicator-dot"></span><span>检查 CLI</span></div>
+          </div>
+        </header>
+
+        <section class="conversation" id="conversation">
+          <div class="welcome-state" id="welcome-state">
+            <div class="welcome-orbit"><span>C</span></div>
+            <p class="eyebrow">CLAUDE CODE · 本地运行</p>
+            <h1>让代码工作<br /><span>从一个想法开始。</span></h1>
+            <p class="welcome-description">选择一个项目文件夹，Claude Code 会在本机读取与修改文件。DeepSeek API Key 只保存在这台 Mac 上。</p>
+            <button class="primary-button welcome-cta" id="welcome-new-session">选择项目文件夹 <span>→</span></button>
+            <div class="welcome-meta"><span class="mini-shield">◆</span>本机 CLI · 本地密钥文件 · 权限模式可切换</div>
+          </div>
+          <div class="message-list" id="message-list" hidden></div>
+        </section>
+
+        <div class="composer-dock" id="composer-dock">
+          <div class="permission-mode-row">
+            <div class="permission-picker" id="permission-picker">
+              <button type="button" class="permission-mode-trigger" id="permission-mode-trigger" aria-haspopup="menu" aria-controls="permission-menu" aria-expanded="false">
+                <span class="mode-indicator"></span>
+                <span id="permission-mode-label">询问权限</span>
+                <span class="mode-chevron">⌃</span>
+              </button>
+              <div class="permission-menu" id="permission-menu" role="menu" aria-label="权限模式" hidden>
+                <button type="button" class="permission-option" role="menuitemradio" data-permission-mode="default" aria-checked="false">
+                  <span class="permission-option-icon">◷</span>
+                  <span class="permission-option-copy"><strong>询问权限</strong><small>需要授权的操作会在对话中询问</small></span>
+                  <span class="permission-option-check">✓</span>
+                </button>
+                <button type="button" class="permission-option" role="menuitemradio" data-permission-mode="acceptEdits" aria-checked="false">
+                  <span class="permission-option-icon">✎</span>
+                  <span class="permission-option-copy"><strong>自动接受编辑</strong><small>自动接受文件编辑；命令等操作仍会询问</small></span>
+                  <span class="permission-option-check">✓</span>
+                </button>
+                <button type="button" class="permission-option permission-option-danger" role="menuitemradio" data-permission-mode="bypassPermissions" aria-checked="false">
+                  <span class="permission-option-icon">⚡</span>
+                  <span class="permission-option-copy"><strong>完全放开 <em>高风险</em></strong><small>跳过工具权限确认，可能访问项目外文件并运行任意命令</small></span>
+                  <span class="permission-option-check">✓</span>
+                </button>
+              </div>
+            </div>
+            <span class="mode-description" id="permission-mode-description">需要授权的操作会在对话中询问。</span>
+            <span class="mode-context" id="composer-context">Claude Code CLI</span>
+          </div>
+          <form class="composer" id="composer-form">
+            <textarea id="prompt-input" rows="1" placeholder="描述你想完成的改动…" aria-label="输入消息" disabled></textarea>
+            <div class="composer-actions">
+              <span class="composer-hint"><kbd>Enter</kbd> 发送 · <kbd>Shift Enter</kbd> 换行</span>
+              <div class="send-actions">
+                <button type="button" class="stop-button" id="stop-button" hidden>停止</button>
+                <button type="submit" class="send-button" id="send-button" disabled aria-label="发送消息"><span>↑</span></button>
+              </div>
+            </div>
+          </form>
+          <p class="composer-footer" id="composer-note">Claude CLI 会在所选目录中工作。请审阅文件改动与命令权限请求。</p>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="settings-backdrop" hidden>
+      <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">PREFERENCES</p>
+            <h2 id="settings-title">设置</h2>
+          </div>
+          <button class="icon-button modal-close" id="close-settings" aria-label="关闭设置">×</button>
+        </div>
+        <p class="modal-description">配置 Claude Code CLI 使用的 Anthropic 兼容接口。密钥以明文本地文件保存，仅当前用户可读写，不使用钥匙串。</p>
+
+        <form id="settings-form">
+          <label class="field-label" for="base-url">API 地址</label>
+          <input id="base-url" name="baseUrl" type="url" value="https://api.deepseek.com/anthropic" autocomplete="url" required />
+
+          <label class="field-label" for="model-name">模型</label>
+          <input id="model-name" name="model" type="text" value="deepseek-flash[1m]" autocomplete="off" required />
+
+          <div class="key-label-row">
+            <label class="field-label" for="api-key">DeepSeek API Key</label>
+            <span class="key-saved-state" id="key-saved-state">本机文件存储</span>
+          </div>
+          <input id="api-key" name="apiKey" type="password" placeholder="输入 sk-...；保存后会清空此栏" autocomplete="new-password" spellcheck="false" />
+          <div class="key-controls">
+            <span class="field-hint" id="key-hint">新密钥以明文保存在本机权限受限文件中，不写入项目仓库或钥匙串。</span>
+            <button type="button" class="text-button" id="clear-key">清除密钥</button>
+          </div>
+
+          <div class="settings-error" id="settings-error" role="alert" hidden></div>
+          <div class="modal-footer">
+            <button type="button" class="secondary-button" id="cancel-settings">取消</button>
+            <button type="submit" class="primary-button" id="save-settings">保存设置 <span>→</span></button>
+          </div>
+        </form>
+        <div class="settings-version" id="cli-version-detail">CLI 状态检查中</div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="full-access-backdrop" hidden>
+      <section class="settings-modal full-access-modal" role="alertdialog" aria-modal="true" aria-labelledby="full-access-title" aria-describedby="full-access-description">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">权限确认</p>
+            <h2 id="full-access-title">启用完全放开？</h2>
+          </div>
+          <button type="button" class="icon-button modal-close" id="close-full-access" aria-label="取消">×</button>
+        </div>
+        <p class="full-access-warning" id="full-access-description">Claude Code 将跳过工具权限确认，可以运行任意本地命令并访问当前用户可读写的文件，包括所选项目目录以外的文件。命令也可能通过网络发送数据。请只在你信任的项目中使用。</p>
+        <div class="modal-footer">
+          <button type="button" class="secondary-button" id="cancel-full-access">取消</button>
+          <button type="button" class="danger-button" id="confirm-full-access">启用完全放开</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="delete-session-backdrop" hidden>
+      <section class="remove-confirmation-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-session-heading" aria-describedby="delete-session-description">
+        <div class="remove-confirmation-heading">
+          <div class="remove-confirmation-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" />
+            </svg>
+          </div>
+          <h2 id="delete-session-heading">删除会话？</h2>
+          <button type="button" class="remove-confirmation-close" id="close-delete-session" aria-label="取消删除">×</button>
+        </div>
+        <p class="remove-confirmation-description" id="delete-session-description">此会话的消息与聊天记录将被永久删除。</p>
+        <div class="remove-confirmation-card">
+          <div class="remove-confirmation-item-icon session-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 5.5h14v10H11l-4.5 3v-3H5z" />
+              <path d="M8 9h8M8 12h5" />
+            </svg>
+          </div>
+          <div class="remove-confirmation-details">
+            <strong id="delete-session-name"></strong>
+            <span id="delete-session-path"></span>
+          </div>
+        </div>
+        <div class="remove-confirmation-note">
+          <span class="remove-confirmation-note-dot" aria-hidden="true"></span>
+          项目文件及同项目的其他会话会保留
+        </div>
+        <div class="settings-error remove-confirmation-error" id="delete-session-error" role="alert" hidden></div>
+        <div class="remove-confirmation-footer">
+          <button type="button" class="secondary-button" id="cancel-delete-session">取消</button>
+          <button type="button" class="danger-button" id="confirm-delete-session">删除会话</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="delete-project-backdrop" hidden>
+      <section class="remove-confirmation-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-project-heading" aria-describedby="delete-project-description">
+        <div class="remove-confirmation-heading">
+          <div class="remove-confirmation-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" />
+            </svg>
+          </div>
+          <h2 id="delete-project-heading">移除项目？</h2>
+          <button type="button" class="remove-confirmation-close" id="close-delete-project" aria-label="取消移除">×</button>
+        </div>
+        <p class="remove-confirmation-description" id="delete-project-description">此项目下的会话和聊天记录将从 Studio 中移除。</p>
+        <div class="remove-confirmation-card">
+          <div class="remove-confirmation-item-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3.5 7.5h6l2 2h9v9h-17z" />
+              <path d="M3.5 9.5h17" />
+            </svg>
+          </div>
+          <div class="remove-confirmation-details">
+            <strong id="delete-project-name"></strong>
+            <span id="delete-project-path"></span>
+          </div>
+          <span class="remove-confirmation-count" id="delete-project-session-count"></span>
+        </div>
+        <div class="remove-confirmation-note">
+          <span class="remove-confirmation-note-dot" aria-hidden="true"></span>
+          项目文件与代码将保留在原位置
+        </div>
+        <div class="settings-error remove-confirmation-error" id="delete-project-error" role="alert" hidden></div>
+        <div class="remove-confirmation-footer">
+          <button type="button" class="secondary-button" id="cancel-delete-project">取消</button>
+          <button type="button" class="danger-button" id="confirm-delete-project">移除项目</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="markdown.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
