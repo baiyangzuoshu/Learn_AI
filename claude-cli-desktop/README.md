@@ -35,6 +35,8 @@ The bottom of the conversation view shows in-memory runtime diagnostics for the 
 
 Each assistant response displays a live elapsed timer and concise progress steps while it is running. The response card retains its progress summary and final duration in the conversation history. When Claude Code automatically compacts the context, the card also shows the compression count and most recent before/after token counts.
 
+Assistant responses also show input/output token usage and an estimated cost range in CNY for supported DeepSeek models. The range covers the published off-peak and peak prices, and cache-hit input uses its separate rate. Set the USD-to-CNY conversion rate in Settings; it is only used for estimates and defaults to the CFETS 6.7152 central parity rate from November 13, 2026. Other providers or unrecognized models show tokens without a cost estimate. The displayed amount is not the provider's bill.
+
 ## Build
 
 ```sh

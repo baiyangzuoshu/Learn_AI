@@ -17,7 +17,7 @@ const state = {
   messageElements: new Map(),
   messageRawText: new Map(),
   diagnosticLogsBySession: new Map(),
-  diagnosticExpanded: true,
+  diagnosticExpanded: false,
   settings: undefined,
   hasApiKey: false,
   clearApiKey: false,
@@ -32,6 +32,12 @@ const messageList = $("#message-list");
 const promptInput = $("#prompt-input");
 const sendButton = $("#send-button");
 const stopButton = $("#stop-button");
+const scrollToLatestButton = $("#scroll-to-latest");
+const messageResizeObserver = new ResizeObserver(updateScrollToLatestButton);
+
+messageList.addEventListener("scroll", updateScrollToLatestButton);
+
+scrollToLatestButton.addEventListener("click", scrollToBottom);
 
 bridge.onEvent((event) => {
   void handleAppEvent(event);
@@ -45,12 +51,11 @@ function showToast(message) {
   state.toastTimer = setTimeout(() => toast.classList.remove("show"), 3600);
 }
 
-function renderDiagnosticLogs(scrollToLatest = false) {
+function renderDiagnosticLogs() {
   const list = $("#diagnostic-list");
   const logs = state.currentSessionId
     ? state.diagnosticLogsBySession.get(state.currentSessionId) ?? []
     : [];
-  const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
   $("#diagnostic-count").textContent = String(logs.length);
   $("#diagnostic-toggle-label").textContent = state.diagnosticExpanded ? "收起" : "展开";
   $("#diagnostic-toggle").setAttribute("aria-expanded", String(state.diagnosticExpanded));
@@ -84,7 +89,6 @@ function renderDiagnosticLogs(scrollToLatest = false) {
     fragment.append(row);
   }
   list.replaceChildren(fragment);
-  if (scrollToLatest || wasAtBottom) list.scrollTop = list.scrollHeight;
 }
 
 function formatTurnDuration(durationMs) {
@@ -111,11 +115,12 @@ function renderMessageTokenUsage(messageId, tokenUsage, running = false) {
   const usage = state.messageElements.get(messageId)?.querySelector(".message-token-usage");
   if (!usage) return;
   if (!tokenUsage || !Number.isSafeInteger(tokenUsage.totalTokens) || tokenUsage.totalTokens < 0) {
-    usage.textContent = "";
+    usage.replaceChildren();
     usage.title = "";
     usage.classList.remove("running");
     return;
   }
+  renderLatestTokenUsage(tokenUsage, running);
   const details = [];
   const cacheTokens = (Number.isSafeInteger(tokenUsage.cacheReadInputTokens) ? tokenUsage.cacheReadInputTokens : 0) +
     (Number.isSafeInteger(tokenUsage.cacheCreationInputTokens) ? tokenUsage.cacheCreationInputTokens : 0);
@@ -125,10 +130,75 @@ function renderMessageTokenUsage(messageId, tokenUsage, running = false) {
     details.push(`${inputText} / 输出 ${formatTokenCount(tokenUsage.outputTokens)}`);
   }
   if (cacheTokens > 0 && details.length === 0) details.push(`缓存 ${formatTokenCount(cacheTokens)}`);
-  usage.textContent = `${running ? "本轮已消耗" : "本轮消耗"} ${formatTokenCount(tokenUsage.totalTokens)} tokens` +
+  const summary = `${running ? "本轮已消耗" : "本轮消耗"} ${formatTokenCount(tokenUsage.totalTokens)} tokens` +
     (details.length ? ` · ${details.join(" · ")}` : "");
-  usage.title = usage.textContent;
+  usage.replaceChildren();
+  const summaryElement = document.createElement("span");
+  summaryElement.textContent = summary;
+  usage.append(summaryElement);
+
+  const estimate = tokenUsage.costEstimate;
+  const tooltipLines = [summary];
+  if (
+    estimate && Number.isFinite(estimate.lowerCny) && Number.isFinite(estimate.upperCny) &&
+    estimate.lowerCny >= 0 && estimate.upperCny >= estimate.lowerCny
+  ) {
+    const costBadge = document.createElement("span");
+    costBadge.className = "message-cost-estimate";
+    costBadge.textContent = `估算 ${formatCnyRange(estimate.lowerCny, estimate.upperCny)}`;
+    usage.append(costBadge);
+    tooltipLines.push(`模型：${estimate.model}`);
+    tooltipLines.push(`美元汇率：1 USD ≈ ¥${Number(estimate.usdToCnyRate).toFixed(4)}`);
+    tooltipLines.push(`范围按 DeepSeek 峰时与谷时官方费率计算，价格表截至 ${estimate.pricingAsOf}。`);
+    if (estimate.currentSettingsFallback) tooltipLines.push("历史记录按当前模型和汇率估算。");
+    tooltipLines.push("实际费用以 DeepSeek 账单为准。");
+  }
+  usage.title = tooltipLines.join("\n");
   usage.classList.toggle("running", running);
+}
+
+function renderLatestTokenUsage(tokenUsage, running) {
+  const panel = $("#latest-usage");
+  const estimate = tokenUsage.costEstimate;
+  const hasEstimate = estimate && Number.isFinite(estimate.lowerCny) &&
+    Number.isFinite(estimate.upperCny) && estimate.lowerCny >= 0 &&
+    estimate.upperCny >= estimate.lowerCny;
+  const cacheTokens = (Number.isSafeInteger(tokenUsage.cacheReadInputTokens) ? tokenUsage.cacheReadInputTokens : 0) +
+    (Number.isSafeInteger(tokenUsage.cacheCreationInputTokens) ? tokenUsage.cacheCreationInputTokens : 0);
+  const breakdown = [];
+  if (Number.isSafeInteger(tokenUsage.inputTokens) && Number.isSafeInteger(tokenUsage.outputTokens)) {
+    breakdown.push(`输入 ${formatTokenCount(tokenUsage.inputTokens)}`);
+    if (cacheTokens > 0) breakdown.push(`缓存 ${formatTokenCount(cacheTokens)}`);
+    breakdown.push(`输出 ${formatTokenCount(tokenUsage.outputTokens)}`);
+  }
+
+  $("#latest-usage-total").textContent = `${formatTokenCount(tokenUsage.totalTokens)} tokens${running ? " · 生成中" : ""}`;
+  $("#latest-usage-breakdown").textContent = breakdown.join("  ·  ") || "输入 / 输出明细暂不可用";
+  $("#latest-usage-cost").textContent = hasEstimate
+    ? formatCnyRange(estimate.lowerCny, estimate.upperCny)
+    : "暂不可估算";
+  $("#latest-usage-cost-label").textContent = hasEstimate ? "本轮费用估算" : "费用估算";
+  panel.title = hasEstimate
+    ? `按 ${estimate.model} 和当前汇率估算；范围按峰时与谷时官方费率计算。实际费用以 DeepSeek 账单为准。`
+    : "当前模型暂无内置价格，暂时无法换算费用。";
+  panel.classList.toggle("has-estimate", Boolean(hasEstimate));
+  panel.classList.toggle("running", running);
+  panel.hidden = false;
+}
+
+function formatCnyRange(lowerCny, upperCny) {
+  const lower = `¥${formatCny(lowerCny)}`;
+  const upper = `¥${formatCny(upperCny)}`;
+  return lowerCny === upperCny ? lower : `${lower}–${upper}`;
+}
+
+function formatCny(value) {
+  if (value > 0 && value < 0.000001) return "<0.000001";
+  const digits = value >= 1 ? 2 : value >= 0.01 ? 4 : 6;
+  return value.toLocaleString("zh-CN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 function refreshTurnTimings() {
@@ -741,13 +811,21 @@ async function confirmDeleteProject() {
 }
 
 function setActiveSession(session) {
+  messageResizeObserver.disconnect();
   state.currentSessionId = session?.id;
+  $("#latest-usage").hidden = true;
+  $("#latest-usage").classList.remove("has-estimate", "running");
+  $("#latest-usage-total").textContent = "";
+  $("#latest-usage-breakdown").textContent = "";
+  $("#latest-usage-cost").textContent = "";
   $("#project-title").textContent = session?.title ?? "选择一个项目";
   $("#project-path").textContent = session?.cwd ?? "Claude CLI 在本机运行";
   welcomeState.hidden = Boolean(session);
   messageList.hidden = !session;
+  messageList.scrollTop = 0;
   if (!session) messageList.replaceChildren();
-  renderDiagnosticLogs(true);
+  updateScrollToLatestButton();
+  renderDiagnosticLogs();
   renderSessions();
   updateControls();
 }
@@ -766,7 +844,8 @@ async function selectSession(sessionId) {
     for (const [messageId, activity] of state.activityByMessage) {
       if (activity.sessionId === sessionId) renderAssistantActivity(messageId, activity);
     }
-    scrollToBottom();
+    messageList.scrollTop = 0;
+    updateScrollToLatestButton();
   } catch (error) {
     showToast(error.message || "无法载入会话");
   }
@@ -799,6 +878,7 @@ function addMessageShell(role, messageId, timestamp = new Date().toISOString()) 
   content.append(label, text);
   article.append(avatar, content);
   messageList.append(article);
+  messageResizeObserver.observe(article);
   state.messageElements.set(messageId, article);
   if (role === "assistant") state.messageRawText.set(messageId, "");
   return { article, text };
@@ -895,7 +975,7 @@ function renderPermissionRequest(event) {
   actions.append(deny, allow);
   card.append(head, preview, actions);
   messageList.append(card);
-  scrollToBottom();
+  updateScrollToLatestButton();
 }
 
 async function handleAppEvent(event) {
@@ -950,7 +1030,7 @@ async function handleAppEvent(event) {
     );
     if (text && !text.textContent) addTypingIndicator(text);
     updateControls();
-    scrollToBottom();
+    updateScrollToLatestButton();
     return;
   }
   if (event.type === "turn-complete" || event.type === "turn-error" || event.type === "turn-stopped") {
@@ -980,7 +1060,7 @@ async function handleAppEvent(event) {
     state.activityByMessage.set(event.messageId, activity);
     if (state.currentSessionId === event.sessionId) {
       renderAssistantActivity(event.messageId, activity);
-      scrollToBottom();
+      updateScrollToLatestButton();
     }
     return;
   }
@@ -998,7 +1078,7 @@ async function handleAppEvent(event) {
     state.activityByMessage.set(event.messageId, activity);
     if (state.currentSessionId === event.sessionId) {
       renderAssistantActivity(event.messageId, activity);
-      scrollToBottom();
+      updateScrollToLatestButton();
     }
     return;
   }
@@ -1024,7 +1104,7 @@ async function handleAppEvent(event) {
     state.activityByMessage.set(event.messageId, activity);
     if (state.currentSessionId === event.sessionId) {
       renderAssistantActivity(event.messageId, activity);
-      scrollToBottom();
+      updateScrollToLatestButton();
     }
     return;
   }
@@ -1037,7 +1117,7 @@ async function handleAppEvent(event) {
     const source = (state.messageRawText.get(event.messageId) ?? "") + event.text;
     state.messageRawText.set(event.messageId, source);
     window.claudeMarkdown.render(text, source);
-    scrollToBottom();
+    updateScrollToLatestButton();
     return;
   }
   if (event.type === "turn-complete") {
@@ -1049,7 +1129,7 @@ async function handleAppEvent(event) {
       window.claudeMarkdown.render(text, event.result);
     }
     refreshSessionSummaries();
-    scrollToBottom();
+    updateScrollToLatestButton();
     return;
   }
   if (event.type === "turn-error") {
@@ -1058,7 +1138,7 @@ async function handleAppEvent(event) {
     text?.querySelector(".typing-indicator")?.remove();
     if (text) text.textContent = event.message;
     article?.classList.add("error");
-    scrollToBottom();
+    updateScrollToLatestButton();
     return;
   }
   if (event.type === "turn-stopped") {
@@ -1066,6 +1146,7 @@ async function handleAppEvent(event) {
     const text = article?.querySelector(".message-text");
     text?.querySelector(".typing-indicator")?.remove();
     if (text && !text.textContent) text.textContent = "已停止";
+    updateScrollToLatestButton();
   }
 }
 
@@ -1083,8 +1164,19 @@ function refreshSessionSummaries() {
   }).catch(() => undefined);
 }
 
+function isConversationAtBottom() {
+  return messageList.scrollHeight - messageList.clientHeight - messageList.scrollTop <= 72;
+}
+
+function updateScrollToLatestButton() {
+  scrollToLatestButton.hidden = messageList.hidden || isConversationAtBottom();
+}
+
 function scrollToBottom() {
-  requestAnimationFrame(() => { messageList.scrollTop = messageList.scrollHeight; });
+  requestAnimationFrame(() => {
+    messageList.scrollTop = messageList.scrollHeight;
+    updateScrollToLatestButton();
+  });
 }
 
 async function startNewSession() {
@@ -1126,9 +1218,11 @@ function openSettings() {
     baseUrl: "https://api.deepseek.com/anthropic",
     model: "deepseek-flash",
     permissionMode: "default",
+    usdToCnyRate: 6.7152,
   };
   $("#base-url").value = settings.baseUrl;
   $("#model-name").value = settings.model;
+  $("#usd-cny-rate").value = String(settings.usdToCnyRate ?? 6.7152);
   $("#api-key").value = "";
   $("#api-key").placeholder = state.hasApiKey ? "密钥已保存；输入新密钥以替换" : "输入 sk-...";
   $("#key-hint").textContent = state.bootstrap?.legacyApiKeyPresent
@@ -1160,6 +1254,7 @@ async function saveSettings(event) {
         baseUrl: $("#base-url").value.trim(),
         model: $("#model-name").value.trim(),
         permissionMode: state.settings?.permissionMode ?? "default",
+        usdToCnyRate: Number($("#usd-cny-rate").value),
       },
       ...(apiKey ? { apiKey } : {}),
       ...(clearApiKey ? { clearApiKey: true } : {}),
@@ -1263,6 +1358,7 @@ async function persistPermissionMode(mode) {
     baseUrl: "https://api.deepseek.com/anthropic",
     model: "deepseek-flash",
     permissionMode: "default",
+    usdToCnyRate: 6.7152,
   };
   try {
     const saved = await bridge.saveSettings({ settings: { ...current, permissionMode: mode } });

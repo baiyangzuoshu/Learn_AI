@@ -76,9 +76,26 @@
             <div class="welcome-meta"><span class="mini-shield">◆</span>本机 CLI · 本地密钥文件 · 权限模式可切换</div>
           </div>
           <div class="message-list" id="message-list" hidden></div>
+          <button type="button" class="scroll-to-latest" id="scroll-to-latest" hidden aria-label="滚动到最新消息">
+            <span aria-hidden="true">↓</span> 回到最新
+          </button>
         </section>
 
         <div class="composer-dock" id="composer-dock">
+          <section class="usage-summary" id="latest-usage" aria-label="最近一轮 Token 用量" hidden>
+            <div class="usage-summary-icon" aria-hidden="true">¥</div>
+            <div class="usage-summary-copy">
+              <div class="usage-summary-heading">
+                <strong>最近一轮用量</strong>
+                <span class="usage-summary-total" id="latest-usage-total"></span>
+              </div>
+              <div class="usage-summary-breakdown" id="latest-usage-breakdown"></div>
+            </div>
+            <div class="usage-summary-cost">
+              <span id="latest-usage-cost-label">费用估算</span>
+              <strong id="latest-usage-cost"></strong>
+            </div>
+          </section>
           <div class="permission-mode-row">
             <div class="permission-picker" id="permission-picker">
               <button type="button" class="permission-mode-trigger" id="permission-mode-trigger" aria-haspopup="menu" aria-controls="permission-menu" aria-expanded="false">
@@ -120,10 +137,10 @@
           <p class="composer-footer" id="composer-note">Claude CLI 会在所选目录中工作。请审阅文件改动与命令权限请求。</p>
           <section class="diagnostic-panel" aria-label="CLI 运行日志">
             <div class="diagnostic-header">
-              <button type="button" class="diagnostic-toggle" id="diagnostic-toggle" aria-expanded="true" aria-controls="diagnostic-list">
+              <button type="button" class="diagnostic-toggle" id="diagnostic-toggle" aria-expanded="false" aria-controls="diagnostic-list">
                 <span>运行日志</span>
                 <span class="diagnostic-count" id="diagnostic-count">0</span>
-                <span class="diagnostic-toggle-label" id="diagnostic-toggle-label">收起</span>
+                <span class="diagnostic-toggle-label" id="diagnostic-toggle-label">展开</span>
               </button>
               <div class="diagnostic-actions">
                 <button type="button" id="diagnostic-copy">复制</button>
@@ -156,6 +173,10 @@
 
             <label class="field-label" for="model-name">模型</label>
             <input id="model-name" name="model" type="text" value="deepseek-flash" autocomplete="off" required />
+
+            <label class="field-label" for="usd-cny-rate">美元兑人民币汇率</label>
+            <input id="usd-cny-rate" name="usdToCnyRate" type="number" min="1" max="20" step="0.0001" value="6.7152" inputmode="decimal" required />
+            <p class="exchange-rate-hint">用于费用估算，不影响 API 调用；可按实际汇率调整。</p>
 
             <div class="key-label-row">
               <label class="field-label" for="api-key">DeepSeek API Key</label>

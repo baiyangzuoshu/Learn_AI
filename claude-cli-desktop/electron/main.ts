@@ -5,6 +5,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import type { AppEvent, AppSettings, AutoCompactionRecord, ChatMessage, TokenUsageSummary } from "./contracts.js";
 import { inspectClaudeCli } from "./claude-cli.js";
+import { estimateTokenCost } from "./pricing.js";
 import { desktopPlatform } from "./platform.js";
 import {
   addMessage,
@@ -52,6 +53,9 @@ interface ActiveTurn {
   startedAt: number;
   senderId: number;
   permissionMode: AppSettings["permissionMode"];
+  model: string;
+  baseUrl: string;
+  usdToCnyRate: number;
   abortController: AbortController;
   query?: ReturnType<typeof query>;
   stopRequested: boolean;
@@ -191,15 +195,17 @@ function recordTokenUsage(
 ): void {
   if (!tokenUsage) return;
   if (phase === "running" && active.tokenUsage && tokenUsage.totalTokens < active.tokenUsage.totalTokens) return;
-  const isUnchanged = active.tokenUsage && JSON.stringify(active.tokenUsage) === JSON.stringify(tokenUsage);
-  active.tokenUsage = tokenUsage;
-  setAssistantTokenUsage(active.sessionId, active.messageId, tokenUsage);
+  const costEstimate = estimateTokenCost(tokenUsage, active.model, active.baseUrl, active.usdToCnyRate);
+  const recordedUsage = costEstimate ? { ...tokenUsage, costEstimate } : tokenUsage;
+  const isUnchanged = active.tokenUsage && JSON.stringify(active.tokenUsage) === JSON.stringify(recordedUsage);
+  active.tokenUsage = recordedUsage;
+  setAssistantTokenUsage(active.sessionId, active.messageId, recordedUsage);
   if (isUnchanged && phase === "running") return;
   emit(active.senderId, {
     type: "token-usage",
     sessionId: active.sessionId,
     messageId: active.messageId,
-    tokenUsage,
+    tokenUsage: recordedUsage,
     phase,
   });
 }
@@ -612,10 +618,28 @@ function registerHandlers(): void {
     }
   });
 
-  ipcMain.handle("session:history", (event, sessionId: unknown) => {
+  ipcMain.handle("session:history", async (event, sessionId: unknown) => {
     assertIpcSender(event.sender.id);
     if (typeof sessionId !== "string" || !/^[0-9a-f-]{36}$/i.test(sessionId)) throw new Error("会话编号无效");
-    return getHistory(sessionId);
+    const settings = await readSettings();
+    return getHistory(sessionId).map((message) => {
+      if (!message.tokenUsage || message.tokenUsage.costEstimate) return message;
+      const costEstimate = estimateTokenCost(
+        message.tokenUsage,
+        settings.model,
+        settings.baseUrl,
+        settings.usdToCnyRate,
+      );
+      return costEstimate
+        ? {
+          ...message,
+          tokenUsage: {
+            ...message.tokenUsage,
+            costEstimate: { ...costEstimate, currentSettingsFallback: true },
+          },
+        }
+        : message;
+    });
   });
 
   ipcMain.handle("settings:save", async (event, input: unknown) => {
@@ -695,6 +719,9 @@ function registerHandlers(): void {
         startedAt,
         senderId: event.sender.id,
         permissionMode: settings.permissionMode,
+        model: settings.model,
+        baseUrl: settings.baseUrl,
+        usdToCnyRate: settings.usdToCnyRate,
         abortController: new AbortController(),
         stopRequested: false,
         toolActionCounts: new Map(),

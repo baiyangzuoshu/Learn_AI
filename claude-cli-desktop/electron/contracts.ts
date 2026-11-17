@@ -4,6 +4,7 @@ export interface AppSettings {
   baseUrl: string;
   model: string;
   permissionMode: PermissionMode;
+  usdToCnyRate: number;
 }
 
 export interface SessionSummary {
@@ -40,6 +41,16 @@ export interface TokenUsageSummary {
   outputTokens?: number;
   cacheReadInputTokens?: number;
   cacheCreationInputTokens?: number;
+  costEstimate?: TokenCostEstimate;
+}
+
+export interface TokenCostEstimate {
+  lowerCny: number;
+  upperCny: number;
+  model: "deepseek-flash" | "deepseek-v4-pro";
+  usdToCnyRate: number;
+  pricingAsOf: string;
+  currentSettingsFallback?: boolean;
 }
 
 export interface BootstrapData {

@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: "https://api.deepseek.com/anthropic",
   model: "deepseek-flash",
   permissionMode: "default",
+  usdToCnyRate: 6.7152,
 };
 
 export interface StoredSession extends SessionSummary {
@@ -43,6 +44,7 @@ export async function readSettings(): Promise<AppSettings> {
     baseUrl: validateBaseUrl(stored.baseUrl, DEFAULT_SETTINGS.baseUrl),
     model: storedModel === "deepseek-flash[1m]" ? DEFAULT_SETTINGS.model : storedModel,
     permissionMode: validatePermissionMode(stored.permissionMode),
+    usdToCnyRate: validateUsdToCnyRate(stored.usdToCnyRate, DEFAULT_SETTINGS.usdToCnyRate),
   };
   if (settings.model !== storedModel) await writeSettings(settings);
   return settings;
@@ -276,10 +278,15 @@ export function validateSettings(value: unknown): AppSettings {
   ) {
     throw new Error("权限模式无效");
   }
+  const usdToCnyRate = settings.usdToCnyRate === undefined
+    ? DEFAULT_SETTINGS.usdToCnyRate
+    : validateUsdToCnyRate(settings.usdToCnyRate, Number.NaN);
+  if (!Number.isFinite(usdToCnyRate)) throw new Error("美元兑人民币汇率需在 1 到 20 之间");
   return {
     baseUrl: url.toString().replace(/\/$/, ""),
     model: settings.model.trim(),
     permissionMode: settings.permissionMode,
+    usdToCnyRate,
   };
 }
 
@@ -304,6 +311,10 @@ function validateModel(value: unknown, fallback: string): string {
 
 function validatePermissionMode(value: unknown): PermissionMode {
   return value === "acceptEdits" || value === "bypassPermissions" ? value : "default";
+}
+
+function validateUsdToCnyRate(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 20 ? value : fallback;
 }
 
 async function readSessions(): Promise<StoredSession[]> {
@@ -397,6 +408,7 @@ function validateTokenUsage(value: unknown): TokenUsageSummary | undefined {
   if (!isValidCount(record.totalTokens)) return undefined;
   const optionalKeys = ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"] as const;
   if (optionalKeys.some((key) => record[key] !== undefined && !isValidCount(record[key]))) return undefined;
+  const costEstimate = validateTokenCostEstimate(record.costEstimate);
   return {
     totalTokens: record.totalTokens,
     ...(isValidCount(record.inputTokens) ? { inputTokens: record.inputTokens } : {}),
@@ -405,6 +417,30 @@ function validateTokenUsage(value: unknown): TokenUsageSummary | undefined {
     ...(isValidCount(record.cacheCreationInputTokens)
       ? { cacheCreationInputTokens: record.cacheCreationInputTokens }
       : {}),
+    ...(costEstimate ? { costEstimate } : {}),
+  };
+}
+
+function validateTokenCostEstimate(value: unknown): TokenUsageSummary["costEstimate"] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const estimate = value as Record<string, unknown>;
+  const isFiniteCost = (amount: unknown): amount is number =>
+    typeof amount === "number" && Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000_000;
+  if (
+    !isFiniteCost(estimate.lowerCny) || !isFiniteCost(estimate.upperCny) || estimate.upperCny < estimate.lowerCny ||
+    (estimate.model !== "deepseek-flash" && estimate.model !== "deepseek-v4-pro") ||
+    typeof estimate.usdToCnyRate !== "number" || !Number.isFinite(estimate.usdToCnyRate) ||
+    estimate.usdToCnyRate < 1 || estimate.usdToCnyRate > 20 ||
+    typeof estimate.pricingAsOf !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(estimate.pricingAsOf) ||
+    (estimate.currentSettingsFallback !== undefined && typeof estimate.currentSettingsFallback !== "boolean")
+  ) return undefined;
+  return {
+    lowerCny: estimate.lowerCny,
+    upperCny: estimate.upperCny,
+    model: estimate.model,
+    usdToCnyRate: estimate.usdToCnyRate,
+    pricingAsOf: estimate.pricingAsOf,
+    ...(estimate.currentSettingsFallback === true ? { currentSettingsFallback: true } : {}),
   };
 }
 
